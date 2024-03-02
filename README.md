@@ -9,6 +9,11 @@ Additionally, it provides a directory listing feature to overview and manage the
 ### for
 * hugo
 
+# Stack
+* TAURI (RUST)
+* SVELTE
+* TYPESCRIPT
+
 # Features
 - [ ] **Markdown File Management**: Create, edit, and delete markdown files through an intuitive web interface.
 - [ ] **Image File Handling**: Upload and manage image files included in markdown content directly to the server.
