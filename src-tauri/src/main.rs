@@ -4,13 +4,13 @@
 mod setting;
 mod ssh;
 
-use std::{hash::RandomState, io::ErrorKind, path::Path};
+use std::path::Path;
 
 use anyhow::Result;
 use setting::{save_config, SETTING_FILE_PATH};
 use ssh::Client;
 
-use crate::setting::{load_config, AppConfig};
+use crate::setting::load_config;
 
 // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
 #[tauri::command]

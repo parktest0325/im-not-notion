@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::fs::File;
-use std::io::{self, ErrorKind};
+use std::io;
 use std::path::Path;
 
 pub const SETTING_FILE_PATH: &str = "./cms_config.json";
