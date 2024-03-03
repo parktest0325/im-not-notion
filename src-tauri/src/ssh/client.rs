@@ -43,8 +43,7 @@ impl Client {
             self.session
                 .userauth_password(&self.username, &self.password)
                 .context("SSH authentication failed by password")?;
-        }
-        if !self.session.authenticated() {
+        } else {
             self.session
                 .userauth_pubkey_file(&self.username, None, Path::new(&self.key_path), None)
                 .context("SSH authentication failed by sshkey")?;

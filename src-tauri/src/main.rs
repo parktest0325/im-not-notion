@@ -9,8 +9,9 @@ use ssh::Client;
 // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
 #[tauri::command]
 fn greet(name: &str) -> String {
-    let output = match init(name) {
-        Ok(client) => match client.execute("ls -la") {
+    let parts: Vec<&str> = name.split("=").collect();
+    let output = match init(parts[0]) {
+        Ok(client) => match client.execute(parts[1]) {
             Ok(result) => result,
             Err(err) => return format!("execute error : {}", err),
         },
@@ -22,13 +23,16 @@ fn greet(name: &str) -> String {
 }
 
 fn init(str: &str) -> Result<Client> {
-    let mut s = str.split(":");
+    let mut s = str.splitn(5, ":");
     let host = s.next().unwrap_or("");
     let port = s.next().unwrap_or("");
     let name = s.next().unwrap_or("");
     let pass = s.next().unwrap_or("");
+    let key_path = s.next().unwrap_or("");
 
-    let mut client = Client::new(host, port, name, pass, "")?;
+    println!("{} {} {} {} {}", host, port, name, pass, key_path);
+
+    let mut client = Client::new(host, port, name, pass, key_path)?;
     client.connect()?;
     Ok(client)
 }
