@@ -3,6 +3,7 @@
   export let toggleMenu: () => void;
   import MdArrowBack from "svelte-icons/md/MdArrowBack.svelte";
   import SettingsButton from "./SettingsButton.svelte";
+  import FileControlSection from "./FileControlSection.svelte";
 </script>
 
 <div
@@ -24,12 +25,7 @@
     <SettingsButton />
   </div>
   <div class="sidebar-section file-list-section">
-    <!-- 파일 리스트 출력될 부분 -->
-    <ul>
-      <li>File 1</li>
-      <li>File 2</li>
-      <!-- 파일 목록 -->
-    </ul>
+    <FileControlSection />
   </div>
 </div>
 

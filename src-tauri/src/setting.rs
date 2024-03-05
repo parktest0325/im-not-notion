@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use std::fs::File;
-use std::io;
 use tauri::InvokeError;
 
 pub const SETTING_FILE_PATH: &str = "./cms_config.json";
@@ -21,8 +20,8 @@ pub struct AppConfig {
 
 #[tauri::command]
 pub fn save_config(config: AppConfig) -> Result<(), InvokeError> {
-    let file = File::create(SETTING_FILE_PATH).map_err(|e| InvokeError::from(e.to_string()))?; // std::io::Error를 InvokeError로 변환
-    serde_json::to_writer_pretty(file, &config).map_err(|e| InvokeError::from(e.to_string()))?; // serde_json::Error를 InvokeError로 변환
+    let file = File::create(SETTING_FILE_PATH).map_err(|e| InvokeError::from(e.to_string()))?;
+    serde_json::to_writer_pretty(file, &config).map_err(|e| InvokeError::from(e.to_string()))?;
     Ok(())
 }
 

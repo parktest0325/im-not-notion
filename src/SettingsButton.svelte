@@ -1,6 +1,7 @@
 <script lang="ts">
   import MdSettings from "svelte-icons/md/MdSettings.svelte";
   import SettingsPopup from "./SettingsPopup.svelte";
+  import FileControlSection from "./FileControlSection.svelte";
   let show: boolean;
 
   function toggleSettings() {
