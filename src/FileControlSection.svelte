@@ -17,57 +17,23 @@
     ];
 </script>
 
-<div class="file-list-container">
-    <div class="actions">
-        <input
-            type="text"
-            placeholder="Search..."
-            bind:value={searchTerm}
-            on:input={() => searchFiles(searchTerm)}
-        />
-        <button>
+<div class="flex space-x-2 h-6 mb-4" style="flex-wrap: nowrap;">
+    <input
+        type="text"
+        placeholder="Search..."
+        class="flex-grow p-2 border rounded"
+        bind:value={searchTerm}
+        on:input={() => searchFiles(searchTerm)}
+        style="min-width: 0; width: auto; flex-grow: 1;"
+    />
+    <button>
+        <div class="w-5 h-5">
             <FaSearch />
-        </button>
-        <button on:click={refreshList}>
+        </div>
+    </button>
+    <button on:click={refreshList}>
+        <div class="w-5 h-5">
             <IoMdRefresh />
-        </button>
-    </div>
-    <ul>
-        {#each files as file}
-            <li>
-                <span class="icon">{file.type === "folder" ? "📁" : "📄"}</span>
-                {file.name}
-            </li>
-        {/each}
-    </ul>
+        </div>
+    </button>
 </div>
-
-<style>
-    .file-list-container {
-        /* 스타일 정의 */
-    }
-    .actions {
-        /* 액션 바 스타일 */
-    }
-    .icon {
-        width: 16px; /* 아이콘 크기 조정 */
-        height: 16px;
-        margin-right: 8px;
-    }
-    input {
-        /* 입력 필드 스타일 */
-    }
-    ul {
-        list-style: none;
-        padding: 0;
-    }
-    li {
-        display: flex;
-        align-items: center;
-        margin-bottom: 5px;
-    }
-    .icon:before {
-        content: attr(data-icon);
-        /* 아이콘에 따른 스타일 */
-    }
-</style>

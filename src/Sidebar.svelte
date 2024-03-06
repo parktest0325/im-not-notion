@@ -7,24 +7,21 @@
 </script>
 
 <div
-  class="sidebar"
-  class:open={!isMenuOpen}
-  style="background-color:var(--pastel-blue);"
+  class={`bg-pastel-blue transition-all duration-300 overflow-hidden ${isMenuOpen ? "w-64" : "w-0"}`}
+  style="flex-shrink: 0; background-color:var(--pastel-blue);"
 >
-  <div class="sidebar-section logo-section">
+  <div class="flex items-center justify-between p-4">
     {#if isMenuOpen}
-      <img src="inn.svg" alt="IM NOT NOTION!" />
-      <button on:click={toggleMenu} class="menu-button">
-        <div class="icon">
-          <MdArrowBack />
-        </div>
+      <img src="inn.svg" alt="IM NOT NOTION!" class="max-w-full h-auto" />
+      <button on:click={toggleMenu} class="text-lg">
+        <MdArrowBack class="w-6 h-6" />
       </button>
     {/if}
   </div>
-  <div class="sidebar-section tools-section">
+  <div class="p-4">
     <SettingsButton />
   </div>
-  <div class="sidebar-section file-list-section">
+  <div class="flex-grow overflow-y-auto p-4">
     <FileControlSection />
   </div>
 </div>
@@ -32,53 +29,5 @@
 <style>
   :root {
     --pastel-blue: #a3cef1;
-  }
-  .sidebar {
-    width: 250px;
-    transition: width 0.3s;
-    overflow: hidden;
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-  }
-  .sidebar.open {
-    width: 0px;
-  }
-  .sidebar-section {
-    padding: 10px;
-  }
-  .logo-section {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-  .tools-section {
-    display: flex;
-    justify-content: space-around;
-  }
-  .tool-button {
-    background: none;
-    border: none;
-    cursor: pointer;
-  }
-  .file-list-section {
-    flex-grow: 1;
-    overflow-y: auto;
-  }
-  .logo {
-    max-width: 100%;
-    height: auto;
-  }
-
-  .menu-button {
-    border: none;
-    background: none;
-    cursor: pointer;
-    padding: 0.5em;
-    font-size: 1em;
-  }
-  .icon {
-    width: 24px;
-    height: 24px;
   }
 </style>

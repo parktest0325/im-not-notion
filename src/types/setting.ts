@@ -1,4 +1,4 @@
-interface SshClientConfig {
+interface SshConfig {
     host: string;
     port: string;
     username: string;
@@ -7,6 +7,33 @@ interface SshClientConfig {
     [key: string]: string;
 }
 
+interface HugoConfig {
+    content_path: string,
+    image_path: string,
+    config_path: string,
+    layout_path: string,
+    [key: string]: string;
+}
+
 interface AppConfig {
-    ssh_client: SshClientConfig;
+    ssh_config: SshConfig;
+    hugo_config: HugoConfig;
+}
+
+function createDefaultAppConfig(): AppConfig {
+    return {
+        ssh_config: {
+            host: 'None',
+            port: 'None',
+            username: 'None',
+            password: 'None',
+            key_path: 'None',
+        },
+        hugo_config: {
+            content_path: 'None',
+            image_path: 'None',
+            config_path: 'None',
+            layout_path: 'None',
+        }
+    };
 }

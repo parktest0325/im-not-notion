@@ -1,7 +1,6 @@
 <script lang="ts">
   import MdSettings from "svelte-icons/md/MdSettings.svelte";
   import SettingsPopup from "./SettingsPopup.svelte";
-  import FileControlSection from "./FileControlSection.svelte";
   let show: boolean;
 
   function toggleSettings() {
@@ -9,14 +8,10 @@
   }
 </script>
 
-<button on:click={toggleSettings}>
-  <MdSettings />
+<button class="p-2" on:click={toggleSettings}>
+  <div class="w-6 h-6">
+    <MdSettings />
+  </div>
 </button>
 
 <SettingsPopup {show} closeSettings={toggleSettings} />
-
-<style>
-  button {
-    /* 버튼 스타일 */
-  }
-</style>
