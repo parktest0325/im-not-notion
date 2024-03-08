@@ -1,7 +1,9 @@
 <script lang="ts">
     import { writable } from "svelte/store";
     import TreeNode from "./TreeNode.svelte";
+    import { selectedFilePath } from "./stores";
 
+    export let path: string = "/";
     export let node: FileSystemNode;
 
     const isExpanded = writable(false);
@@ -13,16 +15,21 @@
         console.log($isExpanded);
     }
 
-    function onFileClick(name: string) {
+    function onFileClick(filePath: string) {
         // 나중에 클릭 핸들러 구현
-        console.log(`File clicked: ${name}`);
+        console.log(`File clicked: ${filePath}`);
+        selectedFilePath.set(filePath);
     }
 </script>
 
 <li>
     <button
         class="flex items-center"
-        on:click={toggleExpand}
+        on:click={() => {
+            node.type_ === "File"
+                ? onFileClick(`${path}${node.name}`)
+                : toggleExpand();
+        }}
         aria-label="Toggle Expand"
     >
         {#if node.type_ === "Directory"}
@@ -35,7 +42,7 @@
     {#if node.type_ === "Directory" && $isExpanded}
         <ul class="pl-4">
             {#each node.children as child}
-                <TreeNode node={child} />
+                <TreeNode path={`${path}${node.name}/`} node={child} />
             {/each}
         </ul>
     {/if}

@@ -1,7 +1,9 @@
 use std::path::Path;
 
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use ssh2::Sftp;
+use std::io::prelude::*;
 
 #[derive(Serialize, Deserialize)]
 pub struct FileSystemNode {
@@ -16,11 +18,7 @@ enum NodeType {
     Directory,
 }
 
-pub fn list_directory(
-    sftp: &Sftp,
-    path: &Path,
-    depth: usize,
-) -> Result<FileSystemNode, ssh2::Error> {
+pub fn list_directory(sftp: &Sftp, path: &Path, depth: usize) -> Result<FileSystemNode> {
     if depth == 0 {
         return Ok(FileSystemNode {
             name: path.to_string_lossy().into_owned(),
@@ -49,4 +47,12 @@ pub fn list_directory(
         type_: NodeType::Directory,
         children,
     })
+}
+
+pub fn get_file(sftp: &Sftp, path: &Path) -> Result<String> {
+    let mut file = sftp.open(path)?;
+    let mut content = String::new();
+    file.read_to_string(&mut content)?;
+
+    Ok(content)
 }

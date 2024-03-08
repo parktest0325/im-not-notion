@@ -2,6 +2,7 @@
     export let isMenuOpen: boolean;
     export let toggleMenu: () => void;
     import MdArrowForward from "svelte-icons/md/MdArrowForward.svelte";
+    import { selectedFilePath } from "./stores";
 </script>
 
 <div class="top-bar" style="background-color:var(--pastel-purple);">
@@ -14,7 +15,7 @@
 
         <img src="inn.svg" alt="IM NOT NOTION!" />
     {/if}
-    <span>Current Path</span>
+    <span>{$selectedFilePath}</span>
 </div>
 
 <style>
