@@ -1,47 +1,22 @@
 <script lang="ts">
+    import { invoke } from "@tauri-apps/api";
     import FaSearch from "svelte-icons/fa/FaSearch.svelte";
     import IoMdRefresh from "svelte-icons/io/IoMdRefresh.svelte";
+    import { writable } from "svelte/store";
+    import TreeNode from "./TreeNode.svelte";
+
     let searchTerm: string = "";
-    const refreshList = () => {
-        // 리스트 새로고침 로직
+    let directoryStructure = writable<FileSystemNode[]>([]);
+
+    const refreshList = async () => {
+        const data: FileSystemNode = await invoke("get_file_list");
+        directoryStructure.set(data.children);
+        console.log(data);
     };
 
     const searchFiles = (term: string) => {
         // 검색 로직
     };
-
-    const files = [
-        { id: 1, name: "2024 계획", type: "folder" },
-        { id: 2, name: "문서안안", type: "file" },
-        { id: 2, name: "문서안안", type: "file" },
-        { id: 2, name: "문서안안", type: "file" },
-        { id: 2, name: "문서안안", type: "file" },
-        { id: 2, name: "문서안안", type: "file" },
-        { id: 2, name: "문서안안", type: "file" },
-        { id: 2, name: "문서안안", type: "file" },
-        { id: 2, name: "문서안안", type: "file" },
-        { id: 2, name: "문서안안", type: "file" },
-        {
-            id: 2,
-            name: "문서안jksdnfjkasdnfjkasdnfjkasdnfjkasdnfjkasdfnjaksdnfk안",
-            type: "file",
-        },
-        { id: 1, name: "2024 계획", type: "folder" },
-        { id: 1, name: "2024 계획", type: "folder" },
-        { id: 1, name: "2024 계획", type: "folder" },
-        { id: 1, name: "2024 계획", type: "folder" },
-        { id: 1, name: "2024 계획", type: "folder" },
-        { id: 1, name: "2024 계획", type: "folder" },
-        { id: 1, name: "2024 계획", type: "folder" },
-        { id: 1, name: "2024 계획", type: "folder" },
-        { id: 1, name: "2024 계획", type: "folder" },
-        { id: 1, name: "2024 계획", type: "folder" },
-        { id: 1, name: "2024 계획", type: "folder" },
-        { id: 1, name: "2024 계획", type: "folder" },
-        { id: 1, name: "2024 계획", type: "folder" },
-        { id: 2, name: "문서안안", type: "file" },
-        // 나머지 파일 및 폴더 데이터...
-    ];
 </script>
 
 <div class="flex flex-col h-full">
@@ -70,11 +45,8 @@
     <!-- 파일 리스트 -->
     <div class="flex-grow overflow-y-auto">
         <ul class="list-none p-0">
-            {#each files as file}
-                <li class="flex items-center mb-2">
-                    <span>{file.type === "folder" ? "📁" : "📄"}</span>
-                    {file.name}
-                </li>
+            {#each $directoryStructure as node}
+                <TreeNode {node} />
             {/each}
         </ul>
     </div>

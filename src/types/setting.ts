@@ -20,6 +20,12 @@ interface AppConfig {
     hugo_config: HugoConfig;
 }
 
+interface FileSystemNode {
+    name: string;
+    type_: 'File' | 'Directory';
+    children: FileSystemNode[];
+}
+
 function createDefaultAppConfig(): AppConfig {
     return {
         ssh_config: {
