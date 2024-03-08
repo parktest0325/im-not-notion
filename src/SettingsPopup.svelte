@@ -27,6 +27,7 @@
   async function saveAndClose() {
     try {
       await invoke("save_config", { config });
+      await invoke("update_and_connect", { config });
     } catch (error) {
       console.error("Failed to save config:", error);
     } finally {
