@@ -1,12 +1,12 @@
 <script lang="ts">
-    import { onMount } from "svelte";
+    import { onDestroy, onMount } from "svelte";
     import { selectedFilePath } from "./stores.js";
     import { invoke } from "@tauri-apps/api";
 
-    // 파일 내용을 저장할 변수
     let fileContent: string = "";
+    let editable: boolean = false;
+    let showDialog: boolean = false; // 대화상자 표시 상태를 위한 일반 boolean 변수
 
-    // selectedFilePath가 변경될 때마다 실행될 반응성 구문
     $: if ($selectedFilePath) {
         getFileContent($selectedFilePath);
     }
@@ -22,8 +22,88 @@
             fileContent = "파일을 불러오는데 실패했습니다.";
         }
     }
+
+    async function saveContent() {
+        try {
+            // await invoke("save_content", {
+            //     filePath: $selectedFilePath,
+            //     content: fileContent,
+            // });
+            console.log("저장되었습니다.");
+            editable = false;
+        } catch (error) {
+            console.log("저장에 실패했습니다.");
+        }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+        console.log("onKeyDown");
+        if (editable && event.ctrlKey && event.key === "s") {
+            event.preventDefault();
+            console.log("ctrl+ s");
+            showDialog = true;
+            editable = false;
+        }
+    }
+
+    onMount(() => {
+        window.addEventListener("keydown", handleKeyDown);
+    });
+
+    onDestroy(() => {
+        window.removeEventListener("keydown", handleKeyDown);
+    });
+
+    function handleInput(e: Event) {
+        const target = e.target as HTMLElement; // HTMLElement로 타입 단언
+        fileContent = target.innerText; // 'innerText' 속성에 안전하게 접근
+    }
 </script>
 
+{#if showDialog}
+    <!-- 대화상자 컨텐츠 -->
+    <div
+        class="fixed inset-0 bg-gray-600 bg-opacity-50 flex justify-center items-center"
+    >
+        <div class="bg-white p-4 rounded-lg shadow-lg space-y-4">
+            <p>저장하시겠습니까?</p>
+            <div class="flex justify-end space-x-2">
+                <button
+                    class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-700"
+                    on:click={() => {
+                        saveContent();
+                        showDialog = false;
+                    }}>예</button
+                >
+                <button
+                    class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-700"
+                    on:click={() => {
+                        showDialog = false;
+                        editable = true;
+                    }}>아니오</button
+                >
+            </div>
+        </div>
+    </div>
+{/if}
 <div class="main-content overflow-y-auto">
-    <pre class="whitespace-pre-wrap">{fileContent}</pre>
+    {#if editable}
+        <pre
+            class="whitespace-pre-wrap"
+            contenteditable="true"
+            on:blur={() => (editable = false)}
+            on:input={handleInput}>
+        {fileContent}
+    </pre>
+    {:else}
+        <pre
+            class="whitespace-pre-wrap"
+            on:dblclick={() => {
+                if ($selectedFilePath != "") {
+                    editable = true;
+                }
+            }}>
+            {fileContent}
+        </pre>
+    {/if}
 </div>
