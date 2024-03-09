@@ -24,6 +24,6 @@
     }
 </script>
 
-<div class="main-content">
-    <pre>{fileContent}</pre>
+<div class="main-content overflow-y-auto">
+    <pre class="whitespace-pre-wrap">{fileContent}</pre>
 </div>

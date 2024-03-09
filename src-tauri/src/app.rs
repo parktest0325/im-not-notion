@@ -3,11 +3,7 @@ use crate::{
     ssh::sftp::{get_file, list_directory, FileSystemNode},
 };
 use ssh2::{Session, Sftp};
-use std::{
-    net::TcpStream,
-    path::{Path, PathBuf},
-    sync::Mutex,
-};
+use std::{net::TcpStream, path::Path, sync::Mutex};
 use tauri::InvokeError;
 
 static APP_CONFIG: Mutex<Option<AppConfig>> = Mutex::new(None);
