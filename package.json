@@ -12,7 +12,8 @@
   },
   "dependencies": {
     "@tauri-apps/api": "^1",
-    "svelte-icons": "^2.1.0"
+    "svelte-icons": "^2.1.0",
+    "uuid": "^9.0.1"
   },
   "devDependencies": {
     "@iconify/tailwind": "^0.1.4",

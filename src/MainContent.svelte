@@ -2,6 +2,7 @@
     import { onDestroy, onMount } from "svelte";
     import { selectedFilePath } from "./stores.js";
     import { invoke } from "@tauri-apps/api";
+    import { v4 as uuidv4 } from "uuid";
 
     let fileContent: string = "";
     let editable: boolean = false;
@@ -53,6 +54,61 @@
         }
     }
 
+    // 붙여넣기 이벤트 핸들러
+    async function handlePaste(event: ClipboardEvent) {
+        const items = event.clipboardData?.items;
+
+        if (items) {
+            const item = items[0]; // 클립보드의 맨 위 아이템만 검사
+
+            // 클립보드 내용이 이미지인 경우
+            if (item.type.indexOf("image") !== -1) {
+                event.preventDefault(); // 기본 붙여넣기 동작을 방지
+
+                try {
+                    const fileData = await readFileAsArrayBuffer(
+                        item.getAsFile()!,
+                    );
+
+                    const textarea = event.target as HTMLTextAreaElement;
+                    const currentPosition = textarea.selectionStart || 0;
+                    const beforeText = fileContent.slice(0, currentPosition);
+                    const afterText = fileContent.slice(currentPosition);
+
+                    const uuidValue = uuidv4();
+                    console.log("uuid: ", uuidValue);
+                    const savedPath = await invoke("save_file_image", {
+                        filePath: $selectedFilePath,
+                        fileName: uuidValue,
+                        fileData: Array.from(fileData),
+                    });
+                    console.log("savedPath: ", savedPath);
+
+                    // 이미지 태그를 현재 커서 위치에 추가
+                    fileContent = `${beforeText}\n![${uuidValue}](${savedPath})${afterText}`;
+                } catch (e) {
+                    console.log("error: ", e);
+                }
+            }
+        }
+    }
+
+    async function readFileAsArrayBuffer(file: File): Promise<Uint8Array> {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                // reader.result는 ArrayBuffer | null 타입을 가집니다.
+                // TypeScript의 타입 가드를 사용하여 ArrayBuffer인 경우만 처리합니다.
+                if (reader.result instanceof ArrayBuffer) {
+                    resolve(new Uint8Array(reader.result));
+                } else {
+                    reject(new Error("File reading resulted in null"));
+                }
+            };
+            reader.onerror = () => reject(reader.error);
+            reader.readAsArrayBuffer(file);
+        });
+    }
     onMount(() => {
         window.addEventListener("keydown", handleKeyDown);
     });
@@ -94,6 +150,7 @@
             class="whitespace-pre-wrap w-full h-full resize-none"
             bind:value={fileContent}
             on:blur={() => (editable = false)}
+            on:paste={handlePaste}
         ></textarea>
     {:else}
         <div

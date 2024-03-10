@@ -1,9 +1,11 @@
 use crate::{
     setting::AppConfig,
-    ssh::sftp::{get_file, list_directory, save_file, FileSystemNode},
+    ssh::sftp::{get_file, list_directory, save_file, save_image, FileSystemNode},
 };
+
+use image::io::Reader as ImageReader;
 use ssh2::{Session, Sftp};
-use std::{net::TcpStream, path::Path, sync::Mutex};
+use std::{io::BufReader, net::TcpStream, path::Path, sync::Mutex};
 use tauri::InvokeError;
 
 static APP_CONFIG: Mutex<Option<AppConfig>> = Mutex::new(None);
@@ -136,4 +138,43 @@ pub fn save_file_content(file_path: &str, file_data: &str) -> Result<(), InvokeE
     )
     .map_err(|e| InvokeError::from(e.to_string()))?;
     Ok(())
+}
+
+#[tauri::command]
+pub fn save_file_image(
+    file_path: &str,
+    file_name: &str,
+    file_data: Vec<u8>,
+) -> Result<String, InvokeError> {
+    let ssh_client_lock = SSH_CLIENT
+        .lock()
+        .map_err(|e| InvokeError::from(e.to_string()))?;
+    let session = ssh_client_lock
+        .as_ref()
+        .ok_or_else(|| InvokeError::from("SSH session not initialized"))?;
+
+    // SFTP 세션을 시작합니다.
+    let sftp: Sftp = session
+        .sftp()
+        .map_err(|e| InvokeError::from(e.to_string()))?;
+
+    // AppConfig에서 content_path 경로를 가져옵니다.
+    let app_config_lock = APP_CONFIG
+        .lock()
+        .map_err(|e| InvokeError::from(e.to_string()))?;
+    let app_config = app_config_lock
+        .as_ref()
+        .ok_or_else(|| InvokeError::from("App config not initialized"))?;
+    let image_path = &app_config.hugo_config.image_path;
+
+    let image_ext = "";
+    let ret_path = format!("{}/{}{}", file_path, file_name, image_ext);
+
+    save_image(
+        &sftp,
+        Path::new(&format!("{}{}", image_path, ret_path)),
+        file_data,
+    )
+    .map_err(|e| InvokeError::from("save_image Error"))?;
+    Ok(ret_path)
 }
