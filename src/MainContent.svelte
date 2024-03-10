@@ -16,7 +16,9 @@
             const content: string = await invoke("get_file_content", {
                 filePath,
             });
+            console.log("content: ", content);
             fileContent = content;
+            console.log("filecontent: ", fileContent);
         } catch (error) {
             console.error("Failed to get file content", error);
             fileContent = "파일을 불러오는데 실패했습니다.";
@@ -56,7 +58,9 @@
 
     function handleInput(e: Event) {
         const target = e.target as HTMLElement; // HTMLElement로 타입 단언
+        console.log("innerText: " + target.innerText);
         fileContent = target.innerText; // 'innerText' 속성에 안전하게 접근
+        console.log("fileContent: " + fileContent);
     }
 </script>
 
@@ -86,24 +90,25 @@
         </div>
     </div>
 {/if}
-<div class="main-content overflow-y-auto">
+<div class="main-content overflow-y-auto h-full w-full">
     {#if editable}
-        <pre
-            class="whitespace-pre-wrap"
-            contenteditable="true"
+        <textarea
+            class="whitespace-pre-wrap w-full h-full resize-none"
+            bind:value={fileContent}
             on:blur={() => (editable = false)}
-            on:input={handleInput}>
-        {fileContent}
-    </pre>
+        ></textarea>
     {:else}
-        <pre
-            class="whitespace-pre-wrap"
+        <div
+            tabindex="0"
+            role="button"
+            class="break-all w-full h-full whitespace-pre-wrap"
             on:dblclick={() => {
                 if ($selectedFilePath != "") {
                     editable = true;
                 }
-            }}>
+            }}
+        >
             {fileContent}
-        </pre>
+        </div>
     {/if}
 </div>

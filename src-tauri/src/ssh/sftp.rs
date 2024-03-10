@@ -54,5 +54,7 @@ pub fn get_file(sftp: &Sftp, path: &Path) -> Result<String> {
     let mut content = String::new();
     file.read_to_string(&mut content)?;
 
+    println!("content: {:#?}", content);
+
     Ok(content)
 }
