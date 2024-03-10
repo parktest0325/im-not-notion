@@ -40,11 +40,16 @@
 
     function handleKeyDown(event: KeyboardEvent) {
         console.log("onKeyDown");
-        if (editable && event.ctrlKey && event.key === "s") {
-            event.preventDefault();
-            console.log("ctrl+ s");
-            showDialog = true;
-            editable = false;
+        if (editable) {
+            if (event.ctrlKey && event.key === "s") {
+                event.preventDefault();
+                console.log("ctrl+ s");
+                showDialog = true;
+                editable = false;
+            } else if (event.key === "Escape") {
+                event.preventDefault();
+                editable = false;
+            }
         }
     }
 
