@@ -58,3 +58,9 @@ pub fn get_file(sftp: &Sftp, path: &Path) -> Result<String> {
 
     Ok(content)
 }
+
+pub fn save_file(sftp: &Sftp, path: &Path, content: String) -> Result<()> {
+    let mut file = sftp.create(path)?;
+    file.write_all(content.as_bytes())?;
+    Ok(())
+}

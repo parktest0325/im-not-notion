@@ -27,14 +27,14 @@
 
     async function saveContent() {
         try {
-            // await invoke("save_content", {
-            //     filePath: $selectedFilePath,
-            //     content: fileContent,
-            // });
+            await invoke("save_file_content", {
+                filePath: $selectedFilePath,
+                fileData: fileContent,
+            });
             console.log("저장되었습니다.");
             editable = false;
         } catch (error) {
-            console.log("저장에 실패했습니다.");
+            console.log("저장에 실패했습니다. reason => ", error);
         }
     }
 
@@ -60,13 +60,6 @@
     onDestroy(() => {
         window.removeEventListener("keydown", handleKeyDown);
     });
-
-    function handleInput(e: Event) {
-        const target = e.target as HTMLElement; // HTMLElement로 타입 단언
-        console.log("innerText: " + target.innerText);
-        fileContent = target.innerText; // 'innerText' 속성에 안전하게 접근
-        console.log("fileContent: " + fileContent);
-    }
 </script>
 
 {#if showDialog}
