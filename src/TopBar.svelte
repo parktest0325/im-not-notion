@@ -10,8 +10,6 @@
         <button on:click={toggleMenu} class="w-6 h-6 mr-4">
             <MdArrowForward />
         </button>
-
-        <img src="inn.svg" alt="IM NOT NOTION!" />
     {/if}
     <span>{$selectedFilePath}</span>
 </div>

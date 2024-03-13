@@ -42,7 +42,7 @@
     function handleKeyDown(event: KeyboardEvent) {
         console.log("onKeyDown");
         if (editable) {
-            if (event.ctrlKey && event.key === "s") {
+            if ((event.ctrlKey || event.metaKey) && event.key === "s") {
                 event.preventDefault();
                 console.log("ctrl+ s");
                 showDialog = true;
@@ -124,21 +124,21 @@
         class="fixed inset-0 bg-gray-600 bg-opacity-50 flex justify-center items-center"
     >
         <div class="bg-white p-4 rounded-lg shadow-lg space-y-4">
-            <p>저장하시겠습니까?</p>
+            <p>Are you Saving?</p>
             <div class="flex justify-end space-x-2">
                 <button
                     class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-700"
                     on:click={() => {
                         saveContent();
                         showDialog = false;
-                    }}>예</button
+                    }}>Yes</button
                 >
                 <button
                     class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-700"
                     on:click={() => {
                         showDialog = false;
                         editable = true;
-                    }}>아니오</button
+                    }}>No</button
                 >
             </div>
         </div>
