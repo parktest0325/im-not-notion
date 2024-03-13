@@ -19,9 +19,9 @@
     },
     "windows": [
       {
-        "title": "tauri-app",
-        "width": 800,
-        "height": 600
+        "title": "im_not_notion",
+        "width": 1024,
+        "height": 768
       }
     ],
     "security": {

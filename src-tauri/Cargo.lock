@@ -1304,6 +1304,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "im_not_notion"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "image",
+ "serde",
+ "serde_json",
+ "ssh2",
+ "tauri",
+ "tauri-build",
+]
+
+[[package]]
 name = "image"
 version = "0.24.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2856,19 +2869,6 @@ dependencies = [
  "webkit2gtk",
  "webview2-com",
  "windows 0.39.0",
-]
-
-[[package]]
-name = "tauri-app"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "image",
- "serde",
- "serde_json",
- "ssh2",
- "tauri",
- "tauri-build",
 ]
 
 [[package]]

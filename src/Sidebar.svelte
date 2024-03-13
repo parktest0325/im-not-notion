@@ -7,14 +7,14 @@
 </script>
 
 <div
-  class={`flex flex-col h-screen bg-pastel-blue transition-all duration-300 overflow-hidden ${isMenuOpen ? "w-64" : "w-0"}`}
+  class={`flex flex-col h-screen bg-pastel-blue transition-all duration-300 overflow-hidden ${isMenuOpen ? "w-80" : "w-0"}`}
   style="flex-shrink: 0; background-color:var(--pastel-blue);"
 >
   <div class="flex items-center justify-between p-4 bg-pastel-blue">
     {#if isMenuOpen}
       <img src="inn.svg" alt="IM NOT NOTION!" class="max-w-full h-auto" />
-      <button on:click={toggleMenu} class="text-lg">
-        <MdArrowBack class="w-6 h-6" />
+      <button on:click={toggleMenu} class="text-lg w-6 h-6">
+        <MdArrowBack />
       </button>
     {/if}
   </div>
