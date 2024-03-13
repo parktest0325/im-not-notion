@@ -13,7 +13,7 @@ pub struct SshConfig {
     pub key_path: String,
 }
 
-#[derive(Serialize, Deserialize, Default, Debug)]
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
 pub struct HugoConfig {
     pub content_path: String,
     pub image_path: String,
