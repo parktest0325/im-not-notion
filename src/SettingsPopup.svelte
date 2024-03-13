@@ -52,7 +52,7 @@
             class:text-white={activeTab === "ssh"}
             on:click={() => (activeTab = "ssh")}
           >
-            SSH 설정
+            SSH Setting
           </button>
           <button
             class="flex-1 py-2 px-4 rounded-lg focus:outline-none"
@@ -60,7 +60,7 @@
             class:text-white={activeTab === "hugo"}
             on:click={() => (activeTab = "hugo")}
           >
-            Hugo 설정
+            Hugo Setting
           </button>
         </div>
 
@@ -170,7 +170,7 @@
           class="w-full py-2 px-4 bg-blue-500 text-white rounded-lg focus:outline-none"
           on:click={saveAndClose}
         >
-          저장하고 나가기
+          Save and Exit
         </button>
       </div>
     {/if}

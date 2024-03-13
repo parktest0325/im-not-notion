@@ -5,7 +5,7 @@
     import { selectedFilePath } from "./stores";
 </script>
 
-<div class="top-bar" style="background-color:var(--pastel-purple);">
+<div class="top-bar p-4" style="background-color:var(--pastel-purple);">
     {#if !isMenuOpen}
         <button on:click={toggleMenu} class="w-6 h-6 mr-4">
             <MdArrowForward />
@@ -21,7 +21,6 @@
         --pastel-purple: #dcb6d5;
     }
     .top-bar {
-        padding: 0.5em; /* 내부 요소 간격 */
         align-items: center;
         display: flex;
     }

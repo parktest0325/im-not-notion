@@ -7,7 +7,7 @@
 </script>
 
 <div
-  class={`flex flex-col h-screen bg-pastel-blue transition-all duration-300 overflow-hidden ${isMenuOpen ? "w-80" : "w-0"}`}
+  class={`flex flex-col h-screen bg-pastel-blue transition-all duration-300 overflow-hidden ${isMenuOpen ? "w-72" : "w-0"}`}
   style="flex-shrink: 0; background-color:var(--pastel-blue);"
 >
   <div class="flex items-center justify-between p-4 bg-pastel-blue">
