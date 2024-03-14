@@ -5,6 +5,7 @@
     import { writable } from "svelte/store";
     import TreeNode from "./TreeNode.svelte";
     import { selectedFilePath, selectedCursor } from "./stores";
+    import { invoke } from "@tauri-apps/api";
 
     export let path: string = "/";
     export let node: FileSystemNode;
@@ -29,10 +30,16 @@
         }
     }
 
-    function createFile(event: MouseEvent) {
+    async function createFile(event: MouseEvent) {
         event.stopPropagation();
+        try {
+            await invoke("new_content_for_hugo", {
+                filePath: `${path}${node.name}` + "/new_file.md",
+            });
+        } catch (error) {
+            console.error("failed to create content:", error);
+        }
         console.log("Create item");
-        // 파일 생성 로직 구현
     }
     function createFolder(event: MouseEvent) {
         event.stopPropagation();

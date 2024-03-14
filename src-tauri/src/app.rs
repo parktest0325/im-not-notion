@@ -120,9 +120,14 @@ pub fn save_file_image(
 pub fn new_content_for_hugo(file_path: &str) -> Result<(), InvokeError> {
     let mut channel = get_global_channel_session()?;
     let hugo_config = get_global_hugo_config()?;
-    let base_path = &hugo_config.base_path;
-    new_hugo_content(&mut channel, base_path, file_path)
-        .map_err(|e| InvokeError::from(e.to_string()))?;
+
+    new_hugo_content(
+        &mut channel,
+        &hugo_config.base_path,
+        &hugo_config.hugo_cmd_path,
+        &format!("{}{}", &hugo_config.content_path, file_path),
+    )
+    .map_err(|e| InvokeError::from(e.to_string()))?;
     Ok(())
 }
 
