@@ -49,5 +49,6 @@
                 <TreeNode {node} />
             {/each}
         </ul>
+        <button class="w-full">+</button>
     </div>
 </div>
