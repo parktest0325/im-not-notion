@@ -7,7 +7,8 @@ mod ssh;
 
 use anyhow::Result;
 use app::{
-    get_file_content, get_file_list, save_file_content, save_file_image, update_and_connect,
+    get_file_content, get_file_list, new_content_for_hugo, save_file_content, save_file_image,
+    update_and_connect,
 };
 use setting::{load_config, save_config};
 
@@ -21,6 +22,7 @@ fn main() -> Result<()> {
             get_file_content,
             save_file_content,
             save_file_image,
+            new_content_for_hugo,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

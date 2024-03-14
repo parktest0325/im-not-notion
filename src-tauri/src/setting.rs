@@ -15,6 +15,7 @@ pub struct SshConfig {
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 pub struct HugoConfig {
+    pub base_path: String,
     pub content_path: String,
     pub image_path: String,
     pub config_path: String,

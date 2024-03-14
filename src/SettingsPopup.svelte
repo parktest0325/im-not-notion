@@ -123,6 +123,16 @@
           <div class="space-y-4">
             <!-- HUGO 설정 필드 -->
             <div class="flex items-center space-x-2">
+              <label class="block min-w-[120px]" for="hugo_config-base_path"
+                >Base Path</label
+              >
+              <input
+                class="flex-1 p-2 border rounded"
+                id="hugo_config-base_path"
+                bind:value={config.hugo_config.base_path}
+              />
+            </div>
+            <div class="flex items-center space-x-2">
               <label class="block min-w-[120px]" for="hugo_config-content_path"
                 >Content Path</label
               >

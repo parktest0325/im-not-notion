@@ -1,6 +1,8 @@
 use crate::{
     setting::{AppConfig, HugoConfig},
-    ssh::sftp::{get_file, list_directory, save_file, save_image, FileSystemNode},
+    ssh::sftp::{
+        get_file, list_directory, new_hugo_content, save_file, save_image, FileSystemNode,
+    },
 };
 
 use ssh2::{Channel, Session, Sftp};
@@ -110,8 +112,18 @@ pub fn save_file_image(
         Path::new(&format!("{}{}", image_path, ret_path)),
         file_data,
     )
-    .map_err(|e| InvokeError::from("save_image Error"))?;
+    .map_err(|e| InvokeError::from(e.to_string()))?;
     Ok(ret_path)
+}
+
+#[tauri::command]
+pub fn new_content_for_hugo(file_path: &str) -> Result<(), InvokeError> {
+    let mut channel = get_global_channel_session()?;
+    let hugo_config = get_global_hugo_config()?;
+    let base_path = &hugo_config.base_path;
+    new_hugo_content(&mut channel, base_path, file_path)
+        .map_err(|e| InvokeError::from(e.to_string()))?;
+    Ok(())
 }
 
 fn get_global_channel_session() -> Result<Channel, InvokeError> {

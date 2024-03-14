@@ -8,6 +8,7 @@ interface SshConfig {
 }
 
 interface HugoConfig {
+    base_path: string,
     content_path: string,
     image_path: string,
     config_path: string,
@@ -36,6 +37,7 @@ function createDefaultAppConfig(): AppConfig {
             key_path: 'None',
         },
         hugo_config: {
+            base_path: 'None',
             content_path: 'None',
             image_path: 'None',
             config_path: 'None',

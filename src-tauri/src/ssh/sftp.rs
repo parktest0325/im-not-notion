@@ -2,7 +2,7 @@ use std::path::Path;
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use ssh2::Sftp;
+use ssh2::{Channel, Sftp};
 use std::io::prelude::*;
 
 #[derive(Serialize, Deserialize)]
@@ -76,5 +76,10 @@ pub fn save_image(sftp: &Sftp, path: &Path, image: Vec<u8>) -> Result<()> {
 
     let mut file = sftp.create(path)?;
     file.write_all(&image)?;
+    Ok(())
+}
+
+pub fn new_hugo_content(channel: &mut Channel, base: &str, path: &str) -> Result<()> {
+    channel.exec(&format!("cd {} && hugo new {}", base, path))?;
     Ok(())
 }
