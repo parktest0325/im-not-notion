@@ -182,6 +182,16 @@
                 bind:value={config.hugo_config.layout_path}
               />
             </div>
+            <div class="flex items-center space-x-2">
+              <label class="block min-w-[120px]" for="hugo_config-trashcan_path"
+                >Trashcan Path</label
+              >
+              <input
+                class="flex-1 p-2 border rounded"
+                id="hugo_config-trashcan_path"
+                bind:value={config.hugo_config.trashcan_path}
+              />
+            </div>
           </div>
         {/if}
 

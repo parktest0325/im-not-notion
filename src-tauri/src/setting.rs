@@ -21,6 +21,7 @@ pub struct HugoConfig {
     pub image_path: String,
     pub config_path: String,
     pub layout_path: String,
+    pub trashcan_path: String,
 }
 
 #[derive(Serialize, Deserialize, Default, Debug)]

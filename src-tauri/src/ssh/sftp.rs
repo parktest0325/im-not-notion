@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -95,5 +95,34 @@ pub fn new_hugo_content(
     println!("Command stderr: {}", s);
     channel.read_to_string(&mut s)?;
     println!("Command stdout: {}", s);
+    Ok(())
+}
+
+pub fn mkdir_recursive(sftp: &Sftp, path: &Path) -> Result<()> {
+    let mut current_path = PathBuf::new();
+
+    for component in path.components() {
+        current_path.push(component);
+        // 이미 존재하는지 확인
+        if sftp.stat(&current_path).is_err() {
+            sftp.mkdir(&current_path, 0o755)?;
+        }
+    }
+
+    Ok(())
+}
+
+pub fn move_file(sftp: &Sftp, src: &Path, dst: &Path) -> Result<()> {
+    if let Some(parent) = dst.parent() {
+        // 디렉토리의 존재 여부를 확인
+        match sftp.stat(parent) {
+            Ok(_) => {} // 디렉토리가 존재하면 아무것도 하지 않음
+            Err(_) => {
+                // 디렉토리가 존재하지 않으면 생성
+                mkdir_recursive(sftp, parent);
+            }
+        }
+    }
+    sftp.rename(src, dst, None)?;
     Ok(())
 }

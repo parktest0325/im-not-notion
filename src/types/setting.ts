@@ -14,6 +14,7 @@ interface HugoConfig {
     image_path: string,
     config_path: string,
     layout_path: string,
+    trashcan_path: string,
     [key: string]: string;
 }
 
@@ -38,6 +39,7 @@ function createDefaultAppConfig(): AppConfig {
             key_path: 'None',
         },
         hugo_config: {
+            trashcan_path: 'None',
             hugo_cmd_path: 'None',
             base_path: 'None',
             content_path: 'None',
