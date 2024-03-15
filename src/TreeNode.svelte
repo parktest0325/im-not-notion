@@ -6,11 +6,21 @@
     import TreeNode from "./TreeNode.svelte";
     import { selectedFilePath, selectedCursor } from "./stores";
     import { invoke } from "@tauri-apps/api";
+    import { getContext } from "svelte";
 
     export let path: string = "/";
     export let node: FileSystemNode;
 
+    interface GlobalFunctions {
+        refreshList: () => Promise<void>;
+    }
+
+    // getContext를 사용하여 전역 함수를 가져옴
+    const { refreshList } = getContext<GlobalFunctions>("globalFunctions");
+
     const isExpanded = writable(false);
+
+    const filePath = `${path}${node.name}`;
 
     function toggleExpand(event: MouseEvent) {
         event.stopPropagation();
@@ -19,7 +29,7 @@
         }
     }
 
-    function onFileClick(event: MouseEvent, filePath: string) {
+    function onFileClick(event: MouseEvent) {
         event.stopPropagation();
         selectedCursor.set(filePath);
         if (node.type_ === "File") {
@@ -30,27 +40,57 @@
         }
     }
 
-    async function createFile(event: MouseEvent) {
+    async function createItem(event: MouseEvent, createType: string) {
         event.stopPropagation();
         try {
-            await invoke("new_content_for_hugo", {
-                filePath: `${path}${node.name}` + "/new_file.md",
-            });
+            let createdPath: string;
+            if (createType === "Directory") {
+                createdPath = filePath + "/new_folder";
+                await invoke("make_directory", {
+                    path: createdPath,
+                });
+            } else {
+                createdPath = filePath + "/new_file.md";
+                await invoke("new_content_for_hugo", {
+                    filePath: createdPath,
+                });
+            }
+            isExpanded.set(true);
+            selectedCursor.set(createdPath);
+            selectedFilePath.set(createdPath);
+            await refreshList();
         } catch (error) {
-            console.error("failed to create content:", error);
+            console.error("failed to create item:", error);
         }
         console.log("Create item");
     }
-    function createFolder(event: MouseEvent) {
+
+    let showDeleteConfirmation = false;
+
+    function confirmDeleteItem(event: MouseEvent) {
         event.stopPropagation();
-        console.log("Create item");
-        // 디렉터리 생성 로직 구현
+        showDeleteConfirmation = true;
     }
 
-    function deleteItem(event: MouseEvent) {
-        event.stopPropagation();
+    async function proceedDelete(confirmation: boolean) {
+        if (confirmation) {
+            await deleteItem();
+        }
+        showDeleteConfirmation = false;
+    }
+
+    async function deleteItem() {
+        try {
+            await invoke("move_to_trashcan", {
+                path: filePath,
+            });
+            selectedCursor.set("");
+            selectedFilePath.set("");
+            await refreshList();
+        } catch (error) {
+            console.error("failed to move trashcan:", error);
+        }
         console.log("Delete item");
-        // 항목 삭제 로직 구현
     }
 </script>
 
@@ -72,34 +112,45 @@
             path + node.name
                 ? 'bg-yellow-200'
                 : ''}"
-            on:click={(event) => onFileClick(event, `${path}${node.name}`)}
+            on:click={onFileClick}
         >
             {node.name}
         </button>
+
         {#if $selectedCursor === path + node.name}
             {#if node.type_ === "Directory"}
                 <button
-                    on:click={createFile}
+                    on:click={(event) => createItem(event, "File")}
                     class="cursor-pointer w-4 h-4 ml-1"
                 >
                     <FaFileMedical />
                 </button>
                 <button
-                    on:click={createFolder}
+                    on:click={(event) => createItem(event, "Directory")}
                     class="cursor-pointer w-4 h-4 ml-1"
                 >
                     <FaFolderPlus />
                 </button>
             {/if}
-            <button on:click={deleteItem} class="cursor-pointer w-4 h-4 ml-1">
+            <button
+                on:click={confirmDeleteItem}
+                class="cursor-pointer w-4 h-4 ml-1"
+            >
                 <FaTrash />
             </button>
         {/if}
     </div>
+    {#if showDeleteConfirmation}
+        <div class="delete-confirmation">
+            <p>Are you sure you want to delete this item?</p>
+            <button on:click={() => proceedDelete(true)}>Yes</button>
+            <button on:click={() => proceedDelete(false)}>No</button>
+        </div>
+    {/if}
     {#if node.type_ === "Directory" && $isExpanded}
         <ul class="pl-4">
             {#each node.children as child}
-                <TreeNode path={`${path}${node.name}/`} node={child} />
+                <TreeNode path={`${filePath}/`} node={child} />
             {/each}
         </ul>
     {/if}

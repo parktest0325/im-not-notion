@@ -133,7 +133,7 @@ pub fn new_content_for_hugo(file_path: &str) -> Result<(), InvokeError> {
 }
 
 #[tauri::command]
-pub fn move_file_and_folder(src: &str, dst: &str) -> Result<(), InvokeError> {
+pub fn move_file_or_folder(src: &str, dst: &str) -> Result<(), InvokeError> {
     let sftp: Sftp = get_global_sftp_session()?;
     let hugo_config = get_global_hugo_config()?;
 
@@ -147,14 +147,14 @@ pub fn move_file_and_folder(src: &str, dst: &str) -> Result<(), InvokeError> {
 }
 
 #[tauri::command]
-pub fn move_to_trashcan(src: &str) -> Result<(), InvokeError> {
+pub fn move_to_trashcan(path: &str) -> Result<(), InvokeError> {
     let sftp: Sftp = get_global_sftp_session()?;
     let hugo_config = get_global_hugo_config()?;
 
     move_file(
         &sftp,
-        &Path::new(&format!("{}{}", &hugo_config.content_path, src)),
-        &Path::new(&format!("{}{}", &hugo_config.trashcan_path, src)),
+        &Path::new(&format!("{}{}", &hugo_config.content_path, path)),
+        &Path::new(&format!("{}{}", &hugo_config.trashcan_path, path)),
     )
     .map_err(|e| InvokeError::from(e.to_string()))?;
     Ok(())

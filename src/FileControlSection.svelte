@@ -4,19 +4,41 @@
     import IoMdRefresh from "svelte-icons/io/IoMdRefresh.svelte";
     import { writable } from "svelte/store";
     import TreeNode from "./TreeNode.svelte";
+    import { setContext } from "svelte";
+    import { selectedCursor, selectedFilePath } from "./stores";
 
     let searchTerm: string = "";
     let directoryStructure = writable<FileSystemNode[]>([]);
 
-    const refreshList = async () => {
+    setContext("globalFunctions", {
+        refreshList,
+    });
+    export async function refreshList() {
         const data: FileSystemNode = await invoke("get_file_list");
         directoryStructure.set(data.children);
         console.log(data);
-    };
+    }
 
     const searchFiles = (term: string) => {
         // 검색 로직
     };
+
+    async function createFolder(event: MouseEvent) {
+        event.stopPropagation();
+        try {
+            const createdPath = "/new_folder";
+            await invoke("make_directory", {
+                path: createdPath,
+            });
+            selectedCursor.set(createdPath);
+            selectedFilePath.set(createdPath);
+            await refreshList();
+        } catch (error) {
+            console.error("failed to make directory:", error);
+        }
+        console.log("Create folder");
+        // 디렉터리 생성 로직 구현
+    }
 </script>
 
 <div class="flex flex-col h-full">
@@ -49,6 +71,6 @@
                 <TreeNode {node} />
             {/each}
         </ul>
-        <button class="w-full">+</button>
+        <button class="w-full" on:click={createFolder}>+</button>
     </div>
 </div>
