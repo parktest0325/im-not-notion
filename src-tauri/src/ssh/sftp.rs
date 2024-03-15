@@ -79,25 +79,6 @@ pub fn save_image(sftp: &Sftp, path: &Path, image: Vec<u8>) -> Result<()> {
     Ok(())
 }
 
-pub fn new_hugo_content(
-    channel: &mut Channel,
-    base: &str,
-    hugo_cmd_path: &str,
-    path: &str,
-) -> Result<()> {
-    channel.exec(&format!(
-        "cd {} ; {} new content {}",
-        base, hugo_cmd_path, path
-    ))?;
-    println!("cd {} ; hugo new content {}", base, path);
-    let mut s = String::new();
-    channel.stderr().read_to_string(&mut s)?;
-    println!("Command stderr: {}", s);
-    channel.read_to_string(&mut s)?;
-    println!("Command stdout: {}", s);
-    Ok(())
-}
-
 pub fn mkdir_recursive(sftp: &Sftp, path: &Path) -> Result<()> {
     let mut current_path = PathBuf::new();
 
@@ -124,5 +105,29 @@ pub fn move_file(sftp: &Sftp, src: &Path, dst: &Path) -> Result<()> {
         }
     }
     sftp.rename(src, dst, None)?;
+    Ok(())
+}
+
+pub fn new_hugo_content(
+    channel: &mut Channel,
+    base: &str,
+    hugo_cmd_path: &str,
+    path: &str,
+) -> Result<()> {
+    channel.exec(&format!(
+        "cd {} ; {} new content {}",
+        base, hugo_cmd_path, path
+    ))?;
+    println!("cd {} ; hugo new content {}", base, path);
+    let mut s = String::new();
+    channel.stderr().read_to_string(&mut s)?;
+    println!("Command stderr: {}", s);
+    channel.read_to_string(&mut s)?;
+    println!("Command stdout: {}", s);
+    Ok(())
+}
+
+pub fn rmrf_file(channel: &mut Channel, path: &str) -> Result<()> {
+    channel.exec(&format!("rm -rf {}", path))?;
     Ok(())
 }

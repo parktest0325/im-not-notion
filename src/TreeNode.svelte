@@ -6,7 +6,7 @@
     import TreeNode from "./TreeNode.svelte";
     import { selectedFilePath, selectedCursor } from "./stores";
     import { invoke } from "@tauri-apps/api";
-    import { getContext } from "svelte";
+    import { getContext, onDestroy, onMount, tick } from "svelte";
     import { slide } from "svelte/transition";
     export let path: string = "/";
     export let node: FileSystemNode;
@@ -67,6 +67,7 @@
 
     $: if ($selectedCursor) {
         showDeleteConfirmation = false;
+        isEditing = false;
     }
 
     let showDeleteConfirmation = false;
@@ -85,17 +86,59 @@
 
     async function deleteItem() {
         try {
-            await invoke("move_to_trashcan", {
+            // await invoke("move_to_trashcan", {
+            await invoke("remove_file", {
                 path: filePath,
             });
             selectedCursor.set("");
             selectedFilePath.set("");
             await refreshList();
         } catch (error) {
-            console.error("failed to move trashcan:", error);
+            console.error("failed to rmrf:", error);
         }
         console.log("Delete item");
     }
+
+    let isEditing = false;
+    let editableName = node.name;
+
+    // 변경 사항 저장 또는 취소
+    async function handleEdit(event: KeyboardEvent) {
+        if (event.key === "Enter") {
+            isEditing = false;
+            try {
+                await invoke("move_file_or_folder", {
+                    src: filePath,
+                    dst: path + editableName,
+                });
+                await refreshList();
+            } catch (error) {
+                console.error("Failed to rename file:", error);
+            }
+        } else if (event.key === "Escape") {
+            isEditing = false;
+            editableName = node.name; // 변경을 취소하고 원래 이름으로 복원
+        }
+    }
+
+    // 선택된 파일명 편집을 위해 F2 또는 Enter 키 이벤트 활성화
+    function onKeyDown(event: KeyboardEvent) {
+        if (
+            $selectedCursor === filePath &&
+            isEditing === false &&
+            (event.key === "F2" || event.key === "Enter")
+        ) {
+            isEditing = true;
+        }
+    }
+
+    onMount(() => {
+        document.addEventListener("keydown", onKeyDown);
+    });
+
+    onDestroy(() => {
+        document.removeEventListener("keydown", onKeyDown);
+    });
 </script>
 
 <li>
@@ -111,15 +154,25 @@
                 {$isExpanded ? "▼" : "▶︎"}
             </button>
         {/if}
-        <button
-            class="cursor-pointer flex-grow text-left overflow-hidden overflow-ellipsis whitespace-nowrap {$selectedCursor ===
-            path + node.name
-                ? 'bg-yellow-200'
-                : ''}"
-            on:click={onFileClick}
-        >
-            {node.name}
-        </button>
+
+        {#if isEditing}
+            <input
+                class="filename-input"
+                type="text"
+                bind:value={editableName}
+                on:keydown={handleEdit}
+            />
+        {:else}
+            <button
+                class="cursor-pointer flex-grow text-left overflow-hidden overflow-ellipsis whitespace-nowrap {$selectedCursor ===
+                path + node.name
+                    ? 'bg-yellow-200'
+                    : ''}"
+                on:click={onFileClick}
+            >
+                {node.name}
+            </button>
+        {/if}
 
         {#if $selectedCursor === path + node.name}
             {#if node.type_ === "Directory"}

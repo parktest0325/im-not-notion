@@ -1,8 +1,8 @@
 use crate::{
     setting::{AppConfig, HugoConfig},
     ssh::sftp::{
-        get_file, list_directory, mkdir_recursive, move_file, new_hugo_content, save_file,
-        save_image, FileSystemNode,
+        get_file, list_directory, mkdir_recursive, move_file, new_hugo_content, rmrf_file,
+        save_file, save_image, FileSystemNode,
     },
 };
 
@@ -127,6 +127,19 @@ pub fn new_content_for_hugo(file_path: &str) -> Result<(), InvokeError> {
         &hugo_config.base_path,
         &hugo_config.hugo_cmd_path,
         &format!("{}{}", &hugo_config.content_path, file_path),
+    )
+    .map_err(|e| InvokeError::from(e.to_string()))?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn remove_file(path: &str) -> Result<(), InvokeError> {
+    let mut channel = get_global_channel_session()?;
+    let hugo_config = get_global_hugo_config()?;
+
+    rmrf_file(
+        &mut channel,
+        &format!("{}{}", &hugo_config.content_path, path),
     )
     .map_err(|e| InvokeError::from(e.to_string()))?;
     Ok(())
