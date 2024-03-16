@@ -6,11 +6,12 @@
     import TreeNode from "./TreeNode.svelte";
     import { selectedFilePath, selectedCursor } from "./stores";
     import { invoke } from "@tauri-apps/api";
-    import { getContext, onDestroy, onMount, tick } from "svelte";
+    import { getContext, onDestroy, onMount } from "svelte";
     import { slide } from "svelte/transition";
+
     export let path: string = "/";
     export let node: FileSystemNode;
-
+    let filenameInput: HTMLInputElement;
     interface GlobalFunctions {
         refreshList: () => Promise<void>;
     }
@@ -20,7 +21,7 @@
 
     const isExpanded = writable(false);
 
-    const filePath = `${path}${node.name}`;
+    $: filePath = `${path}${node.name}`;
 
     function toggleExpand(event: MouseEvent) {
         event.stopPropagation();
@@ -106,11 +107,21 @@
     async function handleEdit(event: KeyboardEvent) {
         if (event.key === "Enter") {
             isEditing = false;
+            event.preventDefault(); // 이벤트의 기본 동작 방지
+            event.stopPropagation(); // 이벤트의 전파 방지
             try {
+                const dstPath = path + editableName;
                 await invoke("move_file_or_folder", {
                     src: filePath,
-                    dst: path + editableName,
+                    dst: dstPath,
                 });
+                node.name = editableName;
+                selectedCursor.set(dstPath);
+                selectedFilePath.set(
+                    node.type_ === "Directory"
+                        ? dstPath + "/_index.md"
+                        : dstPath,
+                );
                 await refreshList();
             } catch (error) {
                 console.error("Failed to rename file:", error);
@@ -121,11 +132,16 @@
         }
     }
 
+    // true일때만 filenameInput에 포커스
+    $: if (isEditing) {
+        filenameInput?.focus();
+    }
+
     // 선택된 파일명 편집을 위해 F2 또는 Enter 키 이벤트 활성화
     function onKeyDown(event: KeyboardEvent) {
         if (
             $selectedCursor === filePath &&
-            isEditing === false &&
+            !isEditing &&
             (event.key === "F2" || event.key === "Enter")
         ) {
             isEditing = true;
@@ -157,10 +173,14 @@
 
         {#if isEditing}
             <input
+                bind:this={filenameInput}
                 class="filename-input"
                 type="text"
                 bind:value={editableName}
                 on:keydown={handleEdit}
+                on:blur={() => {
+                    isEditing = false;
+                }}
             />
         {:else}
             <button

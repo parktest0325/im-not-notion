@@ -7,9 +7,14 @@
     let fileContent: string = "";
     let editable: boolean = false;
     let showDialog: boolean = false; // 대화상자 표시 상태를 위한 일반 boolean 변수
+    let contentTextArea: HTMLTextAreaElement;
 
     $: if ($selectedFilePath) {
         getFileContent($selectedFilePath);
+    }
+
+    $: if (editable) {
+        contentTextArea?.focus();
     }
 
     async function getFileContent(filePath: string) {
@@ -39,9 +44,15 @@
         }
     }
 
+    // TreeNode에 이름 변경을 위해 키다운리스너가 전역적으로 등록되어 있는데,
+    // Enter 키가 TextArea에서 사용하는 개행과 겹쳐 발생하는 문제 해결을 위해
+    // window나 document에 등록한 이벤트는 가장 늦게 처리되기 때문에
+    // 이 이벤트는 TextArea에 직접 등록해 먼저 처리하고, stopPropagation으로 버블링을 막는다.
+    // ctrl+s, Escape 일땐 기본 동작을 제거하고, 특정 동작을 수행하고 나머지 키는 기본동작대로 동작시킨다.
     function handleKeyDown(event: KeyboardEvent) {
         console.log("onKeyDown");
         if (editable) {
+            event.stopPropagation();
             if ((event.ctrlKey || event.metaKey) && event.key === "s") {
                 event.preventDefault();
                 console.log("ctrl+ s");
@@ -109,13 +120,6 @@
             reader.readAsArrayBuffer(file);
         });
     }
-    onMount(() => {
-        window.addEventListener("keydown", handleKeyDown);
-    });
-
-    onDestroy(() => {
-        window.removeEventListener("keydown", handleKeyDown);
-    });
 </script>
 
 {#if showDialog}
@@ -147,8 +151,10 @@
 <div class="main-content overflow-y-auto h-full w-full">
     {#if editable}
         <textarea
+            bind:this={contentTextArea}
             class="whitespace-pre-wrap w-full h-full resize-none"
             bind:value={fileContent}
+            on:keydown={handleKeyDown}
             on:blur={() => (editable = false)}
             on:paste={handlePaste}
         ></textarea>
