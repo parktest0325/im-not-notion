@@ -26,9 +26,13 @@
     async function createFolder(event: MouseEvent) {
         event.stopPropagation();
         try {
-            const createdPath = "/new_folder";
-            await invoke("make_directory", {
-                path: createdPath,
+            // const createdPath = "/new_folder";
+            // await invoke("make_directory", {
+            //     path: createdPath,
+            // });
+            const createdPath = "/new_folder/_index.md";
+            await invoke("new_content_for_hugo", {
+                filePath: createdPath,
             });
             selectedCursor.set(createdPath);
             selectedFilePath.set(createdPath);

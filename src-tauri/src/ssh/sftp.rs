@@ -71,7 +71,7 @@ pub fn save_image(sftp: &Sftp, path: &Path, image: Vec<u8>) -> Result<()> {
         // 디렉토리가 존재하지 않는 경우 생성
         // ssh2에는 직접적인 디렉토리 존재 체크 함수가 없으므로, 무조건 시도
         // 실패시 에러 핸들링은 여러분의 요구사항에 맞게 조정
-        sftp.mkdir(parent, 0o775).ok();
+        mkdir_recursive(sftp, parent)?;
     }
 
     let mut file = sftp.create(path)?;

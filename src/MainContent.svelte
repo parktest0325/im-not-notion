@@ -151,12 +151,12 @@
 <div class="main-content overflow-y-auto h-full w-full">
     {#if editable}
         <textarea
+            on:paste={handlePaste}
             bind:this={contentTextArea}
             class="whitespace-pre-wrap w-full h-full resize-none"
             bind:value={fileContent}
             on:keydown={handleKeyDown}
             on:blur={() => (editable = false)}
-            on:paste={handlePaste}
         ></textarea>
     {:else}
         <div

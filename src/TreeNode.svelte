@@ -46,9 +46,13 @@
         try {
             let createdPath: string;
             if (createType === "Directory") {
-                createdPath = filePath + "/new_folder";
-                await invoke("make_directory", {
-                    path: createdPath,
+                // createdPath = filePath + "/new_folder";
+                // await invoke("make_directory", {
+                //     path: createdPath,
+                // });
+                createdPath = filePath + "/new_folder/_index.md";
+                await invoke("new_content_for_hugo", {
+                    filePath: createdPath,
                 });
             } else {
                 createdPath = filePath + "/new_file.md";
