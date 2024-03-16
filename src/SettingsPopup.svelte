@@ -1,5 +1,6 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api";
+
   export let show: boolean;
   export let closeSettings: () => void;
 
@@ -18,7 +19,24 @@
       config = await invoke("load_config");
     } catch (error) {
       console.log("Failed to load config:", error);
-      config = createDefaultAppConfig();
+      config = {
+        ssh_config: {
+          host: "",
+          port: "",
+          username: "",
+          password: "",
+          key_path: "",
+        },
+        hugo_config: {
+          trashcan_path: "",
+          hugo_cmd_path: "",
+          base_path: "",
+          content_path: "",
+          image_path: "",
+          config_path: "",
+          layout_path: "",
+        },
+      };
     } finally {
       isLoading = false; // 로딩 완료
     }
@@ -29,7 +47,7 @@
       await invoke("save_config", { config });
       await invoke("update_and_connect", { config });
     } catch (error) {
-      console.error("Failed to save config:", error);
+      console.error(error);
     } finally {
       closeSettings();
     }
@@ -124,7 +142,7 @@
             <!-- HUGO 설정 필드 -->
             <div class="flex items-center space-x-2">
               <label class="block min-w-[120px]" for="hugo_config-hugo_cmd_path"
-                >Base Path</label
+                >Hugo Cmd Path</label
               >
               <input
                 class="flex-1 p-2 border rounded"

@@ -1,5 +1,4 @@
 <script lang="ts">
-    import { onDestroy, onMount } from "svelte";
     import { selectedFilePath } from "./stores.js";
     import { invoke } from "@tauri-apps/api";
     import { v4 as uuidv4 } from "uuid";

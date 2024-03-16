@@ -6,8 +6,8 @@
     "distDir": "../dist"
   },
   "package": {
-    "productName": "tauri-app",
-    "version": "0.0.0"
+    "productName": "im-not-notion",
+    "version": "0.1.0"
   },
   "tauri": {
     "allowlist": {
@@ -19,7 +19,7 @@
     },
     "windows": [
       {
-        "title": "im_not_notion",
+        "title": "im not notion",
         "width": 1024,
         "height": 768
       }
@@ -30,7 +30,7 @@
     "bundle": {
       "active": true,
       "targets": "all",
-      "identifier": "com.tauri.dev",
+      "identifier": "im-not-notion",
       "icon": [
         "icons/32x32.png",
         "icons/128x128.png",

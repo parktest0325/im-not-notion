@@ -28,24 +28,3 @@ interface FileSystemNode {
     type_: 'File' | 'Directory';
     children: FileSystemNode[];
 }
-
-function createDefaultAppConfig(): AppConfig {
-    return {
-        ssh_config: {
-            host: 'None',
-            port: 'None',
-            username: 'None',
-            password: 'None',
-            key_path: 'None',
-        },
-        hugo_config: {
-            trashcan_path: 'None',
-            hugo_cmd_path: 'None',
-            base_path: 'None',
-            content_path: 'None',
-            image_path: 'None',
-            config_path: 'None',
-            layout_path: 'None',
-        }
-    };
-}
