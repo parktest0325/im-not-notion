@@ -10,6 +10,7 @@
 
     $: if ($selectedFilePath) {
         getFileContent($selectedFilePath);
+        editable = false;
     }
 
     $: if (editable) {
@@ -147,21 +148,20 @@
         </div>
     </div>
 {/if}
-<div class="main-content overflow-y-auto h-full w-full">
+<div class="{editable ? 'overflow-hidden' : 'overflow-y-auto'} h-full w-full">
     {#if editable}
         <textarea
             on:paste={handlePaste}
             bind:this={contentTextArea}
-            class="whitespace-pre-wrap w-full h-full resize-none"
+            class="whitespace-pre-wrap resize-none p-4 w-full h-full"
             bind:value={fileContent}
             on:keydown={handleKeyDown}
-            on:blur={() => (editable = false)}
         ></textarea>
     {:else}
         <div
             tabindex="0"
             role="button"
-            class="break-all w-full h-full whitespace-pre-wrap"
+            class="break-all w-full h-full whitespace-pre-wrap p-4"
             on:dblclick={() => {
                 if ($selectedFilePath != "") {
                     editable = true;
