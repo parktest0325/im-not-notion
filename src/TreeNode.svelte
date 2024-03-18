@@ -149,6 +149,9 @@
             (event.key === "F2" || event.key === "Enter")
         ) {
             isEditing = true;
+            // 위의 노드가 삭제됐을때 리렌더링이 되면서
+            // editableName이 기존 input 위치의 editableName으로 변해서 강제로 저
+            editableName = node.name;
         }
     }
 
