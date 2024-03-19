@@ -57,11 +57,18 @@ pub fn get_file_list() -> Result<FileSystemNode, InvokeError> {
     let sftp: Sftp = get_global_sftp_session()?;
 
     let hugo_config = get_global_hugo_config()?;
-    let content_path = &hugo_config.content_path;
 
     // 지정된 경로의 파일 리스트를 조회합니다.
-    let file_list = list_directory(&sftp, Path::new(content_path), 5)
-        .map_err(|e| InvokeError::from(e.to_string()))?;
+    // TODO: list_directory의 depth를 5개 까지밖에 안해서 5개 이상의 디렉터리는 이상하게 표시되는 문제가 있다.
+    let file_list = list_directory(
+        &sftp,
+        Path::new(&format!(
+            "{}/{}",
+            &hugo_config.base_path, &hugo_config.content_path
+        )),
+        5,
+    )
+    .map_err(|e| InvokeError::from(e.to_string()))?;
 
     Ok(file_list)
 }
@@ -71,10 +78,15 @@ pub fn get_file_content(file_path: &str) -> Result<String, InvokeError> {
     let sftp: Sftp = get_global_sftp_session()?;
 
     let hugo_config = get_global_hugo_config()?;
-    let content_path = &hugo_config.content_path;
 
-    let file_data = get_file(&sftp, Path::new(&format!("{}{}", content_path, file_path)))
-        .map_err(|e| InvokeError::from(e.to_string()))?;
+    let file_data = get_file(
+        &sftp,
+        Path::new(&format!(
+            "{}/{}/{}",
+            &hugo_config.base_path, &hugo_config.content_path, file_path
+        )),
+    )
+    .map_err(|e| InvokeError::from(e.to_string()))?;
     Ok(file_data)
 }
 
@@ -83,11 +95,13 @@ pub fn save_file_content(file_path: &str, file_data: &str) -> Result<(), InvokeE
     let sftp: Sftp = get_global_sftp_session()?;
 
     let hugo_config = get_global_hugo_config()?;
-    let content_path = &hugo_config.content_path;
 
     save_file(
         &sftp,
-        Path::new(&format!("{}{}", content_path, file_path)),
+        Path::new(&format!(
+            "{}/{}/{}",
+            &hugo_config.base_path, &hugo_config.content_path, file_path
+        )),
         file_data.to_string(),
     )
     .map_err(|e| InvokeError::from(e.to_string()))?;
@@ -103,14 +117,16 @@ pub fn save_file_image(
     let sftp: Sftp = get_global_sftp_session()?;
 
     let hugo_config = get_global_hugo_config()?;
-    let image_path = &hugo_config.image_path;
-
+    // TODO: extract image_ext from image raw data
     let image_ext = "";
     let ret_path = format!("{}/{}{}", file_path, file_name, image_ext);
 
     save_image(
         &sftp,
-        Path::new(&format!("{}{}", image_path, ret_path)),
+        Path::new(&format!(
+            "{}/{}/{}",
+            &hugo_config.base_path, &hugo_config.image_path, ret_path
+        )),
         file_data,
     )
     .map_err(|e| InvokeError::from(e.to_string()))?;
@@ -126,7 +142,10 @@ pub fn new_content_for_hugo(file_path: &str) -> Result<(), InvokeError> {
         &mut channel,
         &hugo_config.base_path,
         &hugo_config.hugo_cmd_path,
-        &format!("{}{}", &hugo_config.content_path, file_path),
+        &format!(
+            "{}/{}/{}",
+            &hugo_config.base_path, &hugo_config.content_path, file_path
+        ),
     )
     .map_err(|e| InvokeError::from(e.to_string()))?;
     Ok(())
@@ -139,7 +158,10 @@ pub fn remove_file(path: &str) -> Result<(), InvokeError> {
 
     rmrf_file(
         &mut channel,
-        &format!("{}{}", &hugo_config.content_path, path),
+        &format!(
+            "{}/{}/{}",
+            &hugo_config.base_path, &hugo_config.content_path, path
+        ),
     )
     .map_err(|e| InvokeError::from(e.to_string()))?;
     Ok(())
@@ -152,8 +174,14 @@ pub fn move_file_or_folder(src: &str, dst: &str) -> Result<(), InvokeError> {
 
     move_file(
         &sftp,
-        &Path::new(&format!("{}{}", &hugo_config.content_path, src)),
-        &Path::new(&format!("{}{}", &hugo_config.content_path, dst)),
+        &Path::new(&format!(
+            "{}/{}/{}",
+            &hugo_config.base_path, &hugo_config.content_path, src
+        )),
+        &Path::new(&format!(
+            "{}/{}/{}",
+            &hugo_config.base_path, &hugo_config.content_path, dst
+        )),
     )
     .map_err(|e| InvokeError::from(e.to_string()))?;
     Ok(())
@@ -166,8 +194,14 @@ pub fn move_to_trashcan(path: &str) -> Result<(), InvokeError> {
 
     move_file(
         &sftp,
-        &Path::new(&format!("{}{}", &hugo_config.content_path, path)),
-        &Path::new(&format!("{}{}", &hugo_config.trashcan_path, path)),
+        &Path::new(&format!(
+            "{}/{}/{}",
+            &hugo_config.base_path, &hugo_config.content_path, path
+        )),
+        &Path::new(&format!(
+            "{}/{}/{}",
+            &hugo_config.base_path, &hugo_config.trashcan_path, path
+        )),
     )
     .map_err(|e| InvokeError::from(e.to_string()))?;
     Ok(())
@@ -179,7 +213,10 @@ pub fn make_directory(path: &str) -> Result<(), InvokeError> {
     let hugo_config = get_global_hugo_config()?;
     mkdir_recursive(
         &sftp,
-        &Path::new(&format!("{}{}", &hugo_config.content_path, path)),
+        &Path::new(&format!(
+            "{}/{}/{}",
+            &hugo_config.base_path, &hugo_config.content_path, path
+        )),
     )
     .map_err(|e| InvokeError::from(e.to_string()))?;
     Ok(())
