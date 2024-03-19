@@ -2,7 +2,7 @@
     export let isMenuOpen: boolean;
     export let toggleMenu: () => void;
     import MdArrowForward from "svelte-icons/md/MdArrowForward.svelte";
-    import { selectedFilePath } from "./stores";
+    import { selectedFilePath } from "../stores";
 </script>
 
 <div class="top-bar p-4" style="background-color:var(--pastel-purple);">

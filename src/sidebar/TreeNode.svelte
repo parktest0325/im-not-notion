@@ -4,7 +4,7 @@
     import FaFolderPlus from "svelte-icons/fa/FaFolderPlus.svelte";
     import { writable } from "svelte/store";
     import TreeNode from "./TreeNode.svelte";
-    import { selectedFilePath, selectedCursor } from "./stores";
+    import { selectedFilePath, selectedCursor } from "../stores";
     import { invoke } from "@tauri-apps/api";
     import { getContext, onDestroy, onMount } from "svelte";
     import { slide } from "svelte/transition";

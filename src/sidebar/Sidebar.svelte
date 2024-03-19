@@ -2,7 +2,7 @@
   export let isMenuOpen: boolean;
   export let toggleMenu: () => void;
   import MdArrowBack from "svelte-icons/md/MdArrowBack.svelte";
-  import SettingsButton from "./SettingsButton.svelte";
+  import Buttons from "./Buttons.svelte";
   import FileControlSection from "./FileControlSection.svelte";
 </script>
 
@@ -19,7 +19,7 @@
     {/if}
   </div>
   <div class="p-4">
-    <SettingsButton />
+    <Buttons />
   </div>
   <div class="flex-grow overflow-y-auto p-4">
     <FileControlSection />

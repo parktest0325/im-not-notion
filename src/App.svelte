@@ -1,7 +1,7 @@
 <script lang="ts">
-  import MainContent from "./MainContent.svelte";
-  import Sidebar from "./Sidebar.svelte";
-  import TopBar from "./TopBar.svelte";
+  import MainContent from "./content/MainContent.svelte";
+  import Sidebar from "./sidebar/Sidebar.svelte";
+  import TopBar from "./topbar/TopBar.svelte";
 
   let isMenuOpen: boolean = true;
 

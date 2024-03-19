@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { selectedFilePath } from "./stores.js";
+    import { selectedFilePath } from "../stores.js";
     import { invoke } from "@tauri-apps/api";
     import { v4 as uuidv4 } from "uuid";
 
