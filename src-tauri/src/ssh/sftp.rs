@@ -131,3 +131,8 @@ pub fn rmrf_file(channel: &mut Channel, path: &str) -> Result<()> {
     channel.exec(&format!("rm -rf {}", path))?;
     Ok(())
 }
+
+// TODO: server reboot... but how?
+// pub fn reboot_hugo_server() -> Result<()> {
+//     Ok(())
+// }

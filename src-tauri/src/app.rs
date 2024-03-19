@@ -222,6 +222,24 @@ pub fn make_directory(path: &str) -> Result<(), InvokeError> {
     Ok(())
 }
 
+// #[tauri::command]
+// pub fn reboot_server_for_hugo() -> Result<(), InvokeError> {
+//     let mut channel = get_global_channel_session()?;
+//     let hugo_config = get_global_hugo_config()?;
+
+//     new_hugo_content(
+//         &mut channel,
+//         &hugo_config.base_path,
+//         &hugo_config.hugo_cmd_path,
+//         &format!(
+//             "{}/{}/{}",
+//             &hugo_config.base_path, &hugo_config.content_path, file_path
+//         ),
+//     )
+//     .map_err(|e| InvokeError::from(e.to_string()))?;
+//     Ok(())
+// }
+
 fn get_global_channel_session() -> Result<Channel, InvokeError> {
     let ssh_client_lock = SSH_CLIENT
         .lock()
