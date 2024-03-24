@@ -1,8 +1,11 @@
 use crate::{
     setting::{AppConfig, HugoConfig},
-    ssh::sftp::{
-        get_file, list_directory, mkdir_recursive, move_file, new_hugo_content, rmrf_file,
-        save_file, save_image, FileSystemNode,
+    ssh::{
+        file_management::{
+            get_file, get_file_list, mkdir_recursive, move_file, rmrf_file, save_file, save_image,
+            FileSystemNode,
+        },
+        hugo_command::hugo_new_content,
     },
 };
 
@@ -53,14 +56,14 @@ pub fn update_and_connect(config: AppConfig) -> Result<(), InvokeError> {
 }
 
 #[tauri::command]
-pub fn get_file_list() -> Result<FileSystemNode, InvokeError> {
+pub fn get_file_list_() -> Result<FileSystemNode, InvokeError> {
     let sftp: Sftp = get_global_sftp_session()?;
 
     let hugo_config = get_global_hugo_config()?;
 
     // 지정된 경로의 파일 리스트를 조회합니다.
     // TODO: list_directory의 depth를 5개 까지밖에 안해서 5개 이상의 디렉터리는 이상하게 표시되는 문제가 있다.
-    let file_list = list_directory(
+    let file_list = get_file_list(
         &sftp,
         Path::new(&format!(
             "{}/{}",
@@ -138,7 +141,7 @@ pub fn new_content_for_hugo(file_path: &str) -> Result<(), InvokeError> {
     let mut channel = get_global_channel_session()?;
     let hugo_config = get_global_hugo_config()?;
 
-    new_hugo_content(
+    hugo_new_content(
         &mut channel,
         &hugo_config.base_path,
         &hugo_config.hugo_cmd_path,
@@ -221,24 +224,6 @@ pub fn make_directory(path: &str) -> Result<(), InvokeError> {
     .map_err(|e| InvokeError::from(e.to_string()))?;
     Ok(())
 }
-
-// #[tauri::command]
-// pub fn reboot_server_for_hugo() -> Result<(), InvokeError> {
-//     let mut channel = get_global_channel_session()?;
-//     let hugo_config = get_global_hugo_config()?;
-
-//     new_hugo_content(
-//         &mut channel,
-//         &hugo_config.base_path,
-//         &hugo_config.hugo_cmd_path,
-//         &format!(
-//             "{}/{}/{}",
-//             &hugo_config.base_path, &hugo_config.content_path, file_path
-//         ),
-//     )
-//     .map_err(|e| InvokeError::from(e.to_string()))?;
-//     Ok(())
-// }
 
 fn get_global_channel_session() -> Result<Channel, InvokeError> {
     let ssh_client_lock = SSH_CLIENT
