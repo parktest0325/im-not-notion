@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use ssh2::{Channel, Sftp};
+
 use std::io::prelude::*;
 
 #[derive(Serialize, Deserialize)]
@@ -18,7 +19,7 @@ enum NodeType {
     Directory,
 }
 
-pub fn list_directory(sftp: &Sftp, path: &Path, depth: usize) -> Result<FileSystemNode> {
+pub fn get_file_list(sftp: &Sftp, path: &Path, depth: usize) -> Result<FileSystemNode> {
     if depth == 0 {
         return Ok(FileSystemNode {
             name: path.to_string_lossy().into_owned(),
@@ -31,7 +32,7 @@ pub fn list_directory(sftp: &Sftp, path: &Path, depth: usize) -> Result<FileSyst
     for entry in sftp.readdir(path)? {
         let (path, stat) = entry;
         let node = if stat.is_dir() {
-            list_directory(sftp, &path, depth - 1)?
+            get_file_list(sftp, &path, depth - 1)?
         } else {
             FileSystemNode {
                 name: path.file_name().unwrap().to_str().unwrap().into(),
@@ -47,6 +48,20 @@ pub fn list_directory(sftp: &Sftp, path: &Path, depth: usize) -> Result<FileSyst
         type_: NodeType::Directory,
         children,
     })
+}
+
+pub fn mkdir_recursive(sftp: &Sftp, path: &Path) -> Result<()> {
+    let mut current_path = PathBuf::new();
+
+    for component in path.components() {
+        current_path.push(component);
+        // 이미 존재하는지 확인
+        if sftp.stat(&current_path).is_err() {
+            sftp.mkdir(&current_path, 0o755)?;
+        }
+    }
+
+    Ok(())
 }
 
 pub fn get_file(sftp: &Sftp, path: &Path) -> Result<String> {
@@ -74,22 +89,8 @@ pub fn save_image(sftp: &Sftp, path: &Path, image: Vec<u8>) -> Result<()> {
         mkdir_recursive(sftp, parent)?;
     }
 
-    let mut file = sftp.create(path)?;
+    let mut file: ssh2::File = sftp.create(path)?;
     file.write_all(&image)?;
-    Ok(())
-}
-
-pub fn mkdir_recursive(sftp: &Sftp, path: &Path) -> Result<()> {
-    let mut current_path = PathBuf::new();
-
-    for component in path.components() {
-        current_path.push(component);
-        // 이미 존재하는지 확인
-        if sftp.stat(&current_path).is_err() {
-            sftp.mkdir(&current_path, 0o755)?;
-        }
-    }
-
     Ok(())
 }
 
@@ -100,7 +101,7 @@ pub fn move_file(sftp: &Sftp, src: &Path, dst: &Path) -> Result<()> {
             Ok(_) => {} // 디렉토리가 존재하면 아무것도 하지 않음
             Err(_) => {
                 // 디렉토리가 존재하지 않으면 생성
-                mkdir_recursive(sftp, parent);
+                mkdir_recursive(sftp, parent)?;
             }
         }
     }
@@ -108,31 +109,7 @@ pub fn move_file(sftp: &Sftp, src: &Path, dst: &Path) -> Result<()> {
     Ok(())
 }
 
-pub fn new_hugo_content(
-    channel: &mut Channel,
-    base: &str,
-    hugo_cmd_path: &str,
-    path: &str,
-) -> Result<()> {
-    channel.exec(&format!(
-        "cd {} ; {} new content {}",
-        base, hugo_cmd_path, path
-    ))?;
-    println!("cd {} ; hugo new content {}", base, path);
-    let mut s = String::new();
-    channel.stderr().read_to_string(&mut s)?;
-    println!("Command stderr: {}", s);
-    channel.read_to_string(&mut s)?;
-    println!("Command stdout: {}", s);
-    Ok(())
-}
-
 pub fn rmrf_file(channel: &mut Channel, path: &str) -> Result<()> {
     channel.exec(&format!("rm -rf {}", path))?;
     Ok(())
 }
-
-// TODO: server reboot... but how?
-// pub fn reboot_hugo_server() -> Result<()> {
-//     Ok(())
-// }
