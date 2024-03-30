@@ -14,7 +14,7 @@
         refreshList,
     });
     export async function refreshList() {
-        const data: FileSystemNode = await invoke("get_file_list");
+        const data: FileSystemNode = await invoke("get_file_list_");
         directoryStructure.set(data.children);
         console.log(data);
     }

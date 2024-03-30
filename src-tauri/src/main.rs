@@ -4,6 +4,7 @@
 mod app;
 mod setting;
 mod ssh;
+mod utils;
 
 use anyhow::Result;
 use app::{

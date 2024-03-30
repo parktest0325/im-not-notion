@@ -6,6 +6,7 @@
   import FaServer from "svelte-icons/fa/FaServer.svelte";
   import GiNuclear from "svelte-icons/gi/GiNuclear.svelte";
   import RebootPopup from "./RebootPopup.svelte";
+  import FaTerminal from "svelte-icons/fa/FaTerminal.svelte";
 
   let bSetting: boolean;
   let bReboot: boolean;
@@ -27,7 +28,7 @@
 
   <button class="p-2" on:click={toggleSettings}>
     <div class="w-6 h-6">
-      <FaFileCode />
+      <FaTerminal />
     </div>
   </button>
 
