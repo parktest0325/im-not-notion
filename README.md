@@ -4,7 +4,7 @@ After setting up the server within the app, you can freely edit the post.
 
 ## USAGE
 Windows can run released files.   
-You can build it directly from your project.   
+You can build it directly from this project.   
 npm run tauri build   
 
 ## Feature

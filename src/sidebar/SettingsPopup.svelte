@@ -7,6 +7,7 @@
   let config: AppConfig;
   let isLoading = true; // 로딩 상태 추가
   let activeTab = "ssh"; // 'ssh' 또는 'hugo'가 될 수 있음
+  let hidePassword = true;
 
   $: if (show) {
     // show가 true일 때만 설정 로드
@@ -120,11 +121,26 @@
               <label class="block min-w-[120px]" for="ssh_client-password"
                 >Password</label
               >
-              <input
-                class="flex-1 p-2 border rounded"
-                id="ssh_client-password"
-                bind:value={config.ssh_config.password}
-              />
+              {#if hidePassword}
+                <input
+                  class="flex-1 p-2 border rounded"
+                  id="ssh_client-password"
+                  type="password"
+                  bind:value={config.ssh_config.password}
+                />
+              {:else}
+                <input
+                  class="flex-1 p-2 border rounded"
+                  id="ssh_client-password"
+                  bind:value={config.ssh_config.password}
+                />
+              {/if}
+              <button
+                class="p-2 border rounded bg-blue-500 text-white"
+                on:click={() => (hidePassword = !hidePassword)}
+              >
+                {hidePassword ? "Hide" : "Show"}
+              </button>
             </div>
             <div class="flex items-center space-x-2">
               <label class="block min-w-[120px]" for="ssh_client-key_path"
