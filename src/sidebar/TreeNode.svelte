@@ -8,6 +8,8 @@
     import { invoke } from "@tauri-apps/api";
     import { getContext, onDestroy, onMount } from "svelte";
     import { slide } from "svelte/transition";
+    import DiJenkins from 'svelte-icons/di/DiJenkins.svelte'
+    import DiComposer from 'svelte-icons/di/DiComposer.svelte'
 
     export let path: string = "/";
     export let node: FileSystemNode;
@@ -172,9 +174,13 @@
                     toggleExpand(event);
                     // onFileClick(event, `${path}${node.name}`);
                 }}
-                class="cursor-pointer style-button pl-1 pr-1"
+                class="cursor-pointer w-6 h-6 rounded"
             >
-                {$isExpanded ? "▼" : "▶︎"}
+            {#if $isExpanded}
+                <img src="/invader_open.svg" alt="open" />
+            {:else}
+                <img src="/invader_close.svg" alt="close"/>
+            {/if}
             </button>
         {/if}
 
