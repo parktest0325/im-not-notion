@@ -5,13 +5,13 @@
     import { selectedFilePath } from "../stores";
 </script>
 
-<div class="top-bar p-4" style="background-color:var(--pastel-purple);">
+<div class="top-bar p-4">
     {#if !isMenuOpen}
         <button on:click={toggleMenu} class="w-6 h-6 mr-4">
             <MdArrowForward />
         </button>
     {/if}
-    <span>{$selectedFilePath}</span>
+    <span class="top-bar-title">{$selectedFilePath}</span>
 </div>
 
 <style>
@@ -21,5 +21,11 @@
     .top-bar {
         align-items: center;
         display: flex;
+        background-color:var(--pastel-purple);
+    }
+
+    .top-bar-title {
+        font-weight: bold;
+        font-size: 20px;
     }
 </style>

@@ -172,7 +172,7 @@
                     toggleExpand(event);
                     // onFileClick(event, `${path}${node.name}`);
                 }}
-                class="cursor-pointer style-button"
+                class="cursor-pointer style-button pl-1 pr-1"
             >
                 {$isExpanded ? "▼" : "▶︎"}
             </button>
@@ -181,7 +181,7 @@
         {#if isEditing}
             <input
                 bind:this={filenameInput}
-                class="filename-input"
+                class="pl-2 pr-2"
                 type="text"
                 bind:value={editableName}
                 on:keydown={handleEdit}
@@ -191,7 +191,7 @@
             />
         {:else}
             <button
-                class="cursor-pointer flex-grow text-left overflow-hidden overflow-ellipsis whitespace-nowrap {$selectedCursor ===
+                class="pl-2 pr-2 font-bold cursor-pointer flex-grow text-left overflow-hidden overflow-ellipsis whitespace-nowrap {$selectedCursor ===
                 path + node.name
                     ? 'bg-yellow-200'
                     : ''}"
