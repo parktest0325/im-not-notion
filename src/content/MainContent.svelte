@@ -13,6 +13,8 @@
 
     $: if ($selectedFilePath) {
         getFileContent($selectedFilePath);
+        scrollPosition = 0;
+        contentDiv?.scrollTo(0, 0);
         editable = false;
     }
 
