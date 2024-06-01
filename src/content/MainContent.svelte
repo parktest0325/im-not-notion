@@ -2,11 +2,14 @@
     import { selectedFilePath } from "../stores.js";
     import { invoke } from "@tauri-apps/api";
     import { v4 as uuidv4 } from "uuid";
+    import { tick } from "svelte";
 
     let fileContent: string = "";
     let editable: boolean = false;
     let showDialog: boolean = false; // 대화상자 표시 상태를 위한 일반 boolean 변수
     let contentTextArea: HTMLTextAreaElement;
+    let contentDiv: HTMLDivElement;
+    let scrollPosition: number = 0; // 스크롤 위치를 저장할 변수 추가
 
     $: if ($selectedFilePath) {
         getFileContent($selectedFilePath);
@@ -14,7 +17,16 @@
     }
 
     $: if (editable) {
-        contentTextArea?.focus();
+        tick().then(() => {
+            contentTextArea?.focus();
+            contentTextArea?.scrollTo(0, scrollPosition);
+        });
+    }
+
+    $: if (!editable) {
+        tick().then(() => {
+            contentDiv?.scrollTo(0, scrollPosition);
+        });
     }
 
     async function getFileContent(filePath: string) {
@@ -52,6 +64,7 @@
     function handleKeyDown(event: KeyboardEvent) {
         console.log("onKeyDown");
         if (editable) {
+            scrollPosition = contentTextArea.scrollTop;
             event.stopPropagation();
             if ((event.ctrlKey || event.metaKey) && event.key === "s") {
                 event.preventDefault();
@@ -148,7 +161,9 @@
         </div>
     </div>
 {/if}
-<div class="{editable ? 'overflow-hidden' : 'overflow-y-auto'} h-full w-full">
+<div 
+    bind:this={contentDiv}
+    class="{editable ? 'overflow-hidden' : 'overflow-y-auto'} h-full w-full">
     {#if editable}
         <textarea
             on:paste={handlePaste}
@@ -164,6 +179,7 @@
             class="break-all w-full h-full whitespace-pre-wrap p-4"
             on:dblclick={() => {
                 if ($selectedFilePath != "") {
+                    scrollPosition = contentDiv.scrollTop;
                     editable = true;
                 }
             }}
