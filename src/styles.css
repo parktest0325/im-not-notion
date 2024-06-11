@@ -37,8 +37,9 @@
   --button-bg-color: #1a73e8;
   --button-hover-bg-color: #174ea6;
   --button-text-color: #ffffff;
-  --textarea-border-color: #1a73e8; /* 추가된 부분 */
-  --textarea-border-width: 2px; /* 추가된 부분 */
+  --textarea-border-color: #1a73e8;
+  --textarea-border-width: 2px;
+  --svg-color: #000;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -69,8 +70,9 @@
     --button-bg-color: #8ab4f8;
     --button-hover-bg-color: #669df6;
     --button-text-color: #121212;
-    --textarea-border-color: #8ab4f8; /* 추가된 부분 */
-    --textarea-border-width: 2px; /* 추가된 부분 */
+    --textarea-border-color: #8ab4f8;
+    --textarea-border-width: 2px;
+    --svg-color: #fff;
   }
 }
 

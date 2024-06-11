@@ -4,6 +4,7 @@
   import MdArrowBack from "svelte-icons/md/MdArrowBack.svelte";
   import Buttons from "./Buttons.svelte";
   import FileControlSection from "./FileControlSection.svelte";
+  import LogoSVG from '../resource/LogoSVG.svelte';
 </script>
 
 <div
@@ -12,7 +13,7 @@
 >
   <div class="flex items-center justify-between p-4" style="background-color: var(--sidebar-bg-color);">
     {#if isMenuOpen}
-      <img src="inn.svg" alt="IM NOT NOTION!" class="max-w-full h-auto" />
+      <LogoSVG />
       <button on:click={toggleMenu} class="text-lg w-6 h-6">
         <MdArrowBack />
       </button>
