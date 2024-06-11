@@ -57,26 +57,24 @@
 
 {#if show}
   <div
-    class="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center p-4"
+    class="fixed inset-0 flex justify-center items-center p-4 settings-overlay"
   >
     {#if isLoading}
       <p>Loading...</p>
     {:else}
-      <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg space-y-4">
+      <div class="settings-popup">
         <!-- 탭 버튼 -->
         <div class="flex space-x-4">
           <button
-            class="flex-1 py-2 px-4 rounded-lg focus:outline-none"
-            class:bg-blue-500={activeTab === "ssh"}
-            class:text-white={activeTab === "ssh"}
+            class="tab-button"
+            class:bg-active={activeTab === "ssh"}
             on:click={() => (activeTab = "ssh")}
           >
             SSH Setting
           </button>
           <button
-            class="flex-1 py-2 px-4 rounded-lg focus:outline-none"
-            class:bg-blue-500={activeTab === "hugo"}
-            class:text-white={activeTab === "hugo"}
+            class="tab-button"
+            class:bg-active={activeTab === "hugo"}
             on:click={() => (activeTab = "hugo")}
           >
             Hugo Setting
@@ -136,7 +134,7 @@
                 />
               {/if}
               <button
-                class="p-2 border rounded bg-blue-500 text-white"
+                class="p-2 border rounded password-toggle"
                 on:click={() => (hidePassword = !hidePassword)}
               >
                 {hidePassword ? "Hide" : "Show"}
@@ -230,13 +228,70 @@
         {/if}
 
         <!-- 공용 저장 버튼 -->
-        <button
-          class="w-full py-2 px-4 bg-blue-500 text-white rounded-lg focus:outline-none"
-          on:click={saveAndClose}
-        >
+        <button class="save-button" on:click={saveAndClose}>
           Save and Exit
         </button>
       </div>
     {/if}
   </div>
 {/if}
+
+<style>
+  .settings-overlay {
+    background-color: var(--settings-popup-overlay-bg-color);
+  }
+
+  .settings-popup {
+    background-color: var(--settings-popup-bg-color);
+    color: var(--settings-popup-text-color);
+    padding: 1.5rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.25);
+    width: 100%;
+    max-width: 32rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .tab-button {
+    flex: 1;
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    border: none;
+    background-color: var(--button-bg-color);
+    color: var(--button-text-color);
+    cursor: pointer;
+    transition: background-color 0.25s;
+  }
+
+  .tab-button.bg-active {
+    background-color: var(--button-hover-bg-color);
+  }
+
+  .password-toggle {
+    background-color: var(--button-bg-color);
+    color: var(--button-text-color);
+    cursor: pointer;
+    transition: background-color 0.25s;
+  }
+
+  .password-toggle:hover {
+    background-color: var(--button-hover-bg-color);
+  }
+
+  .save-button {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background-color: var(--button-bg-color);
+    color: var(--button-text-color);
+    border: none;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: background-color 0.25s;
+  }
+
+  .save-button:hover {
+    background-color: var(--button-hover-bg-color);
+  }
+</style>

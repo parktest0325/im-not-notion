@@ -7,10 +7,10 @@
 </script>
 
 <div
-  class={`flex flex-col h-screen bg-pastel-blue transition-all duration-300 overflow-hidden ${isMenuOpen ? "w-72" : "w-0"}`}
-  style="flex-shrink: 0; background-color:var(--pastel-blue);"
+  class={`flex flex-col h-screen transition-all duration-300 overflow-hidden ${isMenuOpen ? "w-72" : "w-0"}`}
+  style="flex-shrink: 0; background-color: var(--sidebar-bg-color);"
 >
-  <div class="flex items-center justify-between p-4 bg-pastel-blue">
+  <div class="flex items-center justify-between p-4" style="background-color: var(--sidebar-bg-color);">
     {#if isMenuOpen}
       <img src="inn.svg" alt="IM NOT NOTION!" class="max-w-full h-auto" />
       <button on:click={toggleMenu} class="text-lg w-6 h-6">
@@ -25,9 +25,3 @@
     <FileControlSection />
   </div>
 </div>
-
-<style>
-  :root {
-    --pastel-blue: #a3cef1;
-  }
-</style>

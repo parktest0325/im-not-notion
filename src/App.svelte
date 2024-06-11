@@ -12,16 +12,8 @@
 
 <div class="flex h-screen">
   <Sidebar {isMenuOpen} {toggleMenu} />
-  <div class="flex-grow flex flex-col bg-pastel-green">
+  <div class="flex-grow flex flex-col bg-maincontent">
     <TopBar {isMenuOpen} {toggleMenu} />
     <MainContent />
   </div>
 </div>
-
-<style>
-  /* Tailwind CSS에서 커스텀 색상을 정의하는 방법 */
-  .bg-pastel-green {
-    --tw-bg-opacity: 1;
-    background-color: rgba(164, 212, 174, var(--tw-bg-opacity));
-  }
-</style>
