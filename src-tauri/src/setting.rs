@@ -1,10 +1,15 @@
 use serde::{Deserialize, Serialize};
 use std::fs::File;
+use std::path::PathBuf;
+use tauri::api::path::home_dir;
 use tauri::InvokeError;
 
 use crate::utils;
 
-pub const SETTING_FILE_PATH: &str = "./cms_config.json";
+pub fn get_config_file_path() -> PathBuf {
+    let home_dir = home_dir().unwrap();
+    home_dir.join("cms_config.json")
+}
 
 #[derive(Serialize, Deserialize, Default, Debug)]
 pub struct SshConfig {
@@ -54,14 +59,16 @@ pub fn save_config(mut config: AppConfig) -> Result<(), InvokeError> {
             .map_err(|e| InvokeError::from(e.to_string()))?;
     }
 
-    let file = File::create(SETTING_FILE_PATH).map_err(|e| InvokeError::from(e.to_string()))?;
+    let config_file_path = get_config_file_path();
+    let file = File::create(config_file_path).map_err(|e| InvokeError::from(e.to_string()))?;
     serde_json::to_writer_pretty(file, &config).map_err(|e| InvokeError::from(e.to_string()))?;
     Ok(())
 }
 
 #[tauri::command]
 pub fn load_config() -> Result<AppConfig, InvokeError> {
-    let file = File::open(SETTING_FILE_PATH).map_err(|e| InvokeError::from(e.to_string()))?;
+    let config_file_path = get_config_file_path();
+    let file = File::open(config_file_path).map_err(|e| InvokeError::from(e.to_string()))?;
     let mut config: AppConfig =
         serde_json::from_reader(file).map_err(|e| InvokeError::from(e.to_string()))?;
 
