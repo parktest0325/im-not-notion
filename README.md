@@ -7,6 +7,10 @@ Windows can run released files.
 You can build it directly from this project.   
 npm run tauri build   
 
+```bash
+codesign --force --deep --sign - im-not-notion.app
+```
+
 ## Feature
 * Connect to hugo server and get list of posts   
 Enter IP(Domain), Port, ID, and Password and save.   
