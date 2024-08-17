@@ -19,6 +19,7 @@ anyhow = "1.0.80"
 image = "0.25.0"
 aes-gcm = "0.10.3"
 base64 = "0.22.0"
+time = "0.3"
 
 [features]
 # This feature is used for production builds or when a dev server is not specified, DO NOT REMOVE!!
