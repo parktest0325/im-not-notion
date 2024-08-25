@@ -4,7 +4,7 @@
     import IoMdRefresh from "svelte-icons/io/IoMdRefresh.svelte";
     import { writable } from "svelte/store";
     import TreeNode from "./TreeNode.svelte";
-    import { setContext } from "svelte";
+    import { setContext, onMount } from "svelte";
     import { selectedCursor, selectedFilePath } from "../stores";
 
     let searchTerm: string = "";
@@ -18,6 +18,10 @@
         directoryStructure.set(data.children);
         console.log(data);
     }
+
+    onMount(async () => {
+        await refreshList();
+    });
 
     const searchFiles = (term: string) => {
         // 검색 로직

@@ -14,6 +14,16 @@ use app::{
 use setting::{load_config, save_config};
 
 fn main() -> Result<()> {
+    // SSH 연결 설정
+    match load_config() {
+        Ok(config) => {
+            if let Err(e) = update_and_connect(config) {
+                eprintln!("Failed to update and connect: {:?}", e);
+            }
+        }
+        Err(e) => eprintln!("Failed to load config: {:?}", e),
+    }
+
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             load_config,

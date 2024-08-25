@@ -6,14 +6,14 @@ use ssh2::{Channel, Sftp};
 
 use std::io::prelude::*;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct FileSystemNode {
     name: String,
     type_: NodeType,
     children: Vec<FileSystemNode>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 enum NodeType {
     File,
     Directory,
