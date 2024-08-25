@@ -5,9 +5,7 @@
   import Buttons from "./Buttons.svelte";
   import FileControlSection from "./FileControlSection.svelte";
   import LogoSVG from '../resource/LogoSVG.svelte';
-  import { writable } from "svelte/store";
-
-  let isConnected = writable(false);
+  import { isConnected } from "../stores";
 </script>
 
 <div
