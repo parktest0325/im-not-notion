@@ -5,6 +5,9 @@
   import Buttons from "./Buttons.svelte";
   import FileControlSection from "./FileControlSection.svelte";
   import LogoSVG from '../resource/LogoSVG.svelte';
+  import { writable } from "svelte/store";
+
+  let isConnected = writable(false);
 </script>
 
 <div
@@ -23,6 +26,19 @@
     <Buttons />
   </div>
   <div class="flex-grow overflow-y-auto p-4">
-    <FileControlSection />
+    <FileControlSection {isConnected} />
+  </div>
+  <div class="p-4 flex items-center">
+    {#if $isConnected}
+      <div class="flex items-center text-green-500">
+        <div class="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+        Connected
+      </div>
+    {:else}
+      <div class="flex items-center text-red-500">
+        <div class="w-2 h-2 bg-red-500 rounded-full mr-2"></div>
+        Not Connected
+      </div>
+    {/if}
   </div>
 </div>

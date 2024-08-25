@@ -9,14 +9,21 @@
 
     let searchTerm: string = "";
     let directoryStructure = writable<FileSystemNode[]>([]);
+    export let isConnected = writable(false);
 
     setContext("globalFunctions", {
         refreshList,
     });
     export async function refreshList() {
-        const data: FileSystemNode = await invoke("get_file_list_");
-        directoryStructure.set(data.children);
-        console.log(data);
+        try {
+            const data: FileSystemNode = await invoke("get_file_list_");
+            directoryStructure.set(data.children);
+            isConnected.set(true); // 파일 리스트를 정상적으로 가져온 경우
+            console.log(data);
+        } catch (error) {
+            console.error("Failed to update file list:", error);
+            isConnected.set(false); // 파일 리스트를 가져오지 못한 경우
+        }
     }
 
     onMount(async () => {
