@@ -1,17 +1,22 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod app;
-mod setting;
-mod ssh;
+mod commands;
+mod types;
 mod utils;
+mod services;
 
 use anyhow::Result;
-use app::{
-    get_file_content, get_file_list_, make_directory, move_file_or_folder, move_to_trashcan,
-    new_content_for_hugo, remove_file, save_file_content, save_file_image, update_and_connect,
+use commands::{
+    file_command::{
+        get_file_content, get_file_list_, move_file_or_folder,
+        new_content_for_hugo, remove_file, save_file_content, save_file_image
+    },
+    config_command::{
+        load_config, save_config
+    },
+    ssh_command::update_and_connect
 };
-use setting::{load_config, save_config};
 
 fn main() -> Result<()> {
     // SSH 연결 설정
@@ -35,11 +40,10 @@ fn main() -> Result<()> {
             save_file_image,
             new_content_for_hugo,
             move_file_or_folder,
-            move_to_trashcan,
-            make_directory,
             remove_file
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+
     Ok(())
 }

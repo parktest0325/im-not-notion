@@ -1456,6 +1456,7 @@ dependencies = [
  "anyhow",
  "base64 0.22.1",
  "image 0.25.2",
+ "once_cell",
  "rand 0.8.5",
  "serde",
  "serde_json",

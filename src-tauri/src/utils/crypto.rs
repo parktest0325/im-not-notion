@@ -46,7 +46,7 @@ fn get_device_id() -> Result<String> {
 }
 
 fn generate_key(device_id: &str) -> GenericArray<u8, typenum::U32> {
-    let mut hasher = Sha256::new();
+    let mut hasher = Sha256::default();
     hasher.update(device_id.as_bytes());
     let result = hasher.finalize();
     GenericArray::clone_from_slice(&result[0..32])
