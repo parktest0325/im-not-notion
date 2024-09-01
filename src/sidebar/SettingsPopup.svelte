@@ -17,29 +17,14 @@
   async function loadConfig() {
     isLoading = true; // 로딩 시작
     try {
-      config = await invoke("load_config");
+      const loadedConfig : AppConfig = await invoke("load_config");
+      config = {
+        ...createDefaultAppConfig(),
+        ...loadedConfig,
+      };
     } catch (error) {
       console.log("Failed to load config:", error);
-      config = {
-        ssh_config: {
-          host: "",
-          port: "",
-          username: "",
-          password: "",
-          key_path: "",
-        },
-        cms_config: {
-          hugo_config: {
-            trashcan_path: "",
-            hugo_cmd_path: "",
-            base_path: "",
-            content_path: "",
-            image_path: "",
-            config_path: "",
-            layout_path: "",
-          },
-        }
-      };
+      config = createDefaultAppConfig();
     } finally {
       isLoading = false; // 로딩 완료
     }

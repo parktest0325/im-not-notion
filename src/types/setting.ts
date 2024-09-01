@@ -32,3 +32,39 @@ interface FileSystemNode {
     type_: 'File' | 'Directory';
     children: FileSystemNode[];
 }
+
+// 기본값이 포함된 객체 생성 함수
+function createDefaultSshConfig(): SshConfig {
+    return {
+        host: "",
+        port: "",
+        username: "",
+        password: "",
+        key_path: "",
+    };
+}
+
+function createDefaultHugoConfig(): HugoConfig {
+    return {
+        hugo_cmd_path: "",
+        base_path: "",
+        content_path: "",
+        image_path: "",
+        config_path: "",
+        layout_path: "",
+        trashcan_path: "",
+    };
+}
+
+function createDefaultCmsConfig(): CmsConfig {
+    return {
+        hugo_config: createDefaultHugoConfig(),
+    };
+}
+
+function createDefaultAppConfig(): AppConfig {
+    return {
+        ssh_config: createDefaultSshConfig(),
+        cms_config: createDefaultCmsConfig(),
+    };
+}
