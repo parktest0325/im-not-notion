@@ -28,15 +28,17 @@
           password: "",
           key_path: "",
         },
-        hugo_config: {
-          trashcan_path: "",
-          hugo_cmd_path: "",
-          base_path: "",
-          content_path: "",
-          image_path: "",
-          config_path: "",
-          layout_path: "",
-        },
+        cms_config: {
+          hugo_config: {
+            trashcan_path: "",
+            hugo_cmd_path: "",
+            base_path: "",
+            content_path: "",
+            image_path: "",
+            config_path: "",
+            layout_path: "",
+          },
+        }
       };
     } finally {
       isLoading = false; // 로딩 완료
@@ -161,7 +163,7 @@
               <input
                 class="flex-1 p-2 border rounded"
                 id="hugo_config-hugo_cmd_path"
-                bind:value={config.hugo_config.hugo_cmd_path}
+                bind:value={config.cms_config.hugo_config.hugo_cmd_path}
               />
             </div>
             <div class="flex items-center space-x-2">
@@ -171,7 +173,7 @@
               <input
                 class="flex-1 p-2 border rounded"
                 id="hugo_config-base_path"
-                bind:value={config.hugo_config.base_path}
+                bind:value={config.cms_config.hugo_config.base_path}
               />
             </div>
             <div class="flex items-center space-x-2">
@@ -181,7 +183,7 @@
               <input
                 class="flex-1 p-2 border rounded"
                 id="hugo_config-content_path"
-                bind:value={config.hugo_config.content_path}
+                bind:value={config.cms_config.hugo_config.content_path}
               />
             </div>
             <div class="flex items-center space-x-2">
@@ -191,7 +193,7 @@
               <input
                 class="flex-1 p-2 border rounded"
                 id="hugo_config-image_path"
-                bind:value={config.hugo_config.image_path}
+                bind:value={config.cms_config.hugo_config.image_path}
               />
             </div>
             <div class="flex items-center space-x-2">
@@ -201,7 +203,7 @@
               <input
                 class="flex-1 p-2 border rounded"
                 id="hugo_config-config_path"
-                bind:value={config.hugo_config.config_path}
+                bind:value={config.cms_config.hugo_config.config_path}
               />
             </div>
             <div class="flex items-center space-x-2">
@@ -211,7 +213,7 @@
               <input
                 class="flex-1 p-2 border rounded"
                 id="hugo_config-layout_path"
-                bind:value={config.hugo_config.layout_path}
+                bind:value={config.cms_config.hugo_config.layout_path}
               />
             </div>
             <div class="flex items-center space-x-2">
@@ -221,7 +223,7 @@
               <input
                 class="flex-1 p-2 border rounded"
                 id="hugo_config-trashcan_path"
-                bind:value={config.hugo_config.trashcan_path}
+                bind:value={config.cms_config.hugo_config.trashcan_path}
               />
             </div>
           </div>

@@ -18,9 +18,13 @@ interface HugoConfig {
     [key: string]: string;
 }
 
+interface CmsConfig {
+    hugo_config: HugoConfig;
+}
+
 interface AppConfig {
     ssh_config: SshConfig;
-    hugo_config: HugoConfig;
+    cms_config: CmsConfig;
 }
 
 interface FileSystemNode {
