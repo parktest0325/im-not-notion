@@ -8,6 +8,7 @@
     import { invoke } from "@tauri-apps/api";
     import { getContext, onDestroy, onMount } from "svelte";
     import { slide } from "svelte/transition";
+    import type { FileSystemNode } from "../types/setting";
     import DiJenkins from 'svelte-icons/di/DiJenkins.svelte'
     import DiComposer from 'svelte-icons/di/DiComposer.svelte'
 

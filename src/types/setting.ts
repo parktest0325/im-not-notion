@@ -68,3 +68,6 @@ function createDefaultAppConfig(): AppConfig {
         cms_config: createDefaultCmsConfig(),
     };
 }
+
+export type { SshConfig, HugoConfig, CmsConfig, AppConfig, FileSystemNode };
+export { createDefaultAppConfig };

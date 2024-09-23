@@ -6,6 +6,7 @@
     import TreeNode from "./TreeNode.svelte";
     import { setContext, onMount } from "svelte";
     import { selectedCursor, selectedFilePath } from "../stores";
+    import type { FileSystemNode } from "../types/setting";
 
     let searchTerm: string = "";
     let directoryStructure = writable<FileSystemNode[]>([]);

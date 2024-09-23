@@ -1,6 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api";
   import DynamicField from "../component/DynamicField.svelte";
+  import { createDefaultAppConfig, type AppConfig } from "../types/setting";
 
   export let show: boolean;
   export let closeSettings: () => void;
