@@ -11,7 +11,7 @@ pub fn get_file_list_() -> Result<FileSystemNode, InvokeError> {
     let hugo_config = get_hugo_config().map_err(|e| InvokeError::from(e.to_string()))?;
     let file_list = get_file_list(
         &sftp,
-        Path::new(&format!("{}/{}", &hugo_config.base_path, &hugo_config.content_path)),
+        Path::new(&format!("{}/content/{}", &hugo_config.base_path, &hugo_config.content_path)),
         5,
     ).map_err(|e| InvokeError::from(e.to_string()))?;
     Ok(file_list)
@@ -23,7 +23,7 @@ pub fn get_file_content(file_path: &str) -> Result<String, InvokeError> {
     let hugo_config = get_hugo_config().map_err(|e| InvokeError::from(e.to_string()))?;
     let file_data = get_file(
         &sftp,
-        Path::new(&format!("{}/{}/{}", &hugo_config.base_path, &hugo_config.content_path, file_path)),
+        Path::new(&format!("{}/content/{}/{}", &hugo_config.base_path, &hugo_config.content_path, file_path)),
     ).map_err(|e| InvokeError::from(e.to_string()))?;
     Ok(file_data)
 }
@@ -37,7 +37,7 @@ pub fn save_file_content(file_path: &str, file_data: &str) -> Result<(), InvokeE
     save_file(
         &sftp,
         Path::new(&format!(
-            "{}/{}/{}",
+            "{}/content/{}/{}",
             &hugo_config.base_path, &hugo_config.content_path, file_path
         )),
         file_data.to_string(),
@@ -82,7 +82,7 @@ pub fn new_content_for_hugo(file_path: &str) -> Result<(), InvokeError> {
             &hugo_config.base_path,
             &hugo_config.hugo_cmd_path,
             &format!(
-                "{}/{}/{}",
+                "{}/content/{}/{}",
                 &hugo_config.base_path, &hugo_config.content_path, file_path
             )
         ),
@@ -98,7 +98,7 @@ pub fn remove_file(path: &str) -> Result<(), InvokeError> {
     rmrf_file(
         &mut channel,
         &format!(
-            "{}/{}/{}",
+            "{}/content/{}/{}",
             &hugo_config.base_path, &hugo_config.content_path, path
         ),
     )
@@ -114,11 +114,11 @@ pub fn move_file_or_folder(src: &str, dst: &str) -> Result<(), InvokeError> {
     move_file(
         &sftp,
         &Path::new(&format!(
-            "{}/{}/{}",
+            "{}/content/{}/{}",
             &hugo_config.base_path, &hugo_config.content_path, src
         )),
         &Path::new(&format!(
-            "{}/{}/{}",
+            "{}/content/{}/{}",
             &hugo_config.base_path, &hugo_config.content_path, dst
         )),
     )

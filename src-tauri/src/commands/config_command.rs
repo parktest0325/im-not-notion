@@ -14,3 +14,8 @@ pub fn save_config(config: AppConfig) -> Result<(), InvokeError> {
     set_app_config(config).map_err(|e| InvokeError::from(e.to_string()))?;
     save_app_config().map_err(|e| InvokeError::from(e.to_string()))
 }
+
+#[command]
+pub fn get_config() -> Result<AppConfig, InvokeError> {
+    get_app_config().map_err(|e| InvokeError::from(e.to_string()))
+}

@@ -32,7 +32,6 @@ impl AppConfig {
         Ok(())
     }
 
-    // config를 파일에 저장
     pub fn save_config_to_file(&self) -> Result<()> {
         let config_file_path = Self::get_config_path();
         let file = OpenOptions::new()

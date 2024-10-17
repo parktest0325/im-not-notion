@@ -13,7 +13,7 @@ use commands::{
         new_content_for_hugo, remove_file, save_file_content, save_file_image
     },
     config_command::{
-        load_config, save_config
+        load_config, save_config, get_config
     },
     ssh_command::update_and_connect
 };
@@ -33,6 +33,7 @@ fn main() -> Result<()> {
         .invoke_handler(tauri::generate_handler![
             load_config,
             save_config,
+            get_config,
             update_and_connect,
             get_file_list_,
             get_file_content,

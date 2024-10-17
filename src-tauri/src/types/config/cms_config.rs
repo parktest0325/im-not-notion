@@ -5,6 +5,8 @@ use serde_json::Value;
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 pub struct HugoConfig {
     #[serde(default)]
+    pub url: String,
+    #[serde(default)]
     pub hugo_cmd_path: String,
     #[serde(default)]
     pub base_path: String,

@@ -8,6 +8,7 @@ interface SshConfig {
 }
 
 interface HugoConfig {
+    url: string,
     hugo_cmd_path: string,
     base_path: string,
     content_path: string,
@@ -46,6 +47,7 @@ function createDefaultSshConfig(): SshConfig {
 
 function createDefaultHugoConfig(): HugoConfig {
     return {
+        url: "",
         hugo_cmd_path: "",
         base_path: "",
         content_path: "",
