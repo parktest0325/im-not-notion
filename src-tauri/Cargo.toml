@@ -1,7 +1,7 @@
 [package]
 name = "im_not_notion"
 version = "0.1.4"
-description = "A Tauri App"
+description = "im_not_notion"
 authors = ["you"]
 edition = "2021"
 
