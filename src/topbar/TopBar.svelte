@@ -9,9 +9,13 @@
   import { type AppConfig } from "../types/setting";
 
   function handleOpenPage() {
-    let cleanedPath = $selectedFilePath.replace(/\.md$/, "").replace(/\/_index$/, "");
+    let cleanedPath = $selectedFilePath
+      .replace(/\.md$/, "")
+      .replace(/\/_index$/, "")
+      .toLowerCase();
+      
     const fullUrl = new URL(`${contentPath}${cleanedPath}`, url);
-    window.open(fullUrl.toString(), "_blank");
+    window.open(fullUrl.toString().toLowerCase(), "_blank");
   }
 
   let config: AppConfig;
