@@ -200,7 +200,7 @@
             <button
                 class="pl-2 pr-2 font-bold cursor-pointer flex-grow text-left overflow-hidden overflow-ellipsis whitespace-nowrap {$selectedCursor ===
                 path + node.name
-                    ? 'bg-yellow-200'
+                    ? 'bg-selected-file'
                     : ''}"
                 on:click={onFileClick}
             >
@@ -262,3 +262,11 @@
         </ul>
     {/if}
 </li>
+
+
+<style>
+    .bg-selected-file {
+        background-color: var(--selected-bg-color);
+        color: var(--selected-text-color);
+    }
+</style>

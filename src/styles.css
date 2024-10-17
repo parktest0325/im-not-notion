@@ -41,6 +41,9 @@
   --textarea-border-width: 2px;
   --svg-color: #000;
 
+  --selected-bg-color: #FFF59D;
+  --selected-text-color: #333333;
+
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -73,6 +76,9 @@
     --textarea-border-color: #8ab4f8;
     --textarea-border-width: 2px;
     --svg-color: #fff;
+
+    --selected-bg-color: #16A085;
+    --selected-text-color: #ECF0F1;
   }
 }
 
