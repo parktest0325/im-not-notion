@@ -32,7 +32,7 @@
       "targets": "all",
       "identifier": "im-not-notion",
       "icon": [
-        "icons/favicon.ico"
+        "icons/nottion.ico"
       ]
     }
   }
