@@ -31,10 +31,12 @@ fn get_device_id() -> Result<String> {
 
 #[cfg(target_os = "windows")]
 fn get_device_id() -> Result<String> {
+    use std::os::windows::process::CommandExt;
     let output = Command::new("wmic")
         .arg("csproduct")
         .arg("get")
         .arg("UUID")
+        .creation_flags(0x08000000) // CREATE_NO_WINDOW
         .output()
         .context("Failed to execute wmic command")?;
     let output_str = String::from_utf8(output.stdout).context("Failed to parse wmic output")?;
