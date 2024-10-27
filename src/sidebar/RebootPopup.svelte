@@ -1,10 +1,18 @@
 <script lang="ts">
+    import { invoke } from "@tauri-apps/api";
     export let show: boolean;
     export let closeReboot: () => void;
 
-    function handleReboot() {
-        console.log("Rebooting the server...");
-        closeReboot(); // 팝업 닫기
+    async function handleReboot() {
+        try {
+            console.log("Rebooting the server...");
+            await invoke("kill_server");
+            await invoke("start_server");
+        } catch (error) {
+            console.log("Failed to reboot the server:", error);
+        } finally {
+            closeReboot();
+        }
     }
 </script>
 

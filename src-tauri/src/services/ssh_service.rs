@@ -48,7 +48,10 @@ pub fn get_sftp_session() -> Result<Sftp> {
 }
 
 pub fn execute_ssh_command(channel: &mut Channel, command: &str) -> Result<String> {
-    channel.exec(command).context("Failed to execute SSH command")?;
+    match channel.exec(command) {
+        Ok(_) => println!("Command executed successfully"),
+        Err(e) => eprintln!("Failed to execute SSH command: {:#}", e),
+    }
 
     let mut s = String::new();
     channel.stderr().read_to_string(&mut s).context("Failed to read from SSH stderr")?;
