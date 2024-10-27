@@ -10,6 +10,7 @@ npm run tauri build
 ```bash
 codesign --force --deep --sign - im-not-notion.app
 ```
+https://designer-bri.tistory.com/4
 
 ## Feature
 * Connect to hugo server and get list of posts   
