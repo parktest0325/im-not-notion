@@ -38,10 +38,6 @@
     async function createFolder(event: MouseEvent) {
         event.stopPropagation();
         try {
-            // const createdPath = "/new_folder";
-            // await invoke("make_directory", {
-            //     path: createdPath,
-            // });
             const createdPath = "/new_folder/_index.md";
             await invoke("new_content_for_hugo", {
                 filePath: createdPath,
@@ -53,7 +49,6 @@
             console.error("failed to make directory:", error);
         }
         console.log("Create folder");
-        // 디렉터리 생성 로직 구현
     }
 </script>
 

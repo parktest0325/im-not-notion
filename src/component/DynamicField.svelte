@@ -23,22 +23,8 @@
       <input class="flex-1 p-2 border rounded" bind:value={config[configKey]} />
     {/if}
     {#if isPasswordField}
-      <button class="p-2 border rounded password-toggle" on:click={toggleHidePassword}>
+      <button class="p-2 border rounded" on:click={toggleHidePassword}>
         {hidePassword ? "Show" : "Hide"}
       </button>
     {/if}
   </div>
-  
-  <style>
-    .password-toggle {
-      background-color: var(--button-bg-color);
-      color: var(--button-text-color);
-      cursor: pointer;
-      transition: background-color 0.25s;
-    }
-  
-    .password-toggle:hover {
-      background-color: var(--button-hover-bg-color);
-    }
-  </style>
-  

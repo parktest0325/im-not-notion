@@ -266,7 +266,7 @@
 
 <style>
     .bg-selected-file {
-        background-color: var(--selected-bg-color);
-        color: var(--selected-text-color);
+        background-color: var(--button-selected-bg-color);
+        color: var(--button-selected-text-color);
     }
 </style>

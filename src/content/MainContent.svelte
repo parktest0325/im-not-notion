@@ -182,12 +182,12 @@
     </div>
   </div>
 {/if}
-<div bind:this={contentDiv} class="{editable ? 'overflow-hidden' : 'overflow-y-auto'} h-full w-full" style="background-color: var(--maincontent-bg-color);">
+<div bind:this={contentDiv} class="{editable ? 'overflow-hidden' : 'overflow-y-auto'} h-full w-full">
   {#if editable}
     <textarea
       on:paste={handlePaste}
       bind:this={contentTextArea}
-      class="editable-textarea whitespace-pre-wrap resize-none p-4 w-full h-full"
+      class="whitespace-pre-wrap resize-none p-4 w-full h-full"
       bind:value={fileContent}
       on:keydown={handleKeyDown}
     ></textarea>
@@ -207,13 +207,3 @@
     </div>
   {/if}
 </div>
-
-<style>
-  .editable-textarea {
-    background-color: var(--maincontent-bg-color);
-    color: var(--text-color);
-    border: 2px solid var(--input-button-border-hover-color);
-    border-radius: 8px;
-    box-shadow: 0 2px 2px rgba(0, 0, 0, 0.2);
-  }
-</style>

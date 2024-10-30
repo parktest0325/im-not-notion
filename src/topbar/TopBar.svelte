@@ -32,16 +32,16 @@
   });
 </script>
 
-<div class="top-bar p-4 flex justify-between items-center" style="background-color: var(--topbar-bg-color);">
+<div class="p-4 flex justify-between items-center" style="background-color: var(--topbar-bg-color);">
   <div class="flex items-center">
     {#if !isMenuOpen}
       <button on:click={toggleMenu} class="w-6 h-6 mr-4">
         <MdArrowForward />
       </button>
     {/if}
-    <span class="top-bar-title pr-4">{$selectedFilePath}</span>
+    <span>{$selectedFilePath}</span>
   </div>
-  <button on:click={handleOpenPage} class="w-6 h-6 border flex items-center justify-center" style="border-radius: 0;">
+  <button on:click={handleOpenPage} class="w-6 h-6 border flex items-center justify-center">
     <DiIe />
   </button>
 </div>
