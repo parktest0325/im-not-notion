@@ -4,7 +4,7 @@
   import MdArrowForward from "svelte-icons/md/MdArrowForward.svelte";
   import DiIe from 'svelte-icons/di/DiIe.svelte'
   import { selectedFilePath } from "../stores";
-  import { invoke } from "@tauri-apps/api";
+  import { shell, invoke } from "@tauri-apps/api";
   import { onMount } from "svelte";
   import { type AppConfig } from "../types/setting";
 
@@ -15,7 +15,7 @@
       .toLowerCase();
       
     const fullUrl = new URL(`${contentPath}${cleanedPath}`, url);
-    window.open(fullUrl.toString().toLowerCase(), "_blank");
+    shell.open(fullUrl.toString().toLowerCase());
   }
 
   let config: AppConfig;
