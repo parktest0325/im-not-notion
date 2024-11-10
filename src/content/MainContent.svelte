@@ -4,6 +4,7 @@
   import { v4 as uuidv4 } from "uuid";
   import { tick, onMount, onDestroy } from "svelte";
   import { writable } from "svelte/store";
+  import SavePopup from "./SavePopup.svelte";
 
   let fileContent: string = "";
   let editable: boolean = false;
@@ -160,28 +161,18 @@
   });
 </script>
 
-{#if showDialog}
-  <div class="fixed inset-0 bg-gray-600 bg-opacity-50 flex justify-center items-center">
-    <div class="bg-white p-4 rounded-lg shadow-lg space-y-4">
-      <p>Are you Saving?</p>
-      <div class="flex justify-end space-x-2">
-        <button
-          class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-700"
-          on:click={() => {
-            saveContent();
-            editable = false;
-            showDialog = false;
-          }}>Yes</button>
-        <button
-          class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-700"
-          on:click={() => {
-            showDialog = false;
-            editable = true;
-          }}>No</button>
-      </div>
-    </div>
-  </div>
-{/if}
+<SavePopup show={showDialog}
+  closeSave={() => {
+    showDialog = false;
+    editable = true;
+  }}
+  handleSave={() => {
+    saveContent();
+    editable = false;
+    showDialog = false;
+  }}
+/>
+
 <div bind:this={contentDiv} class="{editable ? 'overflow-hidden' : 'overflow-y-auto'} h-full w-full">
   {#if editable}
     <textarea
