@@ -11,6 +11,8 @@
     import type { FileSystemNode } from "../types/setting";
     import DiJenkins from 'svelte-icons/di/DiJenkins.svelte'
     import DiComposer from 'svelte-icons/di/DiComposer.svelte'
+    import FolderClose from '../resource/InvaderClose.svelte';
+    import FolderOpen from '../resource/InvaderOpen.svelte';
 
     export let path: string = "/";
     export let node: FileSystemNode;
@@ -178,9 +180,9 @@
                 class="cursor-pointer w-6 h-6 rounded"
             >
             {#if $isExpanded}
-                <img src="/invader_open.svg" alt="open" />
+                <FolderOpen />
             {:else}
-                <img src="/invader_close.svg" alt="close"/>
+                <FolderClose />
             {/if}
             </button>
         {/if}
