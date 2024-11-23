@@ -14,8 +14,8 @@ pub struct SshConfig {
     pub username: String,
     #[serde(default)]
     pub password: String,
-    #[serde(default)]
-    pub key_path: String,
+    // #[serde(default)]
+    // pub key_path: String,
 }
 
 impl SshConfig {

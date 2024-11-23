@@ -16,14 +16,15 @@ pub fn connect_ssh(config: &AppConfig) -> Result<()> {
     if !config.ssh_config.password.is_empty() {
         session.userauth_password(&config.ssh_config.username, &config.ssh_config.password)
             .context("Failed to authenticate with password")?;
-    } else {
-        session.userauth_pubkey_file(
-            &config.ssh_config.username,
-            None,
-            Path::new(&config.ssh_config.key_path),
-            None,
-        ).context("Failed to authenticate with public key")?;
     }
+    // else {
+    //     session.userauth_pubkey_file(
+    //         &config.ssh_config.username,
+    //         None,
+    //         Path::new(&config.ssh_config.key_path),
+    //         None,
+    //     ).context("Failed to authenticate with public key")?;
+    // }
 
     let mut ssh_client = SSH_CLIENT.lock().unwrap();
     *ssh_client = Some(session);

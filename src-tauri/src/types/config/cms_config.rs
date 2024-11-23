@@ -14,12 +14,12 @@ pub struct HugoConfig {
     pub content_path: String,
     #[serde(default)]
     pub image_path: String,
-    #[serde(default)]
-    pub config_path: String,
-    #[serde(default)]
-    pub layout_path: String,
-    #[serde(default)]
-    pub trashcan_path: String,
+    // #[serde(default)]
+    // pub config_path: String,
+    // #[serde(default)]
+    // pub layout_path: String,
+    // #[serde(default)]
+    // pub trashcan_path: String,
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]

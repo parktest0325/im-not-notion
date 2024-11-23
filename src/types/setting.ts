@@ -3,7 +3,7 @@ interface SshConfig {
     port: string;
     username: string;
     password: string;
-    key_path: string;
+    // key_path: string;
     [key: string]: string;
 }
 
@@ -13,9 +13,9 @@ interface HugoConfig {
     base_path: string,
     content_path: string,
     image_path: string,
-    config_path: string,
-    layout_path: string,
-    trashcan_path: string,
+    // config_path: string,
+    // layout_path: string,
+    // trashcan_path: string,
     [key: string]: string;
 }
 
@@ -41,7 +41,7 @@ function createDefaultSshConfig(): SshConfig {
         port: "",
         username: "",
         password: "",
-        key_path: "",
+        // key_path: "",
     };
 }
 
@@ -52,9 +52,9 @@ function createDefaultHugoConfig(): HugoConfig {
         base_path: "",
         content_path: "",
         image_path: "",
-        config_path: "",
-        layout_path: "",
-        trashcan_path: "",
+        // config_path: "",
+        // layout_path: "",
+        // trashcan_path: "",
     };
 }
 
