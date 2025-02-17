@@ -7,10 +7,12 @@ Windows can run released files.
 You can build it directly from this project.   
 npm run tauri build   
 
+#### for MAC
+This app is unsigned, so the following steps are required:
 ```bash
-codesign --force --deep --sign - im-not-notion.app
+xattr -d com.apple.quarantine /path/to/im-not-notion.app
 ```
-https://designer-bri.tistory.com/4
+
 
 ## Feature
 * Connect to hugo server and get list of posts   
