@@ -2,6 +2,24 @@
 This is a tauri(rust + svelte) project that allows you to manage content by connecting to a static content site server such as hugo via ssh.   
 After setting up the server within the app, you can freely edit the post.   
 
+
+## DEVELOPMENT
+### for MAC
+```zsh
+# 1. install rustup
+# https://rustup.rs/
+$ curl --proto '=https' --tlsv1.2 https://sh.rustup.rs -sSf | sh
+$ . "$HOME/.cargo/env"
+
+# 2. install node
+# https://nodejs.org/ko
+
+# 3. run app
+$ npm install
+$ npm run tauri dev
+$ npm run tauri build
+```
+
 ## USAGE
 Windows can run released files.   
 You can build it directly from this project.   
