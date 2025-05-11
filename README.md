@@ -2,6 +2,8 @@
 This is a tauri(rust + svelte) project that allows you to manage content by connecting to a static content site server such as hugo via ssh.   
 After setting up the server within the app, you can freely edit the post.   
 
+![image](https://github.com/user-attachments/assets/fd64ce39-9594-45b5-8536-9696e40f36ae)
+
 
 ## DEVELOPMENT
 ### for MAC
