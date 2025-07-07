@@ -76,11 +76,6 @@ pub fn new_content_for_hugo(file_path: &str) -> Result<(), InvokeError> {
     let mut channel = get_channel_session().map_err(|e| InvokeError::from(e.to_string()))?;
     let hugo_config = get_hugo_config().map_err(|e| InvokeError::from(e.to_string()))?;
 
-    // file_path is relative to the configured content directory. Trim any
-    // leading slash to avoid duplicated separators when constructing the final
-    // path for the `hugo new` command.
-    let sanitized_path = file_path.trim_start_matches('/');
-
     execute_ssh_command(
         &mut channel,
         &format!(
@@ -88,7 +83,7 @@ pub fn new_content_for_hugo(file_path: &str) -> Result<(), InvokeError> {
             &hugo_config.base_path,
             &hugo_config.hugo_cmd_path,
             &hugo_config.content_path,
-            sanitized_path,
+            file_path,
         ),
     )
     .map_err(|e| InvokeError::from(e.to_string()))?;
