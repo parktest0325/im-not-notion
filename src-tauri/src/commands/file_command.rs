@@ -78,15 +78,15 @@ pub fn new_content_for_hugo(file_path: &str) -> Result<(), InvokeError> {
 
     execute_ssh_command(
         &mut channel,
-        &format!("cd {} ; {} new content {}",
+        &format!(
+            "cd {} ; {} new {}/{}",
             &hugo_config.base_path,
             &hugo_config.hugo_cmd_path,
-            &format!(
-                "{}/content/{}/{}",
-                &hugo_config.base_path, &hugo_config.content_path, file_path
-            )
+            &hugo_config.content_path,
+            file_path,
         ),
-    ).map_err(|e| InvokeError::from(e.to_string()))?;
+    )
+    .map_err(|e| InvokeError::from(e.to_string()))?;
     Ok(())
 }
 
