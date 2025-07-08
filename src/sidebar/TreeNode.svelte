@@ -144,9 +144,12 @@
 
     function handleDragStart(event: DragEvent) {
         event.dataTransfer?.setData("text/plain", filePath);
+        // Indicate we support moving the item
+        if (event.dataTransfer) {
+            event.dataTransfer.effectAllowed = "move";
+            event.dataTransfer.dropEffect = "move";
+        }
         draggingFilePath.set(filePath);
-        const target = event.currentTarget as HTMLElement;
-        event.dataTransfer?.setDragImage(target, 0, 0);
     }
 
     function handleDragEnd() {
@@ -158,6 +161,9 @@
             event.preventDefault();
             isExpanded.set(true);
             dragOver = true;
+            if (event.dataTransfer) {
+                event.dataTransfer.dropEffect = "move";
+            }
         }
     }
 
@@ -170,6 +176,9 @@
     function handleDragOver(event: DragEvent) {
         if (node.type_ === "Directory") {
             event.preventDefault();
+            if (event.dataTransfer) {
+                event.dataTransfer.dropEffect = "move";
+            }
         }
     }
 
@@ -177,6 +186,9 @@
         if (node.type_ !== "Directory") return;
         event.preventDefault();
         dragOver = false;
+        if (event.dataTransfer) {
+            event.dataTransfer.dropEffect = "move";
+        }
         const src = event.dataTransfer?.getData("text/plain") || $draggingFilePath;
         if (!src || src === filePath) return;
         const name = src.split("/").pop();
@@ -225,6 +237,9 @@
         on:dragenter={handleDragEnter}
         on:dragleave={handleDragLeave}
         on:drop={handleDrop}
+        on:dragstart={handleDragStart}
+        on:dragend={handleDragEnd}
+        draggable="true"
         role="treeitem"
         aria-selected={$selectedCursor === filePath}
         tabindex="0"
@@ -236,9 +251,6 @@
                     // onFileClick(event, `${path}${node.name}`);
                 }}
                 class="cursor-pointer w-6 h-6 rounded"
-                draggable="true"
-                on:dragstart={handleDragStart}
-                on:dragend={handleDragEnd}
             >
             {#if $isExpanded}
                 <FolderOpen />
@@ -266,9 +278,6 @@
                     ? 'bg-selected-file'
                     : ''}"
                 on:click={onFileClick}
-                draggable="true"
-                on:dragstart={handleDragStart}
-                on:dragend={handleDragEnd}
             >
                 {node.name}
             </button>
