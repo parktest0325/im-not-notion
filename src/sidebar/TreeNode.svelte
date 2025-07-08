@@ -221,9 +221,6 @@
     <div
         class="flex items-center"
         class:drag-over={dragOver}
-        draggable="true"
-        on:dragstart={handleDragStart}
-        on:dragend={handleDragEnd}
         on:dragover={handleDragOver}
         on:dragenter={handleDragEnter}
         on:dragleave={handleDragLeave}
@@ -239,6 +236,9 @@
                     // onFileClick(event, `${path}${node.name}`);
                 }}
                 class="cursor-pointer w-6 h-6 rounded"
+                draggable="true"
+                on:dragstart={handleDragStart}
+                on:dragend={handleDragEnd}
             >
             {#if $isExpanded}
                 <FolderOpen />
@@ -266,6 +266,9 @@
                     ? 'bg-selected-file'
                     : ''}"
                 on:click={onFileClick}
+                draggable="true"
+                on:dragstart={handleDragStart}
+                on:dragend={handleDragEnd}
             >
                 {node.name}
             </button>
