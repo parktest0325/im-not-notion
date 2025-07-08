@@ -4,7 +4,7 @@
     import FaFolderPlus from "svelte-icons/fa/FaFolderPlus.svelte";
     import { writable } from "svelte/store";
     import TreeNode from "./TreeNode.svelte";
-    import { selectedFilePath, selectedCursor } from "../stores";
+    import { selectedFilePath, selectedCursor, draggingFilePath } from "../stores";
     import { invoke } from "@tauri-apps/api";
     import { getContext, onDestroy, onMount } from "svelte";
     import { slide } from "svelte/transition";
@@ -25,6 +25,7 @@
     const { refreshList } = getContext<GlobalFunctions>("globalFunctions");
 
     const isExpanded = writable(false);
+    let dragOver = false;
 
     $: filePath = `${path}${node.name}`;
 
@@ -141,6 +142,53 @@
         }
     }
 
+    function handleDragStart(event: DragEvent) {
+        event.dataTransfer?.setData("text/plain", filePath);
+        draggingFilePath.set(filePath);
+        const target = event.currentTarget as HTMLElement;
+        event.dataTransfer?.setDragImage(target, 0, 0);
+    }
+
+    function handleDragEnd() {
+        draggingFilePath.set("");
+    }
+
+    function handleDragEnter(event: DragEvent) {
+        if (node.type_ === "Directory") {
+            event.preventDefault();
+            isExpanded.set(true);
+            dragOver = true;
+        }
+    }
+
+    function handleDragLeave(event: DragEvent) {
+        if (node.type_ === "Directory") {
+            dragOver = false;
+        }
+    }
+
+    function handleDragOver(event: DragEvent) {
+        if (node.type_ === "Directory") {
+            event.preventDefault();
+        }
+    }
+
+    async function handleDrop(event: DragEvent) {
+        if (node.type_ !== "Directory") return;
+        event.preventDefault();
+        dragOver = false;
+        const src = event.dataTransfer?.getData("text/plain") || $draggingFilePath;
+        if (!src || src === filePath) return;
+        const name = src.split("/").pop();
+        const dst = `${filePath}/${name}`;
+        try {
+            await invoke("move_file_or_folder", { src, dst });
+            await refreshList();
+        } catch (error) {
+            console.error("Failed to move item:", error);
+        }
+    }
+
     // true일때만 filenameInput에 포커스
     $: if (isEditing) {
         filenameInput?.focus();
@@ -170,7 +218,20 @@
 </script>
 
 <li>
-    <div class="flex items-center">
+    <div
+        class="flex items-center"
+        class:drag-over={dragOver}
+        draggable="true"
+        on:dragstart={handleDragStart}
+        on:dragend={handleDragEnd}
+        on:dragover={handleDragOver}
+        on:dragenter={handleDragEnter}
+        on:dragleave={handleDragLeave}
+        on:drop={handleDrop}
+        role="treeitem"
+        aria-selected={$selectedCursor === filePath}
+        tabindex="0"
+    >
         {#if node.type_ === "Directory"}
             <button
                 on:click={(event) => {
@@ -270,5 +331,8 @@
     .bg-selected-file {
         background-color: var(--button-selected-bg-color);
         color: var(--button-selected-text-color);
+    }
+    .drag-over {
+        background-color: rgba(255, 255, 255, 0.1);
     }
 </style>
