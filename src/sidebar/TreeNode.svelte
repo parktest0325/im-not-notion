@@ -141,6 +141,31 @@
         }
     }
 
+    function handleDragStart(event: DragEvent) {
+        event.dataTransfer?.setData("text/plain", filePath);
+    }
+
+    function handleDragOver(event: DragEvent) {
+        if (node.type_ === "Directory") {
+            event.preventDefault();
+        }
+    }
+
+    async function handleDrop(event: DragEvent) {
+        if (node.type_ !== "Directory") return;
+        event.preventDefault();
+        const src = event.dataTransfer?.getData("text/plain");
+        if (!src || src === filePath) return;
+        const name = src.split("/").pop();
+        const dst = `${filePath}/${name}`;
+        try {
+            await invoke("move_file_or_folder", { src, dst });
+            await refreshList();
+        } catch (error) {
+            console.error("Failed to move item:", error);
+        }
+    }
+
     // true일때만 filenameInput에 포커스
     $: if (isEditing) {
         filenameInput?.focus();
@@ -170,7 +195,16 @@
 </script>
 
 <li>
-    <div class="flex items-center">
+    <div
+        class="flex items-center"
+        draggable="true"
+        on:dragstart={handleDragStart}
+        on:dragover={handleDragOver}
+        on:drop={handleDrop}
+        role="treeitem"
+        aria-selected={$selectedCursor === filePath}
+        tabindex="0"
+    >
         {#if node.type_ === "Directory"}
             <button
                 on:click={(event) => {

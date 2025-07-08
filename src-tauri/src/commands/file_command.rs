@@ -111,15 +111,19 @@ pub fn move_file_or_folder(src: &str, dst: &str) -> Result<(), InvokeError> {
     let sftp: Sftp = get_sftp_session().map_err(|e| InvokeError::from(e.to_string()))?;
     let hugo_config = get_hugo_config().map_err(|e| InvokeError::from(e.to_string()))?;
 
+    // Sanitize paths to avoid accidental absolute paths or duplicate separators
+    let sanitized_src = src.trim_start_matches('/');
+    let sanitized_dst = dst.trim_start_matches('/');
+
     move_file(
         &sftp,
         &Path::new(&format!(
             "{}/content/{}/{}",
-            &hugo_config.base_path, &hugo_config.content_path, src
+            &hugo_config.base_path, &hugo_config.content_path, sanitized_src
         )),
         &Path::new(&format!(
             "{}/content/{}/{}",
-            &hugo_config.base_path, &hugo_config.content_path, dst
+            &hugo_config.base_path, &hugo_config.content_path, sanitized_dst
         )),
     )
     .map_err(|e| InvokeError::from(e.to_string()))?;
