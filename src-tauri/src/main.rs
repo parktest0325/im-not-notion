@@ -14,7 +14,7 @@ use commands::{
         new_content_for_hugo, remove_file, save_file_content, save_file_image,
     },
     config_command::{load_config, save_config, get_config},
-    ssh_command::{update_and_connect, kill_server, start_server},
+    ssh_command::{update_and_connect, kill_server, start_server, execute_ssh},
 };
 
 fn main() -> Result<()> {
@@ -46,6 +46,7 @@ fn main() -> Result<()> {
             remove_file,
             kill_server,
             start_server,
+            execute_ssh,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
