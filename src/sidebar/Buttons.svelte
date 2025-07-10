@@ -7,15 +7,20 @@
   import GiNuclear from "svelte-icons/gi/GiNuclear.svelte";
   import RebootPopup from "./RebootPopup.svelte";
   import FaTerminal from "svelte-icons/fa/FaTerminal.svelte";
+  import TerminalPopup from "./TerminalPopup.svelte";
 
   let bSetting: boolean;
   let bReboot: boolean;
+  let bTerminal: boolean;
 
   function toggleSettings() {
     bSetting = !bSetting;
   }
   function toggleReboot() {
     bReboot = !bReboot;
+  }
+  function toggleTerminal() {
+    bTerminal = !bTerminal;
   }
 </script>
 
@@ -26,7 +31,7 @@
     </div>
   </button>
 
-  <button class="p-2" on:click={toggleSettings}>
+  <button class="p-2" on:click={toggleTerminal}>
     <div class="w-6 h-6">
       <FaTerminal />
     </div>
@@ -53,3 +58,4 @@
 
 <SettingsPopup show={bSetting} closeSettings={toggleSettings} />
 <RebootPopup show={bReboot} closeReboot={toggleReboot} />
+<TerminalPopup show={bTerminal} closeTerminal={toggleTerminal} />

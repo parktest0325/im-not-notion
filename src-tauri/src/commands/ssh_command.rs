@@ -41,3 +41,10 @@ pub fn start_server() -> Result<(), InvokeError> {
     ).map_err(|e| InvokeError::from(e.to_string()))?;
     Ok(())
 }
+
+#[tauri::command]
+pub fn execute_ssh(cmd: &str) -> Result<String, InvokeError> {
+    let mut channel = get_channel_session().map_err(|e| InvokeError::from(e.to_string()))?;
+    let res = execute_ssh_command(&mut channel, cmd).map_err(|e| InvokeError::from(e.to_string()))?;
+    Ok(res)
+}
