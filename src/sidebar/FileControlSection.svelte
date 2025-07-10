@@ -82,6 +82,6 @@
                 <TreeNode {node} />
             {/each}
         </ul>
-        <button class="w-full" on:click={createFolder}>+</button>
+        <button class="w-full mt-2 border-1 border-blue-800 bg-blue-900 hover:border-blue-200 hover:bg-blue-800" on:click={createFolder}>+</button>
     </div>
 </div>
