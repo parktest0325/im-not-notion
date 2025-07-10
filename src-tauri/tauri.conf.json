@@ -12,6 +12,7 @@
   },
 
   "app": {
+    "security": { "csp": null },
     "windows": [
       { "title": "im not notion", "width": 1024, "height": 768 }
     ]
