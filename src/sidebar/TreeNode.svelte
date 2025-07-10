@@ -4,7 +4,7 @@
     import FaFolderPlus from "svelte-icons/fa/FaFolderPlus.svelte";
     import { writable } from "svelte/store";
     import TreeNode from "./TreeNode.svelte";
-    import { selectedFilePath, selectedCursor } from "../stores";
+    import { selectedFilePath, selectedCursor, draggingPath } from "../stores";
     import { invoke } from "@tauri-apps/api/core";
     import { getContext, onDestroy, onMount } from "svelte";
     import { slide } from "svelte/transition";
@@ -167,9 +167,79 @@
     onDestroy(() => {
         document.removeEventListener("keydown", onKeyDown);
     });
+
+    let isDragOver = false;
+    $: isDragging = $draggingPath === filePath;
+
+    function onDragStart(event: DragEvent) {
+        event.stopPropagation();
+        console.log('dragstart', filePath);
+        event.dataTransfer?.setData('text/plain', filePath);
+        event.dataTransfer?.setData('application/x-imnotnotion-path', filePath);
+        draggingPath.set(filePath);
+    }
+
+    function onDragEnd(event: DragEvent) {
+        event.stopPropagation();
+        console.log('dragend', filePath);
+        draggingPath.set(null);
+        isDragOver = false;
+    }
+
+    function onDragOver(event: DragEvent) {
+        event.stopPropagation();
+        if (node.type_ === 'Directory') {
+            event.preventDefault();
+            event.dataTransfer!.dropEffect = 'move';
+        }
+    }
+
+    function onDragEnter(event: DragEvent) {
+        event.stopPropagation();
+        if (node.type_ === 'Directory') {
+            console.log('dragenter', filePath);
+            event.preventDefault();
+            isDragOver = true;
+        }
+    }
+
+    function onDragLeave(event: DragEvent) {
+        event.stopPropagation();
+        console.log('dragleave', filePath);
+        isDragOver = false;
+    }
+
+    async function onDrop(event: DragEvent) {
+        event.stopPropagation();
+        if (node.type_ !== 'Directory') return;
+        console.log('drop', filePath);
+        event.preventDefault();
+        isDragOver = false;
+        const src = $draggingPath;
+        if (!src || src === filePath) return;
+        const name = src.split('/').pop();
+        const dst = `${filePath}/${name}`;
+        try {
+            await invoke('move_file_or_folder', { src, dst });
+            selectedCursor.set(dst);
+            selectedFilePath.set(dst);
+            await refreshList();
+        } catch (e) {
+            console.error('Failed to move file:', e);
+        }
+    }
 </script>
 
-<li>
+<li draggable="true"
+    class:drag-over-target={isDragOver}
+    class:dragging={isDragging}
+    on:dragstart={onDragStart}
+    on:dragend={onDragEnd}
+    on:dragenter={onDragEnter}
+    on:dragover={onDragOver}
+    on:dragleave={onDragLeave}
+    on:drop={onDrop}
+    >
     <div class="flex items-center">
         {#if node.type_ === "Directory"}
             <button
@@ -270,5 +340,12 @@
     .bg-selected-file {
         background-color: var(--button-selected-bg-color);
         color: var(--button-selected-text-color);
+    }
+    .drag-over-target {
+        background-color: var(--button-selected-bg-color);
+        opacity: 0.5;
+    }
+    .dragging {
+        opacity: 0.5;
     }
 </style>
