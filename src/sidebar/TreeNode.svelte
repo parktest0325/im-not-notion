@@ -169,6 +169,7 @@
     });
 
     let isDragOver = false;
+    $: isDragging = $draggingPath === filePath;
 
     function onDragStart(event: DragEvent) {
         console.log('dragstart', filePath);
@@ -180,13 +181,20 @@
     function onDragEnd() {
         console.log('dragend', filePath);
         draggingPath.set(null);
+        isDragOver = false;
     }
 
     function onDragOver(event: DragEvent) {
         if (node.type_ === 'Directory') {
-            console.log('dragover', filePath);
             event.preventDefault();
             event.dataTransfer!.dropEffect = 'move';
+        }
+    }
+
+    function onDragEnter(event: DragEvent) {
+        if (node.type_ === 'Directory') {
+            console.log('dragenter', filePath);
+            event.preventDefault();
             isDragOver = true;
         }
     }
@@ -218,8 +226,10 @@
 
 <li draggable="true"
     class:drag-over-target={isDragOver}
+    class:dragging={isDragging}
     on:dragstart={onDragStart}
     on:dragend={onDragEnd}
+    on:dragenter={onDragEnter}
     on:dragover={onDragOver}
     on:dragleave={onDragLeave}
     on:drop={onDrop}
@@ -327,6 +337,9 @@
     }
     .drag-over-target {
         background-color: var(--button-selected-bg-color);
+        opacity: 0.5;
+    }
+    .dragging {
         opacity: 0.5;
     }
 </style>
