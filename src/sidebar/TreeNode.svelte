@@ -172,19 +172,22 @@
     $: isDragging = $draggingPath === filePath;
 
     function onDragStart(event: DragEvent) {
+        event.stopPropagation();
         console.log('dragstart', filePath);
         event.dataTransfer?.setData('text/plain', filePath);
         event.dataTransfer?.setData('application/x-imnotnotion-path', filePath);
         draggingPath.set(filePath);
     }
 
-    function onDragEnd() {
+    function onDragEnd(event: DragEvent) {
+        event.stopPropagation();
         console.log('dragend', filePath);
         draggingPath.set(null);
         isDragOver = false;
     }
 
     function onDragOver(event: DragEvent) {
+        event.stopPropagation();
         if (node.type_ === 'Directory') {
             event.preventDefault();
             event.dataTransfer!.dropEffect = 'move';
@@ -192,6 +195,7 @@
     }
 
     function onDragEnter(event: DragEvent) {
+        event.stopPropagation();
         if (node.type_ === 'Directory') {
             console.log('dragenter', filePath);
             event.preventDefault();
@@ -199,12 +203,14 @@
         }
     }
 
-    function onDragLeave() {
+    function onDragLeave(event: DragEvent) {
+        event.stopPropagation();
         console.log('dragleave', filePath);
         isDragOver = false;
     }
 
     async function onDrop(event: DragEvent) {
+        event.stopPropagation();
         if (node.type_ !== 'Directory') return;
         console.log('drop', filePath);
         event.preventDefault();
