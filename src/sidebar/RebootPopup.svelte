@@ -1,6 +1,6 @@
 <script lang="ts">
   import Popup from "../component/Popup.svelte";
-  import { invoke } from "@tauri-apps/api";
+  import { invoke } from "@tauri-apps/api/core";
   export let show: boolean;
   export let closeReboot: () => void;
 

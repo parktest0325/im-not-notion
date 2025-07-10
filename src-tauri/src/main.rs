@@ -7,6 +7,7 @@ mod utils;
 mod services;
 
 use anyhow::Result;
+use tauri_plugin_shell::init as shell_init;
 use commands::{
     file_command::{
         get_file_content, get_file_list_, move_file_or_folder,
@@ -30,6 +31,7 @@ fn main() -> Result<()> {
     }
 
     tauri::Builder::default()
+        .plugin(shell_init())
         .invoke_handler(tauri::generate_handler![
             load_config,
             save_config,

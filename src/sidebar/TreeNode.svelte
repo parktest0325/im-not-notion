@@ -5,7 +5,7 @@
     import { writable } from "svelte/store";
     import TreeNode from "./TreeNode.svelte";
     import { selectedFilePath, selectedCursor } from "../stores";
-    import { invoke } from "@tauri-apps/api";
+    import { invoke } from "@tauri-apps/api/core";
     import { getContext, onDestroy, onMount } from "svelte";
     import { slide } from "svelte/transition";
     import type { FileSystemNode } from "../types/setting";

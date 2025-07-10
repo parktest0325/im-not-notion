@@ -1,6 +1,6 @@
 <script lang="ts">
   import { selectedFilePath, isConnected } from "../stores";
-  import { invoke } from "@tauri-apps/api";
+  import { invoke } from "@tauri-apps/api/core";
   import { v4 as uuidv4 } from "uuid";
   import { tick, onMount, onDestroy } from "svelte";
   import { writable } from "svelte/store";

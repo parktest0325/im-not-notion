@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { invoke } from "@tauri-apps/api";
+  import { invoke } from "@tauri-apps/api/core";
   import DynamicField from "../component/DynamicField.svelte";
   import { createDefaultAppConfig, type AppConfig } from "../types/setting";
   import Popup from "../component/Popup.svelte";
