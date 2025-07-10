@@ -57,6 +57,6 @@
   }
 
   :global(.terminal-popup .popup-content) {
-    max-width: 48rem;
+    max-width: 34rem;
   }
 </style>
