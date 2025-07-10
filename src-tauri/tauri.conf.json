@@ -1,39 +1,25 @@
 {
+  "$schema": "https://schema.tauri.app/config/2",
+  "identifier": "dev.dongkim.imnotnotion",
+  "productName": "im-not-notion",
+  "version": "0.2.0",
+
   "build": {
-    "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build",
-    "devPath": "http://localhost:5573",
-    "distDir": "../dist"
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:5573",
+    "frontendDist": "../dist"
   },
-  "package": {
-    "productName": "im-not-notion",
-    "version": "0.2.0"
-  },
-  "tauri": {
-    "allowlist": {
-      "all": false,
-      "shell": {
-        "all": false,
-        "open": true
-      }
-    },
+
+  "app": {
     "windows": [
-      {
-        "title": "im not notion",
-        "width": 1024,
-        "height": 768
-      }
-    ],
-    "security": {
-      "csp": null
-    },
-    "bundle": {
-      "active": true,
-      "targets": "all",
-      "identifier": "im-not-notion",
-      "icon": [
-        "icons/nottion.ico"
-      ]
-    }
+      { "title": "im not notion", "width": 1024, "height": 768 }
+    ]
+  },
+
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": ["icons/nottion.ico"]
   }
 }

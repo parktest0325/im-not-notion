@@ -1,5 +1,5 @@
 use tauri::command;
-use tauri::InvokeError;
+use tauri::ipc::InvokeError;
 use crate::services::config_service::{load_app_config, save_app_config, get_app_config, set_app_config};
 use crate::types::config::AppConfig;
 

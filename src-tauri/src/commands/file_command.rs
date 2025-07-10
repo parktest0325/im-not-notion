@@ -2,7 +2,7 @@ use crate::services::{
     config_service::get_hugo_config, execute_ssh_command, get_channel_session, get_file, get_file_list, get_sftp_session, move_file, rmrf_file, save_file, save_image, FileSystemNode
 };
 use ssh2::Sftp;
-use tauri::InvokeError;
+use tauri::ipc::InvokeError;
 use std::path::Path;
 
 #[tauri::command]
