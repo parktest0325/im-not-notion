@@ -4,7 +4,7 @@
     import FaFolderPlus from "svelte-icons/fa/FaFolderPlus.svelte";
     import { writable } from "svelte/store";
     import TreeNode from "./TreeNode.svelte";
-    import { selectedFilePath, selectedCursor, draggingPath } from "../stores";
+    import { selectedFilePath, selectedCursor, draggingPath, isEditingFileName } from "../stores";
     import { invoke } from "@tauri-apps/api/core";
     import { getContext, onDestroy, onMount } from "svelte";
     import { slide } from "svelte/transition";
@@ -78,6 +78,7 @@
     $: if ($selectedCursor) {
         showDeleteConfirmation = false;
         isEditing = false;
+        isEditingFileName.set(false);
     }
 
     let showDeleteConfirmation = false;
@@ -116,6 +117,7 @@
     async function handleEdit(event: KeyboardEvent) {
         if (event.key === "Enter") {
             isEditing = false;
+            isEditingFileName.set(false);
             event.preventDefault(); // 이벤트의 기본 동작 방지
             event.stopPropagation(); // 이벤트의 전파 방지
             try {
@@ -137,6 +139,7 @@
             }
         } else if (event.key === "Escape") {
             isEditing = false;
+            isEditingFileName.set(false);
             editableName = node.name; // 변경을 취소하고 원래 이름으로 복원
         }
     }
@@ -154,6 +157,7 @@
             (event.key === "F2" || event.key === "Enter")
         ) {
             isEditing = true;
+            isEditingFileName.set(true);
             // 위의 노드가 삭제됐을때 리렌더링이 되면서
             // editableName이 기존 input 위치의 editableName으로 변해서 강제로 저
             editableName = node.name;
@@ -170,8 +174,10 @@
 
     let isDragOver = false;
     $: isDragging = $draggingPath === filePath;
+    $: dragDisabled = $isEditingFileName;
 
     function onDragStart(event: DragEvent) {
+        if (dragDisabled) return;
         event.stopPropagation();
         console.log('dragstart', filePath);
         event.dataTransfer?.setData('text/plain', filePath);
@@ -180,6 +186,7 @@
     }
 
     function onDragEnd(event: DragEvent) {
+        if (dragDisabled) return;
         event.stopPropagation();
         console.log('dragend', filePath);
         draggingPath.set(null);
@@ -187,6 +194,7 @@
     }
 
     function onDragOver(event: DragEvent) {
+        if (dragDisabled) return;
         event.stopPropagation();
         if (node.type_ === 'Directory') {
             event.preventDefault();
@@ -195,6 +203,7 @@
     }
 
     function onDragEnter(event: DragEvent) {
+        if (dragDisabled) return;
         event.stopPropagation();
         if (node.type_ === 'Directory') {
             console.log('dragenter', filePath);
@@ -204,12 +213,14 @@
     }
 
     function onDragLeave(event: DragEvent) {
+        if (dragDisabled) return;
         event.stopPropagation();
         console.log('dragleave', filePath);
         isDragOver = false;
     }
 
     async function onDrop(event: DragEvent) {
+        if (dragDisabled) return;
         event.stopPropagation();
         if (node.type_ !== 'Directory') return;
         console.log('drop', filePath);
@@ -230,7 +241,7 @@
     }
 </script>
 
-<li draggable="true"
+<li draggable={!dragDisabled}
     class:drag-over-target={isDragOver}
     class:dragging={isDragging}
     on:dragstart={onDragStart}
@@ -266,6 +277,7 @@
                 on:keydown={handleEdit}
                 on:blur={() => {
                     isEditing = false;
+                    isEditingFileName.set(false);
                 }}
             />
         {:else}
