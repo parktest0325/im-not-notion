@@ -1,4 +1,4 @@
-use tauri::InvokeError;
+use tauri::ipc::InvokeError;
 use crate::services::config_service::get_hugo_config;
 use crate::services::ssh_service::{get_channel_session, connect_ssh, execute_ssh_command};
 use crate::types::config::AppConfig;

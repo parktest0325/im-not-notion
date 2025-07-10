@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::fs::{File, OpenOptions};
 use std::path::PathBuf;
-use tauri::api::path::home_dir;
+use dirs_next::home_dir;
 use anyhow::Result;
 use serde_json::Value;
 

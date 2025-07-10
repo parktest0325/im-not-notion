@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { invoke } from "@tauri-apps/api";
+    import { invoke } from "@tauri-apps/api/core";
     import FaSearch from "svelte-icons/fa/FaSearch.svelte";
     import IoMdRefresh from "svelte-icons/io/IoMdRefresh.svelte";
     import { writable } from "svelte/store";
