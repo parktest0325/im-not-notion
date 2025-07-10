@@ -171,17 +171,20 @@
     let isDragOver = false;
 
     function onDragStart(event: DragEvent) {
+        console.log('dragstart', filePath);
         event.dataTransfer?.setData('text/plain', filePath);
         event.dataTransfer?.setData('application/x-imnotnotion-path', filePath);
         draggingPath.set(filePath);
     }
 
     function onDragEnd() {
+        console.log('dragend', filePath);
         draggingPath.set(null);
     }
 
     function onDragOver(event: DragEvent) {
         if (node.type_ === 'Directory') {
+            console.log('dragover', filePath);
             event.preventDefault();
             event.dataTransfer!.dropEffect = 'move';
             isDragOver = true;
@@ -189,11 +192,13 @@
     }
 
     function onDragLeave() {
+        console.log('dragleave', filePath);
         isDragOver = false;
     }
 
     async function onDrop(event: DragEvent) {
         if (node.type_ !== 'Directory') return;
+        console.log('drop', filePath);
         event.preventDefault();
         isDragOver = false;
         const src = $draggingPath;
