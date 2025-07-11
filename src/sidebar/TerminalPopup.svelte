@@ -10,6 +10,28 @@
   let currentDir = "";
   let terminalEl: HTMLPreElement | null = null;
 
+  function resolvePath(base: string, target: string): string {
+    if (target.startsWith("/")) {
+      base = "";
+    }
+
+    const parts = (base || "/").split("/");
+    const segments = target.split("/");
+
+    for (const seg of segments) {
+      if (!seg || seg === ".") continue;
+      if (seg === "..") {
+        if (parts.length > 1) parts.pop();
+      } else {
+        parts.push(seg);
+      }
+    }
+
+    let path = parts.join("/");
+    if (!path.startsWith("/")) path = "/" + path;
+    return path.replace(/\/+/g, "/");
+  }
+
   onMount(async () => {
     try {
       const res: string = await invoke("execute_ssh", { cmd: "pwd" });
@@ -27,30 +49,29 @@
       command = "";
       return;
     }
+
+    if (cmd.startsWith("cd ") || cmd === "cd") {
+      const target = cmd.slice(2).trim();
+      currentDir = resolvePath(currentDir, target || "/");
+      if (output) {
+        output += "\n";
+      }
+      output += `$ ${cmd}\n`;
+      command = "";
+      return;
+    }
+
     try {
       const result: string = await invoke("execute_ssh", {
-        cmd: `cd ${currentDir}; ${cmd} 2>&1; pwd`,
+        cmd: `cd ${currentDir}; ${cmd} 2>&1`,
       });
-
-      const trimmed = result.trimEnd();
-      const idx = trimmed.lastIndexOf("\n");
-      let newDir = currentDir;
-      let cmdOutput = trimmed;
-      if (idx !== -1) {
-        cmdOutput = trimmed.slice(0, idx);
-        newDir = trimmed.slice(idx + 1).trim();
-      }
 
       if (output) {
         output += "\n";
       }
       output += `$ ${cmd}\n`;
-      if (cmdOutput) {
-        output += `${cmdOutput}\n`;
-      }
-
-      if (idx !== -1) {
-        currentDir = newDir;
+      if (result.trim()) {
+        output += `${result.trimEnd()}\n`;
       }
     } catch (e) {
       if (output) {
