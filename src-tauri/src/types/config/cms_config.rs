@@ -14,6 +14,8 @@ pub struct HugoConfig {
     pub content_path: String,
     #[serde(default)]
     pub image_path: String,
+    #[serde(default)]
+    pub hidden_path: String,
     // #[serde(default)]
     // pub config_path: String,
     // #[serde(default)]

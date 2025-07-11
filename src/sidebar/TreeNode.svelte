@@ -283,16 +283,16 @@
         {:else}
             <button
                 class="pl-2 pr-2 font-bold cursor-pointer flex-grow text-left overflow-hidden overflow-ellipsis whitespace-nowrap {$selectedCursor ===
-                path + node.name
+                filePath
                     ? 'bg-selected-file'
-                    : ''}"
+                    : ''} {node.is_hidden ? 'text-hidden' : ''}"
                 on:click={onFileClick}
             >
                 {node.name}
             </button>
         {/if}
 
-        {#if $selectedCursor === path + node.name}
+        {#if $selectedCursor === filePath}
             {#if node.type_ === "Directory"}
                 <button
                     on:click={(event) => createItem(event, "File")}
@@ -359,5 +359,9 @@
     }
     .dragging {
         opacity: 0.5;
+    }
+    .text-hidden {
+        opacity: 0.6;
+        color: #888;
     }
 </style>

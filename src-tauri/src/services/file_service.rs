@@ -4,15 +4,19 @@ use serde::{Deserialize, Serialize};
 use ssh2::{Channel, Sftp};
 use std::io::prelude::*;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct FileSystemNode {
-    name: String,
-    type_: NodeType,
-    children: Vec<FileSystemNode>,
+    pub name: String,
+    pub type_: NodeType,
+    pub children: Vec<FileSystemNode>,
+    #[serde(default)]
+    pub is_hidden: bool,
+    #[serde(default)]
+    pub full_path: String, // 실제 파일 경로 (Hidden/ 포함)
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-enum NodeType {
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum NodeType {
     File,
     Directory,
 }
@@ -23,6 +27,8 @@ pub fn get_file_list(sftp: &Sftp, path: &Path, depth: usize) -> Result<FileSyste
             name: path.to_string_lossy().into_owned(),
             type_: NodeType::Directory,
             children: vec![],
+            is_hidden: false,
+            full_path: String::new(),
         });
     }
 
@@ -36,6 +42,8 @@ pub fn get_file_list(sftp: &Sftp, path: &Path, depth: usize) -> Result<FileSyste
                 name: path.file_name().unwrap().to_str().unwrap().into(),
                 type_: NodeType::File,
                 children: vec![],
+                is_hidden: false,
+                full_path: String::new(),
             }
         };
         children.push(node);
@@ -45,6 +53,8 @@ pub fn get_file_list(sftp: &Sftp, path: &Path, depth: usize) -> Result<FileSyste
         name: path.file_name().unwrap().to_str().unwrap().into(),
         type_: NodeType::Directory,
         children,
+        is_hidden: false,
+        full_path: String::new(),
     })
 }
 
