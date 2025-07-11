@@ -1694,7 +1694,7 @@ dependencies = [
 
 [[package]]
 name = "im_not_notion"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "aes-gcm",
  "anyhow",
