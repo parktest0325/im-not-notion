@@ -3,30 +3,29 @@
   export let toggleMenu: () => void;
   import MdArrowForward from "svelte-icons/md/MdArrowForward.svelte";
   import DiIe from 'svelte-icons/di/DiIe.svelte'
-  import { selectedFilePath } from "../stores";
+  import { selectedFilePath, url, contentPath } from "../stores";
   import { invoke } from "@tauri-apps/api/core";
   import { open } from "@tauri-apps/plugin-shell";
   import { onMount } from "svelte";
-  import { type AppConfig } from "../types/setting";
+  import type { AppConfig } from "../types/setting";
 
   function handleOpenPage() {
     let cleanedPath = $selectedFilePath
       .replace(/\.md$/, "")
       .replace(/\/_index$/, "")
       .toLowerCase();
-      
-    const fullUrl = new URL(`${contentPath}${cleanedPath}`, url);
+
+    const fullUrl = new URL(`${$contentPath}${cleanedPath}`, $url);
     open(fullUrl.toString().toLowerCase());
   }
 
   let config: AppConfig;
-  let url: string = "https://www.naver.com";
-  let contentPath: string = "/content/";
+
   onMount(async () => {
     try {
       config = await invoke("get_config");
-      url = config.cms_config.hugo_config.url;
-      contentPath = config.cms_config.hugo_config.content_path;
+      url.set(config.cms_config.hugo_config.url);
+      contentPath.set(config.cms_config.hugo_config.content_path);
     } catch (error) {
       console.error("Failed to get config:", error);
     }
