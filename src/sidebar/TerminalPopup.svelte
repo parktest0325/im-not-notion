@@ -29,23 +29,33 @@
     }
     try {
       const result: string = await invoke("execute_ssh", {
-        cmd: `cd ${currentDir}; ${cmd}; pwd`,
+        cmd: `cd ${currentDir}; ${cmd} 2>&1; pwd`,
       });
 
       const trimmed = result.trimEnd();
       const idx = trimmed.lastIndexOf("\n");
-      let newDir = trimmed;
-      let cmdOutput = "";
+      let newDir = currentDir;
+      let cmdOutput = trimmed;
       if (idx !== -1) {
         cmdOutput = trimmed.slice(0, idx);
-        newDir = trimmed.slice(idx + 1);
+        newDir = trimmed.slice(idx + 1).trim();
       }
-      currentDir = newDir.trim();
+
+      if (output) {
+        output += "\n";
+      }
       output += `$ ${cmd}\n`;
       if (cmdOutput) {
         output += `${cmdOutput}\n`;
       }
+
+      if (idx !== -1) {
+        currentDir = newDir;
+      }
     } catch (e) {
+      if (output) {
+        output += "\n";
+      }
       output += `$ ${cmd}\nError: ${e}\n`;
     }
     command = "";
@@ -89,6 +99,6 @@
   }
 
   :global(.terminal-popup .popup-content) {
-    max-width: 34rem;
+    max-width: 40rem;
   }
 </style>
