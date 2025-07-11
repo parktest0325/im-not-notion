@@ -31,11 +31,20 @@
       const result: string = await invoke("execute_ssh", {
         cmd: `cd ${currentDir}; ${cmd}; pwd`,
       });
-      const lines = result.trim().split(/\r?\n/);
-      const newDir = lines.pop();
-      if (newDir) currentDir = newDir.trim();
-      const cmdOutput = lines.join("\n");
-      output += `$ ${cmd}\n${cmdOutput}\n`;
+
+      const trimmed = result.trimEnd();
+      const idx = trimmed.lastIndexOf("\n");
+      let newDir = trimmed;
+      let cmdOutput = "";
+      if (idx !== -1) {
+        cmdOutput = trimmed.slice(0, idx);
+        newDir = trimmed.slice(idx + 1);
+      }
+      currentDir = newDir.trim();
+      output += `$ ${cmd}\n`;
+      if (cmdOutput) {
+        output += `${cmdOutput}\n`;
+      }
     } catch (e) {
       output += `$ ${cmd}\nError: ${e}\n`;
     }
@@ -52,8 +61,8 @@
   <Popup {show} closePopup={closeTerminal}>
     <h2 class="font-bold text-lg mb-2">SSH Terminal</h2>
     <pre class="terminal-output" bind:this={terminalEl}>{output}</pre>
-    <div class="flex mt-2 space-x-2 items-center">
-      <span class="text-gray-400">{currentDir}</span>
+    <div class="text-gray-400 mt-2">{currentDir}</div>
+    <div class="flex mt-1 space-x-2">
       <input
         class="flex-grow p-2 rounded bg-gray-800 text-white"
         bind:value={command}
