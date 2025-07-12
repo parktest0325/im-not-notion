@@ -359,7 +359,6 @@
         opacity: 0.5;
     }
     .text-hidden {
-        opacity: 0.6;
-        color: #888;
+        color: var(--reverse-third-color);
     }
 </style>

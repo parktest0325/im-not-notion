@@ -20,6 +20,7 @@
 
   --reverse-primary-color: #000000;
   --reverse-secondary-color: #333333;
+  --reverse-third-color: #4c2b5c;
   
   --success-color: #16A085;
   --warning-color: #FFF59D;
@@ -38,13 +39,14 @@
 
     --reverse-primary-color: #ffffff;
     --reverse-secondary-color: #e0e0e0;
+    --reverse-third-color: #ba9be4;
 
     --success-color: #16A085;
     --warning-color: hsl(40, 100%, 50%);
     --error-color: #FF4C4C;
     --info-color: #669df6;
     --highlight-color: hsl(202, 100%, 24%);
-    --accent-color: #16A085;
+    --accent-color: #2d6e61;
   }
 }
 
