@@ -5,7 +5,7 @@
     import { writable } from "svelte/store";
     import TreeNode from "./TreeNode.svelte";
     import { setContext, onMount } from "svelte";
-    import { selectedCursor, selectedFilePath } from "../stores";
+    import { selectedCursor, relativeFilePath } from "../stores";
     import type { FileSystemNode } from "../types/setting";
 
     let searchTerm: string = "";
@@ -43,7 +43,7 @@
                 filePath: createdPath,
             });
             selectedCursor.set(createdPath);
-            selectedFilePath.set(createdPath);
+            relativeFilePath.set(createdPath);
             await refreshList();
         } catch (error) {
             console.error("failed to make directory:", error);

@@ -3,7 +3,7 @@
   import DynamicField from "../component/DynamicField.svelte";
   import { createDefaultAppConfig, type AppConfig } from "../types/setting";
   import Popup from "../component/Popup.svelte";
-  import { url, contentPath } from "../stores";
+  import { url, contentPath, hiddenPath } from "../stores";
 
   export let show: boolean;
   export let closeSettings: () => void;
@@ -27,6 +27,7 @@
       };
       url.set(config.cms_config.hugo_config.url);
       contentPath.set(config.cms_config.hugo_config.content_path);
+      hiddenPath.set(config.cms_config.hugo_config.hidden_path);
     } catch (error) {
       console.log("Failed to load config:", error);
       config = createDefaultAppConfig();
@@ -41,6 +42,7 @@
       await invoke("update_and_connect", { config });
       url.set(config.cms_config.hugo_config.url);
       contentPath.set(config.cms_config.hugo_config.content_path);
+      hiddenPath.set(config.cms_config.hugo_config.hidden_path);
     } catch (error) {
       console.error(error);
     } finally {

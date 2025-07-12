@@ -4,7 +4,7 @@
     import FaFolderPlus from "svelte-icons/fa/FaFolderPlus.svelte";
     import { writable } from "svelte/store";
     import TreeNode from "./TreeNode.svelte";
-    import { selectedFilePath, selectedCursor, draggingPath, isEditingFileName } from "../stores";
+    import { relativeFilePath, selectedCursor, draggingInfo, isEditingFileName } from "../stores";
     import { invoke } from "@tauri-apps/api/core";
     import { getContext, onDestroy, onMount } from "svelte";
     import { slide } from "svelte/transition";
@@ -40,9 +40,9 @@
         selectedCursor.set(filePath);
         if (node.type_ === "File") {
             console.log(`File clicked: ${filePath}`);
-            selectedFilePath.set(filePath);
+            relativeFilePath.set(filePath);
         } else {
-            selectedFilePath.set(filePath + "/_index.md");
+            relativeFilePath.set(filePath + "/_index.md");
         }
     }
 
@@ -51,10 +51,6 @@
         try {
             let createdPath: string;
             if (createType === "Directory") {
-                // createdPath = filePath + "/new_folder";
-                // await invoke("make_directory", {
-                //     path: createdPath,
-                // });
                 createdPath = filePath + "/new_folder/_index.md";
                 await invoke("new_content_for_hugo", {
                     filePath: createdPath,
@@ -67,7 +63,7 @@
             }
             isExpanded.set(true);
             selectedCursor.set(createdPath);
-            selectedFilePath.set(createdPath);
+            relativeFilePath.set(createdPath);
             await refreshList();
         } catch (error) {
             console.error("failed to create item:", error);
@@ -102,7 +98,7 @@
                 path: filePath,
             });
             selectedCursor.set("");
-            selectedFilePath.set("");
+            relativeFilePath.set("");
             await refreshList();
         } catch (error) {
             console.error("failed to rmrf:", error);
@@ -128,7 +124,7 @@
                 });
                 node.name = editableName;
                 selectedCursor.set(dstPath);
-                selectedFilePath.set(
+                relativeFilePath.set(
                     node.type_ === "Directory"
                         ? dstPath + "/_index.md"
                         : dstPath,
@@ -173,23 +169,24 @@
     });
 
     let isDragOver = false;
-    $: isDragging = $draggingPath === filePath;
+    $: isDragging = $draggingInfo?.path === filePath;
     $: dragDisabled = $isEditingFileName;
 
     function onDragStart(event: DragEvent) {
         if (dragDisabled) return;
         event.stopPropagation();
         console.log('dragstart', filePath);
-        event.dataTransfer?.setData('text/plain', filePath);
+
         event.dataTransfer?.setData('application/x-imnotnotion-path', filePath);
-        draggingPath.set(filePath);
+
+        draggingInfo.set({ path: filePath });
     }
 
     function onDragEnd(event: DragEvent) {
         if (dragDisabled) return;
         event.stopPropagation();
         console.log('dragend', filePath);
-        draggingPath.set(null);
+        draggingInfo.set(null);
         isDragOver = false;
     }
 
@@ -220,20 +217,24 @@
     }
 
     async function onDrop(event: DragEvent) {
-        if (dragDisabled) return;
+        if (dragDisabled || node.type_ !== 'Directory') return;
         event.stopPropagation();
-        if (node.type_ !== 'Directory') return;
-        console.log('drop', filePath);
         event.preventDefault();
+
+        console.log('drop', filePath);
+
         isDragOver = false;
-        const src = $draggingPath;
-        if (!src || src === filePath) return;
+        const info = $draggingInfo;
+        if (!info || info.path === filePath) return;
+
+        const src = info.path;
         const name = src.split('/').pop();
-        const dst = `${filePath}/${name}`;
+        const dst  = `${filePath}/${name}`;
+
         try {
             await invoke('move_file_or_folder', { src, dst });
             selectedCursor.set(dst);
-            selectedFilePath.set(dst);
+            relativeFilePath.set(dst);
             await refreshList();
         } catch (e) {
             console.error('Failed to move file:', e);
@@ -282,17 +283,17 @@
             />
         {:else}
             <button
-                class="pl-2 pr-2 font-bold cursor-pointer flex-grow text-left overflow-hidden overflow-ellipsis whitespace-nowrap {$selectedCursor ===
-                path + node.name
+                class="pl-2 pr-2 font-bold cursor-pointer flex-grow text-left overflow-hidden overflow-ellipsis whitespace-nowrap
+                {$selectedCursor === filePath
                     ? 'bg-selected-file'
-                    : ''}"
+                    : ''} {node.is_hidden ? 'text-hidden' : ''}"
                 on:click={onFileClick}
             >
                 {node.name}
             </button>
         {/if}
 
-        {#if $selectedCursor === path + node.name}
+        {#if $selectedCursor === filePath}
             {#if node.type_ === "Directory"}
                 <button
                     on:click={(event) => createItem(event, "File")}
@@ -359,5 +360,9 @@
     }
     .dragging {
         opacity: 0.5;
+    }
+    .text-hidden {
+        opacity: 0.6;
+        color: #888;
     }
 </style>

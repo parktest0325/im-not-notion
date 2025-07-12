@@ -1701,6 +1701,7 @@ dependencies = [
  "base64 0.22.1",
  "dirs-next",
  "image",
+ "indexmap 2.10.0",
  "once_cell",
  "rand 0.8.5",
  "serde",
