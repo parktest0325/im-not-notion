@@ -31,6 +31,7 @@ interface AppConfig {
 interface FileSystemNode {
     name: string;
     type_: 'File' | 'Directory';
+    is_hidden: boolean;
     children: FileSystemNode[];
 }
 

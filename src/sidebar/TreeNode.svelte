@@ -4,7 +4,7 @@
     import FaFolderPlus from "svelte-icons/fa/FaFolderPlus.svelte";
     import { writable } from "svelte/store";
     import TreeNode from "./TreeNode.svelte";
-    import { relativeFilePath, selectedCursor, draggingPath, isEditingFileName } from "../stores";
+    import { relativeFilePath, selectedCursor, draggingInfo, isEditingFileName } from "../stores";
     import { invoke } from "@tauri-apps/api/core";
     import { getContext, onDestroy, onMount } from "svelte";
     import { slide } from "svelte/transition";
@@ -169,23 +169,24 @@
     });
 
     let isDragOver = false;
-    $: isDragging = $draggingPath === filePath;
+    $: isDragging = $draggingInfo?.path === filePath;
     $: dragDisabled = $isEditingFileName;
 
     function onDragStart(event: DragEvent) {
         if (dragDisabled) return;
         event.stopPropagation();
         console.log('dragstart', filePath);
-        event.dataTransfer?.setData('text/plain', filePath);
+
         event.dataTransfer?.setData('application/x-imnotnotion-path', filePath);
-        draggingPath.set(filePath);
+
+        draggingInfo.set({ path: filePath });
     }
 
     function onDragEnd(event: DragEvent) {
         if (dragDisabled) return;
         event.stopPropagation();
         console.log('dragend', filePath);
-        draggingPath.set(null);
+        draggingInfo.set(null);
         isDragOver = false;
     }
 
@@ -216,16 +217,20 @@
     }
 
     async function onDrop(event: DragEvent) {
-        if (dragDisabled) return;
+        if (dragDisabled || node.type_ !== 'Directory') return;
         event.stopPropagation();
-        if (node.type_ !== 'Directory') return;
-        console.log('drop', filePath);
         event.preventDefault();
+
+        console.log('drop', filePath);
+
         isDragOver = false;
-        const src = $draggingPath;
-        if (!src || src === filePath) return;
+        const info = $draggingInfo;
+        if (!info || info.path === filePath) return;
+
+        const src = info.path;
         const name = src.split('/').pop();
-        const dst = `${filePath}/${name}`;
+        const dst  = `${filePath}/${name}`;
+
         try {
             await invoke('move_file_or_folder', { src, dst });
             selectedCursor.set(dst);
@@ -278,17 +283,17 @@
             />
         {:else}
             <button
-                class="pl-2 pr-2 font-bold cursor-pointer flex-grow text-left overflow-hidden overflow-ellipsis whitespace-nowrap {$selectedCursor ===
-                path + node.name
+                class="pl-2 pr-2 font-bold cursor-pointer flex-grow text-left overflow-hidden overflow-ellipsis whitespace-nowrap
+                {$selectedCursor === filePath
                     ? 'bg-selected-file'
-                    : ''}"
+                    : ''} {node.is_hidden ? 'text-hidden' : ''}"
                 on:click={onFileClick}
             >
                 {node.name}
             </button>
         {/if}
 
-        {#if $selectedCursor === path + node.name}
+        {#if $selectedCursor === filePath}
             {#if node.type_ === "Directory"}
                 <button
                     on:click={(event) => createItem(event, "File")}
@@ -355,5 +360,9 @@
     }
     .dragging {
         opacity: 0.5;
+    }
+    .text-hidden {
+        opacity: 0.6;
+        color: #888;
     }
 </style>
