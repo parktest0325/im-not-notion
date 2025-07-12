@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { selectedFilePath, isConnected } from "../stores";
+  import { fullFilePath, isConnected } from "../stores";
   import { invoke } from "@tauri-apps/api/core";
   import { v4 as uuidv4 } from "uuid";
   import { tick, onMount, onDestroy } from "svelte";
@@ -18,8 +18,8 @@
   let autoSaveInterval = 1000 * 5; //* 60; // 자동 저장 주기 (5분)
   let autoSaveTimer: number | null = null; // 자동 저장 타이머
 
-  $: if ($selectedFilePath) {
-    getFileContent($selectedFilePath);
+  $: if ($fullFilePath) {
+    getFileContent($fullFilePath);
     scrollPosition = 0;
     contentDiv?.scrollTo(0, 0);
     editable = false;
@@ -76,7 +76,7 @@
     }
     try {
       await invoke("save_file_content", {
-        filePath: $selectedFilePath,
+        filePath: $fullFilePath,
         fileData: fileContent,
       });
       console.log("저장되었습니다.");
@@ -127,7 +127,7 @@
           const uuidValue = uuidv4();
           console.log("uuid: ", uuidValue);
           const savedPath = await invoke("save_file_image", {
-            filePath: $selectedFilePath,
+            filePath: $fullFilePath,
             fileName: uuidValue,
             fileData: Array.from(fileData),
           });
@@ -188,7 +188,7 @@
       role="button"
       class="break-all w-full h-full whitespace-pre-wrap p-4"
       on:dblclick={() => {
-        if ($selectedFilePath != "") {
+        if ($fullFilePath != "") {
           scrollPosition = contentDiv.scrollTop;
           editable = true;
         }

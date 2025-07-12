@@ -4,7 +4,7 @@
     import FaFolderPlus from "svelte-icons/fa/FaFolderPlus.svelte";
     import { writable } from "svelte/store";
     import TreeNode from "./TreeNode.svelte";
-    import { selectedFilePath, selectedCursor, draggingPath, isEditingFileName } from "../stores";
+    import { relativeFilePath, selectedCursor, draggingPath, isEditingFileName } from "../stores";
     import { invoke } from "@tauri-apps/api/core";
     import { getContext, onDestroy, onMount } from "svelte";
     import { slide } from "svelte/transition";
@@ -40,9 +40,9 @@
         selectedCursor.set(filePath);
         if (node.type_ === "File") {
             console.log(`File clicked: ${filePath}`);
-            selectedFilePath.set(filePath);
+            relativeFilePath.set(filePath);
         } else {
-            selectedFilePath.set(filePath + "/_index.md");
+            relativeFilePath.set(filePath + "/_index.md");
         }
     }
 
@@ -51,10 +51,6 @@
         try {
             let createdPath: string;
             if (createType === "Directory") {
-                // createdPath = filePath + "/new_folder";
-                // await invoke("make_directory", {
-                //     path: createdPath,
-                // });
                 createdPath = filePath + "/new_folder/_index.md";
                 await invoke("new_content_for_hugo", {
                     filePath: createdPath,
@@ -67,7 +63,7 @@
             }
             isExpanded.set(true);
             selectedCursor.set(createdPath);
-            selectedFilePath.set(createdPath);
+            relativeFilePath.set(createdPath);
             await refreshList();
         } catch (error) {
             console.error("failed to create item:", error);
@@ -102,7 +98,7 @@
                 path: filePath,
             });
             selectedCursor.set("");
-            selectedFilePath.set("");
+            relativeFilePath.set("");
             await refreshList();
         } catch (error) {
             console.error("failed to rmrf:", error);
@@ -128,7 +124,7 @@
                 });
                 node.name = editableName;
                 selectedCursor.set(dstPath);
-                selectedFilePath.set(
+                relativeFilePath.set(
                     node.type_ === "Directory"
                         ? dstPath + "/_index.md"
                         : dstPath,
@@ -233,7 +229,7 @@
         try {
             await invoke('move_file_or_folder', { src, dst });
             selectedCursor.set(dst);
-            selectedFilePath.set(dst);
+            relativeFilePath.set(dst);
             await refreshList();
         } catch (e) {
             console.error('Failed to move file:', e);
