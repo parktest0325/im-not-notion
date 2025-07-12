@@ -25,7 +25,7 @@
   }
 
   async function checkHidden() {
-    if (!$relativeFilePath || $relativeFilePath.endsWith('_index.md')) return;
+    // if (!$relativeFilePath || $relativeFilePath.endsWith('_index.md')) return;
     try {
       isHidden = await invoke("check_file_hidden", { path: $relativeFilePath });
       console.log(isHidden);
@@ -33,9 +33,6 @@
       console.error("Failed to check hidden status:", error);
       isHidden = false; // 오류 시 기본값 설정
     }
-    // 전체 파일 경로 갱신
-    const newPath = (isHidden ? `/${$hiddenPath}` : '') + `/${$contentPath}${$relativeFilePath}`;
-    fullFilePath.set(newPath);
   }
 
   let config: AppConfig;
@@ -47,9 +44,9 @@
     try {
       await invoke("toggle_hidden_file", { path: $relativeFilePath, state: isHidden });
       isHidden = !isHidden;
-      // 토글 후 전체 파일 경로 갱신
-      const newPath = (isHidden ? `/${$hiddenPath}` : '') + `/${$contentPath}${$relativeFilePath}`;
-      fullFilePath.set(newPath);
+      // // 토글 후 전체 파일 경로 갱신 없어도 잘만됨
+      // const newPath = (isHidden ? `/${$hiddenPath}` : '') + `/${$contentPath}${$relativeFilePath}`;
+      // fullFilePath.set(newPath);
       await refreshList();
     } catch (error) {
       console.error("Failed to toggle hidden status:", error);
@@ -61,6 +58,10 @@
   $: if ($relativeFilePath) {
     // 파일 선택 시 숨김 상태를 확인하고 전체 경로를 설정
     checkHidden();
+    
+    // relativeFilePath가 갱신되면 전체 파일 경로 갱신
+    const newPath = (isHidden ? `/${$hiddenPath}` : '') + `/${$contentPath}${$relativeFilePath}`;
+    fullFilePath.set(newPath);
   }
 
   onMount(async () => {

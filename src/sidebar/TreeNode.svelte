@@ -35,8 +35,8 @@
     function onFileClick(event: MouseEvent) {
         event.stopPropagation();
         selectedCursor.set(filePath);
+        console.log(`File clicked: ${filePath}`);
         if (node.type_ === "File") {
-            console.log(`File clicked: ${filePath}`);
             relativeFilePath.set(filePath);
         } else {
             relativeFilePath.set(filePath + "/_index.md");
