@@ -64,16 +64,16 @@
     fullFilePath.set(newPath);
   }
 
-  onMount(async () => {
-    try {
-      config = await invoke("get_config");
-      url.set(config.cms_config.hugo_config.url);
-      contentPath.set(config.cms_config.hugo_config.content_path);
-      hiddenPath.set(config.cms_config.hugo_config.hidden_path);
-    } catch (error) {
-      console.error("Failed to get config:", error);
-    }
-  });
+  // onMount(async () => {
+  //   try {
+  //     config = await invoke("get_config");
+  //     url.set(config.cms_config.hugo_config.url);
+  //     contentPath.set(config.cms_config.hugo_config.content_path);
+  //     hiddenPath.set(config.cms_config.hugo_config.hidden_path);
+  //   } catch (error) {
+  //     console.error("Failed to get config:", error);
+  //   }
+  // });
 
 
 </script>

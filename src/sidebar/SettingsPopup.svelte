@@ -4,6 +4,7 @@
   import { createDefaultAppConfig, type AppConfig } from "../types/setting";
   import Popup from "../component/Popup.svelte";
   import { url, contentPath, hiddenPath } from "../stores";
+    import { onMount } from "svelte";
 
   export let show: boolean;
   export let closeSettings: () => void;
@@ -11,6 +12,8 @@
   let config: AppConfig;
   let isLoading = true; // 로딩 상태 추가
   let activeTab = "ssh"; // 'ssh' 또는 'hugo'가 될 수 있음
+
+  onMount(loadConfig);
 
   $: if (show) {
     // show가 true일 때만 설정 로드
@@ -40,9 +43,7 @@
     try {
       await invoke("save_config", { config });
       await invoke("update_and_connect", { config });
-      url.set(config.cms_config.hugo_config.url);
-      contentPath.set(config.cms_config.hugo_config.content_path);
-      hiddenPath.set(config.cms_config.hugo_config.hidden_path);
+      loadConfig();
     } catch (error) {
       console.error(error);
     } finally {
