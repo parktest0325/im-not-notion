@@ -23,17 +23,17 @@
   }
 
   async function checkHidden() {
-    if (!$relativeFilePath || $relativeFilePath.endsWith('_index.md')) return;
-    
-    try {
-      isHidden = await invoke("check_file_hidden", {
-        path: $relativeFilePath,
-      });
-      console.log(isHidden)
-    } catch (error) {
-      console.error("Failed to check hidden status:", error);
-      isHidden = false; // 오류 시 기본값으로 설정
-    }
+  if (!$relativeFilePath || $relativeFilePath.endsWith('_index.md')) return;
+  try {
+    isHidden = await invoke("check_file_hidden", { path: $relativeFilePath });
+    console.log(isHidden);
+  } catch (error) {
+    console.error("Failed to check hidden status:", error);
+    isHidden = false; // 오류 시 기본값 설정
+  }
+  // 전체 파일 경로 갱신
+  const newPath = (isHidden ? `/${$hiddenPath}` : '') + `/${$contentPath}${$relativeFilePath}`;
+  fullFilePath.set(newPath);
   }
 
   let config: AppConfig;
@@ -41,24 +41,23 @@
   async function toggleHidden() {
     if (!$relativeFilePath || isLoading) return;
     
-    isLoading = true;
-    try {
-      await invoke("toggle_hidden_file", { path: $relativeFilePath, state: isHidden})
-      isHidden = !isHidden;
-    } catch (error) {
-      console.error("Failed to toggle hidden status:", error);
-    } finally {
-      isLoading = false;
-    }
+  isLoading = true;
+  try {
+    await invoke("toggle_hidden_file", { path: $relativeFilePath, state: isHidden });
+    isHidden = !isHidden;
+    // 토글 후 전체 파일 경로 갱신
+    const newPath = (isHidden ? `/${$hiddenPath}` : '') + `/${$contentPath}${$relativeFilePath}`;
+    fullFilePath.set(newPath);
+  } catch (error) {
+    console.error("Failed to toggle hidden status:", error);
+  } finally {
+    isLoading = false;
+  }
   }
   
   $: if ($relativeFilePath) {
-    isHidden = false;
+    // 파일 선택 시 숨김 상태를 확인하고 전체 경로를 설정
     checkHidden();
-  }
-  $: {
-    const newPath = (isHidden ? `/${$hiddenPath}` : '') + `/${$contentPath}${$relativeFilePath}`;
-    fullFilePath.set(newPath);
   }
 
   onMount(async () => {

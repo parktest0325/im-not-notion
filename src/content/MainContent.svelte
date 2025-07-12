@@ -46,6 +46,8 @@
       console.log("content: ", content);
       fileContent = content;
       isContentChanged = false; // 파일 내용을 불러올 때 변경 여부 초기화
+      // 성공적으로 파일 내용을 불러온 경우 연결 상태를 갱신
+      isConnected.set(true);
       console.log("filecontent: ", fileContent);
     } catch (error) {
       console.error("Failed to get file content", error);
