@@ -1,5 +1,6 @@
 import { writable } from 'svelte/store';
 
+// ---------- 상태 ----------
 export const relativeFilePath = writable<string>("");
 export const selectedCursor = writable<string>("");
 export const isConnected = writable(false);
@@ -12,3 +13,9 @@ export const draggingInfo = writable<{
 } | null>(null);
 // Indicates whether any filename is currently being edited.
 export const isEditingFileName = writable(false);
+
+// ---------- 컨텍스트 ----------
+export const GLOBAL_FUNCTIONS = Symbol('globalFunctions');
+export interface GlobalFunctions {
+  refreshList: () => Promise<void>;
+}

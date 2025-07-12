@@ -3,14 +3,16 @@
   export let toggleMenu: () => void;
   import MdArrowForward from "svelte-icons/md/MdArrowForward.svelte";
   import DiIe from 'svelte-icons/di/DiIe.svelte'
-  import { relativeFilePath, url, contentPath, hiddenPath, fullFilePath } from "../stores";
+  import { relativeFilePath, url, contentPath, hiddenPath, fullFilePath, type GlobalFunctions, GLOBAL_FUNCTIONS } from "../stores";
   import { invoke } from "@tauri-apps/api/core";
   import { open } from "@tauri-apps/plugin-shell";
-  import { onMount } from "svelte";
+  import { getContext, onMount } from "svelte";
   import type { AppConfig } from "../types/setting";
 
   let isHidden = false;
   let isLoading = false;
+
+  const { refreshList } = getContext<GlobalFunctions>(GLOBAL_FUNCTIONS);
 
   function handleOpenPage() {
     let cleanedPath = $fullFilePath
@@ -23,17 +25,17 @@
   }
 
   async function checkHidden() {
-  if (!$relativeFilePath || $relativeFilePath.endsWith('_index.md')) return;
-  try {
-    isHidden = await invoke("check_file_hidden", { path: $relativeFilePath });
-    console.log(isHidden);
-  } catch (error) {
-    console.error("Failed to check hidden status:", error);
-    isHidden = false; // 오류 시 기본값 설정
-  }
-  // 전체 파일 경로 갱신
-  const newPath = (isHidden ? `/${$hiddenPath}` : '') + `/${$contentPath}${$relativeFilePath}`;
-  fullFilePath.set(newPath);
+    if (!$relativeFilePath || $relativeFilePath.endsWith('_index.md')) return;
+    try {
+      isHidden = await invoke("check_file_hidden", { path: $relativeFilePath });
+      console.log(isHidden);
+    } catch (error) {
+      console.error("Failed to check hidden status:", error);
+      isHidden = false; // 오류 시 기본값 설정
+    }
+    // 전체 파일 경로 갱신
+    const newPath = (isHidden ? `/${$hiddenPath}` : '') + `/${$contentPath}${$relativeFilePath}`;
+    fullFilePath.set(newPath);
   }
 
   let config: AppConfig;
@@ -41,18 +43,19 @@
   async function toggleHidden() {
     if (!$relativeFilePath || isLoading) return;
     
-  isLoading = true;
-  try {
-    await invoke("toggle_hidden_file", { path: $relativeFilePath, state: isHidden });
-    isHidden = !isHidden;
-    // 토글 후 전체 파일 경로 갱신
-    const newPath = (isHidden ? `/${$hiddenPath}` : '') + `/${$contentPath}${$relativeFilePath}`;
-    fullFilePath.set(newPath);
-  } catch (error) {
-    console.error("Failed to toggle hidden status:", error);
-  } finally {
-    isLoading = false;
-  }
+    isLoading = true;
+    try {
+      await invoke("toggle_hidden_file", { path: $relativeFilePath, state: isHidden });
+      isHidden = !isHidden;
+      // 토글 후 전체 파일 경로 갱신
+      const newPath = (isHidden ? `/${$hiddenPath}` : '') + `/${$contentPath}${$relativeFilePath}`;
+      fullFilePath.set(newPath);
+      await refreshList();
+    } catch (error) {
+      console.error("Failed to toggle hidden status:", error);
+    } finally {
+      isLoading = false;
+    }
   }
   
   $: if ($relativeFilePath) {

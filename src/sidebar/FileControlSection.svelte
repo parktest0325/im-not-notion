@@ -5,16 +5,13 @@
     import { writable } from "svelte/store";
     import TreeNode from "./TreeNode.svelte";
     import { setContext, onMount } from "svelte";
-    import { selectedCursor, relativeFilePath } from "../stores";
+    import { selectedCursor, relativeFilePath, GLOBAL_FUNCTIONS } from "../stores";
     import type { FileSystemNode } from "../types/setting";
 
     let searchTerm: string = "";
     let directoryStructure = writable<FileSystemNode[]>([]);
     export let isConnected = writable(false);
 
-    setContext("globalFunctions", {
-        refreshList,
-    });
     export async function refreshList() {
         try {
             const data: FileSystemNode = await invoke("get_file_list_");
@@ -26,10 +23,8 @@
             isConnected.set(false); // 파일 리스트를 가져오지 못한 경우
         }
     }
-
-    onMount(async () => {
-        await refreshList();
-    });
+    setContext(GLOBAL_FUNCTIONS, { refreshList });
+    onMount(refreshList);
 
     const searchFiles = (term: string) => {
         // 검색 로직

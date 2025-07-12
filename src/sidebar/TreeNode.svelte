@@ -4,7 +4,7 @@
     import FaFolderPlus from "svelte-icons/fa/FaFolderPlus.svelte";
     import { writable } from "svelte/store";
     import TreeNode from "./TreeNode.svelte";
-    import { relativeFilePath, selectedCursor, draggingInfo, isEditingFileName } from "../stores";
+    import { relativeFilePath, selectedCursor, draggingInfo, isEditingFileName, type GlobalFunctions, GLOBAL_FUNCTIONS } from "../stores";
     import { invoke } from "@tauri-apps/api/core";
     import { getContext, onDestroy, onMount } from "svelte";
     import { slide } from "svelte/transition";
@@ -17,12 +17,9 @@
     export let path: string = "/";
     export let node: FileSystemNode;
     let filenameInput: HTMLInputElement;
-    interface GlobalFunctions {
-        refreshList: () => Promise<void>;
-    }
 
     // getContext를 사용하여 전역 함수를 가져옴
-    const { refreshList } = getContext<GlobalFunctions>("globalFunctions");
+    const { refreshList } = getContext<GlobalFunctions>(GLOBAL_FUNCTIONS);
 
     const isExpanded = writable(false);
 
