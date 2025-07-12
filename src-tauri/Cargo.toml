@@ -1,6 +1,6 @@
 [package]
 name = "im_not_notion"
-version = "0.2.2"
+version = "0.3.0"
 description = "im_not_notion"
 authors = ["dongkim"]
 edition = "2021"
