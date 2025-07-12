@@ -1,17 +1,7 @@
-<script lang="ts">
+<script context="module" lang="ts">
     import { invoke } from "@tauri-apps/api/core";
-    import FaSearch from "svelte-icons/fa/FaSearch.svelte";
-    import IoMdRefresh from "svelte-icons/io/IoMdRefresh.svelte";
-    import { writable } from "svelte/store";
-    import TreeNode from "./TreeNode.svelte";
-    import { setContext, onMount } from "svelte";
-    import { selectedCursor, relativeFilePath, GLOBAL_FUNCTIONS } from "../stores";
-    import type { FileSystemNode } from "../types/setting";
 
-    let searchTerm: string = "";
     let directoryStructure = writable<FileSystemNode[]>([]);
-    export let isConnected = writable(false);
-
     export async function refreshList() {
         try {
             const data: FileSystemNode = await invoke("get_file_list_");
@@ -23,7 +13,19 @@
             isConnected.set(false); // 파일 리스트를 가져오지 못한 경우
         }
     }
-    setContext(GLOBAL_FUNCTIONS, { refreshList });
+</script>
+
+<script lang="ts">
+    import FaSearch from "svelte-icons/fa/FaSearch.svelte";
+    import IoMdRefresh from "svelte-icons/io/IoMdRefresh.svelte";
+    import { writable } from "svelte/store";
+    import TreeNode from "./TreeNode.svelte";
+    import { setContext, onMount } from "svelte";
+    import { selectedCursor, relativeFilePath, GLOBAL_FUNCTIONS, isConnected } from "../stores";
+    import type { FileSystemNode } from "../types/setting";
+
+    let searchTerm: string = "";
+
     onMount(refreshList);
 
     const searchFiles = (term: string) => {
