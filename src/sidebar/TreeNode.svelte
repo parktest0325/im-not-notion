@@ -290,7 +290,7 @@
             </button>
         {/if}
 
-        {#if $selectedCursor === filePath}
+        {#if $selectedCursor === filePath && !$isEditingFileName}
             {#if node.type_ === "Directory"}
                 <button
                     on:click={(event) => createItem(event, "File")}
