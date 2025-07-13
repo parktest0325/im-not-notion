@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { fullFilePath, isConnected } from "../stores";
+  import { fullFilePath, isConnected, relativeFilePath } from "../stores";
   import { invoke } from "@tauri-apps/api/core";
   import { v4 as uuidv4 } from "uuid";
   import { tick, onMount, onDestroy } from "svelte";
@@ -129,7 +129,7 @@
           const uuidValue = uuidv4();
           console.log("uuid: ", uuidValue);
           const savedPath = await invoke("save_file_image", {
-            filePath: $fullFilePath,
+            filePath: $relativeFilePath,
             fileName: uuidValue,
             fileData: Array.from(fileData),
           });

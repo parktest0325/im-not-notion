@@ -109,7 +109,7 @@
         class:dark:border-orange-600={isHidden}
         class:dark:hover:bg-orange-700={isHidden}
       >
-        {isHidden ? "숨겨짐" : "표시중"}
+        {isHidden ? "Show" : "Hide"}
       </button>
     {/if}
     <button on:click={handleOpenPage} class="w-6 h-6 border flex items-center justify-center">
