@@ -16,12 +16,13 @@ pub struct HugoConfig {
     pub image_path: String,
     #[serde(default)]
     pub hidden_path: String,
-    // #[serde(default)]
-    // pub config_path: String,
-    // #[serde(default)]
-    // pub layout_path: String,
-    // #[serde(default)]
-    // pub trashcan_path: String,
+}
+
+impl HugoConfig {
+    /// 필수 필드가 비어있는지 확인
+    pub fn is_empty(&self) -> bool {
+        self.base_path.is_empty() && self.content_path.is_empty()
+    }
 }
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]

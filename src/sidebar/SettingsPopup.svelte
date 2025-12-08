@@ -42,8 +42,7 @@
   async function saveAndClose() {
     try {
       await invoke("save_config", { config });
-      await invoke("update_and_connect", { config });
-      loadConfig();
+      await loadConfig(); // 저장 후 최신 상태 로드
     } catch (error) {
       console.error(error);
     } finally {

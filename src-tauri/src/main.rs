@@ -14,30 +14,23 @@ use commands::{
         new_content_for_hugo, remove_file, save_file_content, save_file_image,
         toggle_hidden_file, check_file_hidden,
     },
-    config_command::{load_config, save_config, get_config},
-    ssh_command::{update_and_connect, kill_server, start_server, execute_ssh},
+    config_command::{load_config, save_config},
+    ssh_command::{kill_server, start_server, execute_ssh},
 };
 
 fn main() -> Result<()> {
     tauri::Builder::default()
         .plugin(shell_init())
         .setup(|_app| {
-            // SSH 연결 설정
-            match load_config() {
-                Ok(config) => {
-                    if let Err(e) = update_and_connect(config) {
-                        eprintln!("Failed to update and connect: {:?}", e);
-                    }
-                }
-                Err(e) => eprintln!("Failed to load config: {:?}", e),
+            // 앱 시작 시 설정 로드 (SSH 연결 포함)
+            if let Err(e) = load_config() {
+                eprintln!("Failed to load config: {:?}", e);
             }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             load_config,
             save_config,
-            get_config,
-            update_and_connect,
             get_file_list_,
             get_file_content,
             save_file_content,

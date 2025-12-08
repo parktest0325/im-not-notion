@@ -1,13 +1,11 @@
 use serde::{Deserialize, Serialize};
-use std::fs::{File, OpenOptions};
-use std::path::PathBuf;
-use dirs_next::home_dir;
 use anyhow::Result;
-use serde_json::Value;
+use ssh2::Sftp;
 
-use super::{CmsConfig, SshConfig};
+use super::{ClientConfig, CmsConfig, ServerConfig, SshConfig};
 
-
+/// 프론트엔드와 통신하는 통합 설정 구조체
+/// 실제 저장은 ClientConfig(로컬)와 ServerConfig(서버)로 분리됨
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 pub struct AppConfig {
     #[serde(default)]
@@ -17,36 +15,48 @@ pub struct AppConfig {
 }
 
 impl AppConfig {
-    fn get_config_path() -> PathBuf {
-        home_dir().unwrap().join(".inn_config.json")
+    /// SSH 설정이 있는지 확인
+    pub fn has_ssh_config(&self) -> bool {
+        !self.ssh_config.host.is_empty() && !self.ssh_config.username.is_empty()
     }
 
-    pub fn load_config_from_file(&mut self) -> Result<()> {
-        let config_file_path = Self::get_config_path();
-        let file = File::open(config_file_path)?;
-        let config_data: Value = serde_json::from_reader(file)?;
+    /// AppConfig를 ClientConfig로 분리
+    pub fn to_client_config(&self) -> ClientConfig {
+        ClientConfig {
+            ssh_config: self.ssh_config.clone(),
+        }
+    }
 
-        self.ssh_config.load(&config_data["ssh_config"])?;
-        self.cms_config.load(&config_data["cms_config"])?;
+    /// AppConfig를 ServerConfig로 분리
+    pub fn to_server_config(&self) -> ServerConfig {
+        ServerConfig {
+            cms_config: self.cms_config.clone(),
+        }
+    }
 
+    /// 로컬 설정 파일에서 ClientConfig만 로드
+    pub fn load_client_only() -> Result<Self> {
+        let client = ClientConfig::load_from_file()?;
+        Ok(AppConfig {
+            ssh_config: client.ssh_config,
+            cms_config: CmsConfig::default(),
+        })
+    }
+
+    /// 서버에서 ServerConfig 로드하여 합침
+    pub fn load_server_config(&mut self, sftp: &Sftp, home_path: &str) -> Result<()> {
+        let server = ServerConfig::load_from_sftp(sftp, home_path)?;
+        self.cms_config = server.cms_config;
         Ok(())
     }
 
-    pub fn save_config_to_file(&self) -> Result<()> {
-        let config_file_path = Self::get_config_path();
-        let file = OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(config_file_path)?;
+    /// ClientConfig를 로컬에 저장
+    pub fn save_client_config(&self) -> Result<()> {
+        self.to_client_config().save_to_file()
+    }
 
-        let save_config = AppConfig {
-            ssh_config: self.ssh_config.prepare_for_save()?,
-            cms_config: self.cms_config.prepare_for_save()?,
-        };
-
-        serde_json::to_writer_pretty(file, &save_config)?;
-
-        Ok(())
+    /// ServerConfig를 서버에 저장
+    pub fn save_server_config(&self, sftp: &Sftp, home_path: &str) -> Result<()> {
+        self.to_server_config().save_to_sftp(sftp, home_path)
     }
 }

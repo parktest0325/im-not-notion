@@ -1,23 +1,17 @@
 use tauri::command;
 use tauri::ipc::InvokeError;
-use crate::services::config_service::{load_app_config, save_app_config, get_app_config, set_app_config};
+use crate::services::config_service::{load_app_config, save_app_config};
 use crate::types::config::AppConfig;
 use crate::utils::IntoInvokeError;
 
+/// 설정 로드: 로컬 + SSH 연결되어 있으면 서버 설정도 병합
 #[command]
 pub fn load_config() -> Result<AppConfig, InvokeError> {
-    load_app_config().into_invoke_err()?;
-    get_app_config().into_invoke_err()
+    load_app_config().into_invoke_err()
 }
 
+/// 설정 저장: 로컬 저장 → SSH 연결 → 서버 저장
 #[command]
 pub fn save_config(config: AppConfig) -> Result<(), InvokeError> {
-    set_app_config(config).into_invoke_err()?;
-    Ok(())
-    // save_app_config().into_invoke_err()
-}
-
-#[command]
-pub fn get_config() -> Result<AppConfig, InvokeError> {
-    get_app_config().into_invoke_err()
+    save_app_config(config).into_invoke_err()
 }

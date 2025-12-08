@@ -1,13 +1,7 @@
 use tauri::ipc::InvokeError;
 use crate::services::config_service::get_hugo_config;
-use crate::services::ssh_service::{get_channel_session, connect_ssh, execute_ssh_command};
-use crate::types::config::AppConfig;
+use crate::services::ssh_service::{get_channel_session, execute_ssh_command};
 use crate::utils::IntoInvokeError;
-
-#[tauri::command]
-pub fn update_and_connect(config: AppConfig) -> Result<(), InvokeError> {
-    connect_ssh(&config).into_invoke_err()
-}
 
 // [Session(-39)] Channel can not be reused.. so need to reconnect ssh session.
 #[tauri::command]
