@@ -34,7 +34,7 @@
 
   onMount(async () => {
     try {
-      const res: string = await invoke("execute_ssh", { cmd: "pwd" });
+      const res: string = await invoke("execute_ssh", { cmd: "echo $HOME" });
       currentDir = res.trim();
     } catch (e) {
       console.error(e);
