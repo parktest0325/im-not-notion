@@ -1,17 +1,19 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import DynamicField from "../component/DynamicField.svelte";
+  import HugoSetup from "./HugoSetup.svelte";
   import { createDefaultAppConfig, type AppConfig } from "../types/setting";
   import Popup from "../component/Popup.svelte";
   import { url, contentPath, hiddenPath } from "../stores";
-    import { onMount } from "svelte";
+  import { onMount } from "svelte";
 
   export let show: boolean;
   export let closeSettings: () => void;
 
   let config: AppConfig;
-  let isLoading = true; // 로딩 상태 추가
-  let activeTab = "ssh"; // 'ssh' 또는 'hugo'가 될 수 있음
+  let isLoading = true;
+  let activeTab = "ssh";
+  let isSetupRunning = false;
 
   onMount(loadConfig);
 
@@ -51,7 +53,7 @@
   }
 </script>
 
-<Popup {show} {isLoading} closePopup={closeSettings}>
+<Popup {show} {isLoading} closePopup={() => { if (!isSetupRunning) closeSettings(); }}>
   <!-- 탭 버튼 -->
   <div class="flex space-x-4">
     <button
@@ -79,6 +81,7 @@
     </div>
   {:else if activeTab === "hugo"}
     <div class="space-y-4">
+      <HugoSetup bind:config bind:isSetupRunning />
       {#each Object.keys(config.cms_config.hugo_config) as key}
         <DynamicField config={config.cms_config.hugo_config} configKey={key} />
       {/each}
@@ -86,7 +89,7 @@
   {/if}
 
   <!-- 공용 저장 버튼 -->
-  <button class="save-button" on:click={saveAndClose}>
+  <button class="save-button" on:click={saveAndClose} disabled={isSetupRunning}>
     Save and Exit
   </button>
 </Popup>

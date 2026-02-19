@@ -16,6 +16,13 @@ use commands::{
     },
     config_command::{load_config, save_config},
     ssh_command::{kill_server, start_server, execute_ssh},
+    setup_command::{
+        check_prerequisites_cmd, check_hugo_installed_cmd,
+        detect_server_platform_cmd, get_latest_hugo_version_cmd,
+        install_hugo_cmd, generate_site_name_cmd,
+        create_hugo_site_cmd, validate_hugo_project_cmd,
+        git_init_site_cmd, install_theme_cmd,
+    },
 };
 
 fn main() -> Result<()> {
@@ -43,6 +50,16 @@ fn main() -> Result<()> {
             execute_ssh,
             toggle_hidden_file,
             check_file_hidden,
+            check_prerequisites_cmd,
+            check_hugo_installed_cmd,
+            detect_server_platform_cmd,
+            get_latest_hugo_version_cmd,
+            install_hugo_cmd,
+            generate_site_name_cmd,
+            create_hugo_site_cmd,
+            validate_hugo_project_cmd,
+            git_init_site_cmd,
+            install_theme_cmd,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

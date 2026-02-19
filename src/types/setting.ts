@@ -72,5 +72,11 @@ function createDefaultAppConfig(): AppConfig {
     };
 }
 
-export type { SshConfig, HugoConfig, CmsConfig, AppConfig, FileSystemNode };
+interface PrerequisiteResult {
+    curl: boolean;
+    tar: boolean;
+    git: boolean;
+}
+
+export type { SshConfig, HugoConfig, CmsConfig, AppConfig, FileSystemNode, PrerequisiteResult };
 export { createDefaultAppConfig };
