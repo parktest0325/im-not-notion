@@ -1,7 +1,6 @@
 <script lang="ts">
   import MdSettings from "svelte-icons/md/MdSettings.svelte";
   import SettingsPopup from "./SettingsPopup.svelte";
-  import FaFileCode from "svelte-icons/fa/FaFileCode.svelte";
   import IoMdTrash from "svelte-icons/io/IoMdTrash.svelte";
   import FaServer from "svelte-icons/fa/FaServer.svelte";
   import GiNuclear from "svelte-icons/gi/GiNuclear.svelte";

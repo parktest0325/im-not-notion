@@ -1,5 +1,5 @@
 use ssh2::{Session, Channel, Sftp};
-use std::{net::TcpStream, path::Path, sync::Mutex, io::Read};
+use std::{net::TcpStream, sync::Mutex, io::Read};
 use anyhow::{Result, Context};
 use crate::types::config::AppConfig;
 use once_cell::sync::Lazy;
@@ -72,17 +72,17 @@ pub fn get_sftp_session() -> Result<Sftp> {
 }
 
 pub fn execute_ssh_command(channel: &mut Channel, command: &str) -> Result<String> {
-    match channel.exec(command) {
-        Ok(_) => println!("Command executed successfully"),
-        Err(e) => eprintln!("Failed to execute SSH command: {:#}", e),
+    channel.exec(command).context("Failed to execute SSH command")?;
+
+    let mut stdout = String::new();
+    channel.read_to_string(&mut stdout).context("Failed to read from SSH stdout")?;
+
+    let mut stderr = String::new();
+    channel.stderr().read_to_string(&mut stderr).context("Failed to read from SSH stderr")?;
+
+    if !stderr.is_empty() {
+        eprintln!("run_command stderr: {}", stderr);
     }
 
-    let mut s = String::new();
-    channel.stderr().read_to_string(&mut s).context("Failed to read from SSH stderr")?;
-    println!("run_command stderr: {}", s);
-    if s.is_empty() {
-        channel.read_to_string(&mut s).context("Failed to read from SSH stdout")?;
-        println!("run_command stdout: {}", s);
-    }
-    Ok(s)
+    Ok(stdout)
 }

@@ -28,8 +28,8 @@
 
     onMount(refreshList);
 
-    const searchFiles = (term: string) => {
-        // 검색 로직
+    const searchFiles = (_term: string) => {
+        // TODO: 검색 로직 구현
     };
 
     async function createFolder(event: MouseEvent) {

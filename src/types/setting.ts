@@ -13,9 +13,7 @@ interface HugoConfig {
     base_path: string,
     content_path: string,
     image_path: string,
-    // config_path: string,
-    // layout_path: string,
-    // trashcan_path: string,
+    hidden_path: string,
     [key: string]: string;
 }
 
@@ -53,9 +51,7 @@ function createDefaultHugoConfig(): HugoConfig {
         base_path: "",
         content_path: "",
         image_path: "",
-        // config_path: "",
-        // layout_path: "",
-        // trashcan_path: "",
+        hidden_path: "",
     };
 }
 

@@ -70,11 +70,10 @@ pub fn encrypt_string(plain_data: &str) -> Result<String> {
     let nonce = Nonce::from_slice(&iv);
     let ciphertext = cipher
         .encrypt(nonce, plain_data.as_bytes())
-        .expect("encryption failure"); // 암호화 실패 시 panic 발생
+        .map_err(|e| anyhow::anyhow!("Encryption failure: {}", e))?;
 
-    // IV를 Base64로 인코딩하여 암호화된 데이터와 함께 반환
-    let iv_base64 = BASE64_STANDARD.encode(&iv);
-    let ciphertext_base64 = BASE64_STANDARD.encode(&ciphertext);
+    let iv_base64 = BASE64_STANDARD.encode(iv);
+    let ciphertext_base64 = BASE64_STANDARD.encode(ciphertext);
     Ok(format!("{}:{}", iv_base64, ciphertext_base64))
 }
 
@@ -94,6 +93,6 @@ pub fn decrypt_string(encoded_data: &str) -> Result<String> {
     let nonce = Nonce::from_slice(&iv);
     let decrypted_data = cipher
         .decrypt(nonce, ciphertext.as_ref())
-        .expect("decryption failure");
-    Ok(String::from_utf8(decrypted_data).context("UTF-8 conversion failure")?)
+        .map_err(|e| anyhow::anyhow!("Decryption failure: {}", e))?;
+    String::from_utf8(decrypted_data).context("UTF-8 conversion failure")
 }

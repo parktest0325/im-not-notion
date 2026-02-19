@@ -9,8 +9,6 @@
     import { getContext, onDestroy, onMount } from "svelte";
     import { slide } from "svelte/transition";
     import type { FileSystemNode } from "../types/setting";
-    import DiJenkins from 'svelte-icons/di/DiJenkins.svelte'
-    import DiComposer from 'svelte-icons/di/DiComposer.svelte'
     import FolderClose from '../resource/InvaderClose.svelte';
     import FolderOpen from '../resource/InvaderOpen.svelte';
 
