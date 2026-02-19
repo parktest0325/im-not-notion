@@ -61,6 +61,12 @@ pub fn save_app_config(mut new_config: AppConfig) -> Result<()> {
     Ok(())
 }
 
+pub fn get_app_config() -> Result<AppConfig> {
+    APP_CONFIG.lock().unwrap()
+        .clone()
+        .context("APP_CONFIG not initialized")
+}
+
 pub fn get_hugo_config() -> Result<HugoConfig> {
     APP_CONFIG.lock().unwrap()
         .clone()

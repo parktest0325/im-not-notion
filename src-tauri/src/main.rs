@@ -23,6 +23,7 @@ use commands::{
         create_hugo_site_cmd, validate_hugo_project_cmd,
         git_init_site_cmd, install_theme_cmd,
     },
+    pty_command::{start_pty_cmd, write_pty_cmd, resize_pty_cmd, stop_pty_cmd},
 };
 
 fn main() -> Result<()> {
@@ -60,6 +61,10 @@ fn main() -> Result<()> {
             validate_hugo_project_cmd,
             git_init_site_cmd,
             install_theme_cmd,
+            start_pty_cmd,
+            write_pty_cmd,
+            resize_pty_cmd,
+            stop_pty_cmd,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -2,6 +2,7 @@ pub mod config_service;
 pub mod ssh_service;
 pub mod file_service;
 pub mod setup_service;
+pub mod pty_service;
 
 pub use ssh_service::{get_channel_session, get_sftp_session, execute_ssh_command};
 pub use file_service::{
