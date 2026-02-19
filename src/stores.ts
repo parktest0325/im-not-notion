@@ -13,6 +13,15 @@ export const draggingInfo = writable<{
 } | null>(null);
 // Indicates whether any filename is currently being edited.
 export const isEditingFileName = writable(false);
+// Indicates whether content editor is active.
+export const isEditingContent = writable(false);
+// Set to a file path to trigger rename mode on the matching TreeNode.
+export const renamingPath = writable<string>("");
+// Set to trigger a plugin via shortcut: { pluginName, triggerLabel, inputFields }
+export const triggerPluginShortcut = writable<{
+  pluginName: string;
+  triggerLabel: string;
+} | null>(null);
 
 // ---------- 토스트 ----------
 

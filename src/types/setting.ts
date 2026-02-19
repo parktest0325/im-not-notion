@@ -9,9 +9,15 @@ export type {
     AppConfig,
     FileSystemNode,
     PrerequisiteResult,
+    PluginManifest,
+    PluginInfo,
+    Trigger,
+    InputField,
+    PluginResult,
+    PluginAction,
 } from "./generated";
 
-export { NodeType } from "./generated";
+export { NodeType, HookEvent } from "./generated";
 
 import type { SshConfig, HugoConfig, CmsConfig, AppConfig } from "./generated";
 

@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use anyhow::{Result, Context};
 use ssh2::Sftp;
 use std::io::{Read, Write};
@@ -14,6 +15,8 @@ const SERVER_CONFIG_PATH: &str = ".inn_server_config.json";
 pub struct ServerConfig {
     #[serde(default)]
     pub cms_config: CmsConfig,
+    #[serde(default)]
+    pub shortcuts: HashMap<String, Vec<String>>,
 }
 
 impl ServerConfig {
