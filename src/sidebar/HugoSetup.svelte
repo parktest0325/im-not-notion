@@ -140,7 +140,7 @@
       config.cms_config.hugo_config.hugo_cmd_path = hugoPath!;
       config.cms_config.hugo_config.base_path = sitePath;
       config.cms_config.hugo_config.content_path = "posts";
-      config.cms_config.hugo_config.image_path = "static/images";
+      config.cms_config.hugo_config.image_path = "static";
       config = config;
       updateStep(4, "done", "Config fields populated");
 
