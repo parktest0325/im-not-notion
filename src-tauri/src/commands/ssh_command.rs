@@ -12,15 +12,14 @@ pub fn kill_server() -> Result<(), InvokeError> {
         &mut channel,
         &format!("ps -ef | grep '{} server' | grep -v grep | awk '{{print$2}}'", &hugo_config.hugo_cmd_path)
     ).into_invoke_err()?;
-    println!("pid: {}", pid);
-    // let s = execute_ssh_command(&mut channel, "id").into_invoke_err()?;
-    // println!("s: {}", s);
-    channel = get_channel_session().into_invoke_err()?;
-    let s = execute_ssh_command(
-        &mut channel,
-        &format!("kill -9 {}", pid)
-    ).into_invoke_err()?;
-    println!("s: {}", s);
+    let pid = pid.trim();
+    if !pid.is_empty() {
+        channel = get_channel_session().into_invoke_err()?;
+        execute_ssh_command(
+            &mut channel,
+            &format!("kill -9 {}", pid)
+        ).into_invoke_err()?;
+    }
 
     Ok(())
 }

@@ -1,125 +1,118 @@
 <script lang="ts">
   import Popup from "../component/Popup.svelte";
-  import { invoke } from "@tauri-apps/api/core";
-  import { afterUpdate, onMount } from "svelte";
+  import { invoke, Channel } from "@tauri-apps/api/core";
+  import { onDestroy, tick } from "svelte";
+  import { addToast } from "../stores";
+  import { Terminal } from "@xterm/xterm";
+  import { FitAddon } from "@xterm/addon-fit";
+  import "@xterm/xterm/css/xterm.css";
+
   export let show: boolean;
   export let closeTerminal: () => void;
 
-  let command = "";
-  let output = "";
-  let currentDir = "";
-  let terminalEl: HTMLPreElement | null = null;
+  let termContainer: HTMLDivElement;
+  let terminal: Terminal | null = null;
+  let fitAddon: FitAddon | null = null;
+  let started = false;
 
-  function resolvePath(base: string, target: string): string {
-    if (target.startsWith("/")) {
-      base = "";
-    }
+  async function startTerminal() {
+    if (started) return;
+    await tick();
+    if (!termContainer) return;
 
-    const parts = (base || "/").split("/");
-    const segments = target.split("/");
+    terminal = new Terminal({
+      cursorBlink: true,
+      fontSize: 14,
+      fontFamily: "'Menlo', 'Monaco', 'Courier New', monospace",
+      theme: {
+        background: "#1e1e1e",
+        foreground: "#d4d4d4",
+        cursor: "#d4d4d4",
+      },
+    });
 
-    for (const seg of segments) {
-      if (!seg || seg === ".") continue;
-      if (seg === "..") {
-        if (parts.length > 1) parts.pop();
-      } else {
-        parts.push(seg);
-      }
-    }
+    fitAddon = new FitAddon();
+    terminal.loadAddon(fitAddon);
+    terminal.open(termContainer);
+    fitAddon.fit();
 
-    let path = parts.join("/");
-    if (!path.startsWith("/")) path = "/" + path;
-    return path.replace(/\/+/g, "/");
-  }
+    const { cols, rows } = terminal;
 
-  onMount(async () => {
+    // Tauri Channel: 서버 출력 수신
+    const onEvent = new Channel<string>();
+    onEvent.onmessage = (data: string) => {
+      terminal?.write(data);
+    };
+
     try {
-      const res: string = await invoke("execute_ssh", { cmd: "echo $HOME" });
-      currentDir = res.trim();
+      await invoke("start_pty_cmd", { cols, rows, onEvent });
+      started = true;
     } catch (e) {
-      console.error(e);
-    }
-  });
-
-  async function sendCommand() {
-    const cmd = command.trim();
-    if (!cmd) return;
-    if (cmd === "clear") {
-      output = "";
-      command = "";
+      terminal.write(`\r\nError: ${e}\r\n`);
+      addToast("Failed to connect terminal.");
       return;
     }
 
-    if (cmd.startsWith("cd ") || cmd === "cd") {
-      const target = cmd.slice(2).trim();
-      currentDir = resolvePath(currentDir, target || "/");
-      if (output) {
-        output += "\n";
-      }
-      output += `$ ${cmd}\n`;
-      command = "";
-      return;
-    }
-
-    try {
-      const result: string = await invoke("execute_ssh", {
-        cmd: `cd ${currentDir}; ${cmd} 2>&1`,
+    // 사용자 입력 → 서버로 전송
+    terminal.onData((data: string) => {
+      invoke("write_pty_cmd", { data }).catch((e: unknown) => {
+        console.error("write_pty_cmd error:", e);
       });
+    });
 
-      if (output) {
-        output += "\n";
-      }
-      output += `$ ${cmd}\n`;
-      if (result.trim()) {
-        output += `${result.trimEnd()}\n`;
-      }
-    } catch (e) {
-      if (output) {
-        output += "\n";
-      }
-      output += `$ ${cmd}\nError: ${e}\n`;
-    }
-    command = "";
+    // 터미널 리사이즈 → 서버 PTY 리사이즈
+    terminal.onResize(({ cols, rows }: { cols: number; rows: number }) => {
+      invoke("resize_pty_cmd", { cols, rows }).catch((e: unknown) => {
+        console.error("resize_pty_cmd error:", e);
+      });
+    });
   }
-  afterUpdate(() => {
-    if (terminalEl) {
-      terminalEl.scrollTop = terminalEl.scrollHeight;
-    }
+
+  function stopTerminal() {
+    if (!started) return;
+    invoke("stop_pty_cmd").catch((e: unknown) => {
+      console.error("stop_pty_cmd error:", e);
+    });
+    terminal?.dispose();
+    terminal = null;
+    fitAddon = null;
+    started = false;
+  }
+
+  // show 변경 감시
+  $: if (show) {
+    startTerminal();
+  } else if (!show && started) {
+    stopTerminal();
+  }
+
+  // 팝업 크기 변경 시 터미널 리사이즈
+  function handleResize() {
+    fitAddon?.fit();
+  }
+
+  onDestroy(() => {
+    stopTerminal();
   });
 </script>
 
+<svelte:window on:resize={handleResize} />
+
 <div class="terminal-popup">
   <Popup {show} closePopup={closeTerminal}>
-    <h2 class="font-bold text-lg mb-2">SSH Terminal</h2>
-    <pre class="terminal-output" bind:this={terminalEl}>{output}</pre>
-    <div class="text-gray-400 mt-2">{currentDir}</div>
-    <div class="flex mt-1 space-x-2">
-      <input
-        class="flex-grow p-2 rounded bg-gray-800 text-white"
-        bind:value={command}
-        on:keydown={(e) => {
-          if (e.key === 'Enter') {
-            e.stopPropagation();
-            sendCommand();
-          }
-        }}
-        placeholder="Enter command" />
-      <button class="bg-blue-600 hover:bg-blue-800 px-4 rounded" on:click={sendCommand}>Run</button>
-    </div>
+    <div bind:this={termContainer} class="terminal-container"></div>
   </Popup>
 </div>
 
 <style>
-  .terminal-output {
-    background-color: #000;
-    color: #0f0;
-    padding: 0.5rem;
-    height: 15rem;
-    overflow-y: auto;
-    white-space: pre-wrap;
+  .terminal-container {
+    width: 100%;
+    height: 60vh;
   }
 
   :global(.terminal-popup .popup-content) {
-    max-width: 40rem;
+    max-width: 56rem;
+    max-height: 90vh;
+    padding: 0.5rem !important;
   }
 </style>

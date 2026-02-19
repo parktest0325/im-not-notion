@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { fullFilePath, isConnected, relativeFilePath } from "../stores";
+  import { fullFilePath, isConnected, relativeFilePath, addToast } from "../stores";
   import { invoke } from "@tauri-apps/api/core";
   import { v4 as uuidv4 } from "uuid";
   import { tick, onMount, onDestroy } from "svelte";
@@ -8,15 +8,15 @@
 
   let fileContent: string = "";
   let editable: boolean = false;
-  let showDialog: boolean = false; // 대화상자 표시 상태를 위한 일반 boolean 변수
+  let showDialog: boolean = false;
   let contentTextArea: HTMLTextAreaElement;
   let contentDiv: HTMLDivElement;
-  let scrollPosition: number = 0; // 스크롤 위치를 저장할 변수 추가
+  let scrollPosition: number = 0;
 
-  let isContentChanged: boolean = false; // 내용 변경 여부를 추적하는 변수
-  let autoSaveEnabled = writable(true); // 자동 저장 기능 활성화 여부
-  let autoSaveInterval = 1000 * 5; //* 60; // 자동 저장 주기 (5분)
-  let autoSaveTimer: number | null = null; // 자동 저장 타이머
+  let isContentChanged: boolean = false;
+  let autoSaveEnabled = writable(true);
+  let autoSaveInterval = 1000 * 5;
+  let autoSaveTimer: number | null = null;
 
   $: if ($fullFilePath) {
     getFileContent($fullFilePath);
@@ -29,12 +29,12 @@
     tick().then(() => {
       contentTextArea?.focus();
       contentTextArea?.scrollTo(0, scrollPosition);
-      startAutoSave(); // editable이 true일 때 자동 저장 시작
+      startAutoSave();
     });
   } else {
     tick().then(() => {
       contentDiv?.scrollTo(0, scrollPosition);
-      stopAutoSave(); // editable이 false일 때 자동 저장 중지
+      stopAutoSave();
     });
   }
 
@@ -43,15 +43,12 @@
       const content: string = await invoke("get_file_content", {
         filePath,
       });
-      console.log("content: ", content);
       fileContent = content;
-      isContentChanged = false; // 파일 내용을 불러올 때 변경 여부 초기화
-      // 성공적으로 파일 내용을 불러온 경우 연결 상태를 갱신
+      isContentChanged = false;
       isConnected.set(true);
-      console.log("filecontent: ", fileContent);
     } catch (error) {
       console.error("Failed to get file content", error);
-      fileContent = "파일을 불러오는데 실패했습니다.";
+      fileContent = "Failed to load file.";
       isConnected.set(false);
     }
   }
@@ -61,7 +58,6 @@
       autoSaveTimer = setInterval(() => {
         saveContent();
       }, autoSaveInterval);
-      console.log(autoSaveTimer);
     }
   }
 
@@ -81,23 +77,21 @@
         filePath: $fullFilePath,
         fileData: fileContent,
       });
-      console.log("저장되었습니다.");
-      isContentChanged = false; // 저장 후 내용 변경 여부를 false로 설정
+      isContentChanged = false;
       isConnected.set(true);
     } catch (error) {
-      console.log("저장에 실패했습니다. reason => ", error);
+      console.error("Failed to save content:", error);
       isConnected.set(false);
+      addToast("Failed to save file.");
     }
   }
 
   function handleKeyDown(event: KeyboardEvent) {
-    console.log("onKeyDown");
     if (editable) {
       scrollPosition = contentTextArea.scrollTop;
       event.stopPropagation();
       if ((event.ctrlKey || event.metaKey) && event.key === "s") {
         event.preventDefault();
-        console.log("ctrl+ s");
         showDialog = true;
         // editable = false;
       } else if (event.key === "Escape") {
@@ -127,17 +121,16 @@
           const afterText = fileContent.slice(currentPosition);
 
           const uuidValue = uuidv4();
-          console.log("uuid: ", uuidValue);
           const savedPath = await invoke("save_file_image", {
             filePath: $relativeFilePath,
             fileName: uuidValue,
             fileData: Array.from(fileData),
           });
-          console.log("savedPath: ", savedPath);
 
           fileContent = `${beforeText}\n![${uuidValue}](${savedPath})${afterText}`;
         } catch (e) {
-          console.log("error: ", e);
+          console.error("Image paste failed:", e);
+        addToast("Failed to save image.");
         }
       }
     }
@@ -168,8 +161,9 @@
     showDialog = false;
     editable = true;
   }}
-  handleSave={() => {
-    saveContent();
+  handleSave={async () => {
+    await saveContent();
+    addToast("File saved.", "success");
     editable = false;
     showDialog = false;
   }}

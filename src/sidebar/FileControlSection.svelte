@@ -21,31 +21,31 @@
     import { writable } from "svelte/store";
     import TreeNode from "./TreeNode.svelte";
     import { setContext, onMount } from "svelte";
-    import { selectedCursor, relativeFilePath, GLOBAL_FUNCTIONS, isConnected } from "../stores";
+    import { selectedCursor, relativeFilePath, GLOBAL_FUNCTIONS, isConnected, addToast } from "../stores";
     import type { FileSystemNode } from "../types/setting";
 
     let searchTerm: string = "";
 
     onMount(refreshList);
 
-    const searchFiles = (term: string) => {
-        // 검색 로직
+    const searchFiles = (_term: string) => {
+        // TODO: 검색 로직 구현
     };
 
     async function createFolder(event: MouseEvent) {
         event.stopPropagation();
         try {
-            const createdPath = "/new_folder/_index.md";
-            await invoke("new_content_for_hugo", {
-                filePath: createdPath,
+            const createdPath: string = await invoke("new_content_for_hugo", {
+                filePath: "/new_folder/_index.md",
             });
             selectedCursor.set(createdPath);
             relativeFilePath.set(createdPath);
             await refreshList();
+            addToast("Folder created.", "success");
         } catch (error) {
             console.error("failed to make directory:", error);
+            addToast("Failed to create folder.");
         }
-        console.log("Create folder");
     }
 </script>
 

@@ -1,15 +1,35 @@
 use ssh2::{Session, Channel, Sftp};
-use std::{net::TcpStream, path::Path, sync::Mutex, io::Read};
+use std::{net::{TcpStream, ToSocketAddrs}, sync::Mutex, io::Read, time::Duration};
 use anyhow::{Result, Context};
 use crate::types::config::AppConfig;
 use once_cell::sync::Lazy;
 
+const TCP_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+
 static SSH_CLIENT: Lazy<Mutex<Option<Session>>> = Lazy::new(|| Mutex::new(None));
 
-pub fn connect_ssh(config: &AppConfig) -> Result<()> {
+/// Connect SSH. If `force` is false, reuses existing live session.
+pub fn connect_ssh_inner(config: &AppConfig, force: bool) -> Result<()> {
+    if !force {
+        let client = SSH_CLIENT.lock().unwrap();
+        if let Some(ref session) = *client {
+            if session.authenticated() {
+                // Try opening a channel to verify connection is alive
+                if session.channel_session().is_ok() {
+                    return Ok(());
+                }
+            }
+        }
+    }
+
     let mut session = Session::new().context("Failed to create SSH session")?;
-    let tcp = TcpStream::connect(format!("{}:{}", config.ssh_config.host, config.ssh_config.port))
-        .context("Failed to connect to SSH server")?;
+    let addr = format!("{}:{}", config.ssh_config.host, config.ssh_config.port);
+    let sock_addr = addr.to_socket_addrs()
+        .context("Failed to resolve SSH address")?
+        .next()
+        .context("No address found for SSH host")?;
+    let tcp = TcpStream::connect_timeout(&sock_addr, TCP_CONNECT_TIMEOUT)
+        .context("Failed to connect to SSH server (timeout)")?;
     session.set_tcp_stream(tcp);
     session.handshake().context("Failed to perform SSH handshake")?;
 
@@ -32,6 +52,16 @@ pub fn connect_ssh(config: &AppConfig) -> Result<()> {
     Ok(())
 }
 
+/// Connect SSH, reusing existing session if alive
+pub fn connect_ssh(config: &AppConfig) -> Result<()> {
+    connect_ssh_inner(config, false)
+}
+
+/// Force reconnect SSH (used when credentials may have changed)
+pub fn reconnect_ssh(config: &AppConfig) -> Result<()> {
+    connect_ssh_inner(config, true)
+}
+
 pub fn get_channel_session() -> Result<Channel> {
     let channel = SSH_CLIENT.lock().unwrap()
         .as_ref()
@@ -49,17 +79,17 @@ pub fn get_sftp_session() -> Result<Sftp> {
 }
 
 pub fn execute_ssh_command(channel: &mut Channel, command: &str) -> Result<String> {
-    match channel.exec(command) {
-        Ok(_) => println!("Command executed successfully"),
-        Err(e) => eprintln!("Failed to execute SSH command: {:#}", e),
+    channel.exec(command).context("Failed to execute SSH command")?;
+
+    let mut stdout = String::new();
+    channel.read_to_string(&mut stdout).context("Failed to read from SSH stdout")?;
+
+    let mut stderr = String::new();
+    channel.stderr().read_to_string(&mut stderr).context("Failed to read from SSH stderr")?;
+
+    if !stderr.is_empty() {
+        eprintln!("run_command stderr: {}", stderr);
     }
 
-    let mut s = String::new();
-    channel.stderr().read_to_string(&mut s).context("Failed to read from SSH stderr")?;
-    println!("run_command stderr: {}", s);
-    if s.is_empty() {
-        channel.read_to_string(&mut s).context("Failed to read from SSH stdout")?;
-        println!("run_command stdout: {}", s);
-    }
-    Ok(s)
+    Ok(stdout)
 }

@@ -4,13 +4,11 @@
     import FaFolderPlus from "svelte-icons/fa/FaFolderPlus.svelte";
     import { writable } from "svelte/store";
     import TreeNode from "./TreeNode.svelte";
-    import { relativeFilePath, selectedCursor, draggingInfo, isEditingFileName, type GlobalFunctions, GLOBAL_FUNCTIONS } from "../stores";
+    import { relativeFilePath, selectedCursor, draggingInfo, isEditingFileName, addToast, type GlobalFunctions, GLOBAL_FUNCTIONS } from "../stores";
     import { invoke } from "@tauri-apps/api/core";
     import { getContext, onDestroy, onMount } from "svelte";
     import { slide } from "svelte/transition";
     import type { FileSystemNode } from "../types/setting";
-    import DiJenkins from 'svelte-icons/di/DiJenkins.svelte'
-    import DiComposer from 'svelte-icons/di/DiComposer.svelte'
     import FolderClose from '../resource/InvaderClose.svelte';
     import FolderOpen from '../resource/InvaderOpen.svelte';
 
@@ -46,26 +44,21 @@
     async function createItem(event: MouseEvent, createType: string) {
         event.stopPropagation();
         try {
-            let createdPath: string;
-            if (createType === "Directory") {
-                createdPath = filePath + "/new_folder/_index.md";
-                await invoke("new_content_for_hugo", {
-                    filePath: createdPath,
-                });
-            } else {
-                createdPath = filePath + "/new_file.md";
-                await invoke("new_content_for_hugo", {
-                    filePath: createdPath,
-                });
-            }
+            const basePath = createType === "Directory"
+                ? filePath + "/new_folder/_index.md"
+                : filePath + "/new_file.md";
+            const createdPath: string = await invoke("new_content_for_hugo", {
+                filePath: basePath,
+            });
             isExpanded.set(true);
             selectedCursor.set(createdPath);
             relativeFilePath.set(createdPath);
             await refreshList();
+            addToast("Item created.", "success");
         } catch (error) {
             console.error("failed to create item:", error);
+            addToast("Failed to create item.");
         }
-        console.log("Create item");
     }
 
     $: if ($selectedCursor) {
@@ -97,8 +90,10 @@
             selectedCursor.set("");
             relativeFilePath.set("");
             await refreshList();
+            addToast("Item deleted.", "success");
         } catch (error) {
             console.error("failed to rmrf:", error);
+            addToast("Failed to delete item.");
         }
         console.log("Delete item");
     }
@@ -127,8 +122,10 @@
                         : dstPath,
                 );
                 await refreshList();
+                addToast("Item renamed.", "success");
             } catch (error) {
                 console.error("Failed to rename file:", error);
+                addToast("Failed to rename item.");
             }
         } else if (event.key === "Escape") {
             isEditing = false;
@@ -233,8 +230,10 @@
             selectedCursor.set(dst);
             relativeFilePath.set(dst);
             await refreshList();
+            addToast("Item moved.", "success");
         } catch (e) {
             console.error('Failed to move file:', e);
+            addToast("Failed to move item.");
         }
     }
 </script>

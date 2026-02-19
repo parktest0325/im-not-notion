@@ -2,7 +2,7 @@ use std::{path::Path, sync::Mutex};
 use anyhow::{Result, Context};
 use once_cell::sync::Lazy;
 use crate::{services::{execute_ssh_command, get_channel_session, get_sftp_session, move_file}, types::config::{cms_config::HugoConfig, AppConfig}};
-use crate::services::ssh_service::connect_ssh;
+use crate::services::ssh_service::{connect_ssh, reconnect_ssh};
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 
 static APP_CONFIG: Lazy<Mutex<Option<AppConfig>>> = Lazy::new(|| Mutex::new(None));
@@ -40,8 +40,8 @@ pub fn save_app_config(mut new_config: AppConfig) -> Result<()> {
     // 1. 로컬에 먼저 저장 (SSH 설정)
     new_config.save_client_config()?;
 
-    // 2. SSH 연결
-    connect_ssh(&new_config)?;
+    // 2. SSH 연결 (설정 변경됐을 수 있으므로 강제 재연결)
+    reconnect_ssh(&new_config)?;
 
     // 3. 서버 설정이 비어있지 않으면 저장
     if !new_config.cms_config.hugo_config.is_empty() {
@@ -59,6 +59,12 @@ pub fn save_app_config(mut new_config: AppConfig) -> Result<()> {
     *APP_CONFIG.lock().unwrap() = Some(new_config);
 
     Ok(())
+}
+
+pub fn get_app_config() -> Result<AppConfig> {
+    APP_CONFIG.lock().unwrap()
+        .clone()
+        .context("APP_CONFIG not initialized")
 }
 
 pub fn get_hugo_config() -> Result<HugoConfig> {
@@ -93,7 +99,6 @@ pub fn set_hidden_path(new_hidden_path: &str) -> Result<String> {
     if old_hidden_path.is_empty() || old_hidden_path == final_hidden {
         // 이미 같은 경로 or
         // 이전 설정이 없는경우에도 move를 안해도됨. hidden 파일이 없다는 뜻이니까
-        println!("same path or no previous config");
         return Ok(final_hidden);
     }
 
@@ -106,18 +111,13 @@ pub fn set_hidden_path(new_hidden_path: &str) -> Result<String> {
     let new_path = Path::new(&new_hidden_abs);
 
     if sftp.stat(new_path).is_ok() {
-        // 대상 폴더가 이미 존재 - move 불필요
-        println!("target path already exists: {}", new_hidden_abs);
         return Ok(final_hidden);
     }
 
     // 소스가 존재할 때만 이동
     let old_path = Path::new(&old_hidden_abs);
     if sftp.stat(old_path).is_ok() {
-        println!("{old_hidden_abs} -> {new_hidden_abs}");
         move_file(&sftp, old_path, new_path)?;
-    } else {
-        println!("source path does not exist: {}", old_hidden_abs);
     }
 
     Ok(final_hidden)

@@ -3,7 +3,7 @@
   export let toggleMenu: () => void;
   import MdArrowForward from "svelte-icons/md/MdArrowForward.svelte";
   import DiIe from 'svelte-icons/di/DiIe.svelte'
-  import { relativeFilePath, url, contentPath, hiddenPath, fullFilePath, type GlobalFunctions, GLOBAL_FUNCTIONS } from "../stores";
+  import { relativeFilePath, url, contentPath, hiddenPath, fullFilePath, addToast, type GlobalFunctions, GLOBAL_FUNCTIONS } from "../stores";
   import { invoke } from "@tauri-apps/api/core";
   import { open } from "@tauri-apps/plugin-shell";
   import { getContext, onMount } from "svelte";
@@ -31,7 +31,8 @@
       console.log(isHidden);
     } catch (error) {
       console.error("Failed to check hidden status:", error);
-      isHidden = false; // 오류 시 기본값 설정
+      isHidden = false;
+      addToast("Failed to check hidden status.");
     }
   }
 
@@ -44,12 +45,11 @@
     try {
       await invoke("toggle_hidden_file", { path: $relativeFilePath, state: isHidden });
       isHidden = !isHidden;
-      // // 토글 후 전체 파일 경로 갱신 없어도 잘만됨
-      // const newPath = (isHidden ? `/${$hiddenPath}` : '') + `/${$contentPath}${$relativeFilePath}`;
-      // fullFilePath.set(newPath);
       await refreshList();
+      addToast(isHidden ? "File hidden." : "File visible.", "success");
     } catch (error) {
       console.error("Failed to toggle hidden status:", error);
+      addToast("Failed to toggle hidden status.");
     } finally {
       isLoading = false;
     }

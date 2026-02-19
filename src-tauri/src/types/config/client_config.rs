@@ -15,12 +15,13 @@ pub struct ClientConfig {
 }
 
 impl ClientConfig {
-    pub fn get_config_path() -> PathBuf {
-        home_dir().unwrap().join(".inn_config.json")
+    pub fn get_config_path() -> Result<PathBuf> {
+        let home = home_dir().context("Failed to determine home directory")?;
+        Ok(home.join(".inn_config.json"))
     }
 
     pub fn load_from_file() -> Result<Self> {
-        let config_file_path = Self::get_config_path();
+        let config_file_path = Self::get_config_path()?;
         let file = File::open(&config_file_path)
             .context(format!("Failed to open config file: {:?}", config_file_path))?;
         let mut config: ClientConfig = serde_json::from_reader(file)
@@ -31,7 +32,7 @@ impl ClientConfig {
     }
 
     pub fn save_to_file(&self) -> Result<()> {
-        let config_file_path = Self::get_config_path();
+        let config_file_path = Self::get_config_path()?;
         let file = OpenOptions::new()
             .write(true)
             .create(true)

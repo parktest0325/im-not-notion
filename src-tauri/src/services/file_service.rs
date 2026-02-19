@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use ssh2::{Channel, Sftp};
+use ssh2::Sftp;
 use std::io::prelude::*;
 use indexmap::IndexMap;
 
@@ -164,7 +164,6 @@ pub fn get_file(sftp: &Sftp, path: &Path) -> Result<String> {
     let mut file = sftp.open(path)?;
     let mut content = String::new();
     file.read_to_string(&mut content)?;
-    println!("content: {:#?}", content);
     Ok(content)
 }
 
