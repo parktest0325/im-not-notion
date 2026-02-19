@@ -2,8 +2,10 @@ use crate::services::{
     config_service::get_hugo_config, execute_ssh_command, get_channel_session, get_file, get_file_list, get_sftp_session, move_file, rmrf_file, save_file, save_image, FileSystemNode,
     merge_tree,
 };
+use crate::types::config::cms_config::HugoConfig;
 use crate::utils::IntoInvokeError;
 use tauri::ipc::InvokeError;
+use ssh2::Sftp;
 use std::path::{Path, PathBuf};
 
 #[tauri::command]
@@ -82,10 +84,69 @@ pub fn save_file_image(
     Ok(ret_path)
 }
 
+/// content/hidden 양쪽을 확인하여 중복되지 않는 경로를 반환.
+/// 이미 존재하면 _1, _2, ... suffix를 붙인다.
+fn find_unique_path(sftp: &Sftp, hugo_config: &HugoConfig, file_path: &str) -> String {
+    let is_dir = file_path.ends_with("/_index.md");
+
+    if is_dir {
+        // e.g. "/new_folder/_index.md" → 디렉토리 "/new_folder" 중복 확인
+        let dir_part = &file_path[..file_path.len() - "/_index.md".len()];
+        let (parent, name) = match dir_part.rfind('/') {
+            Some(pos) => (&dir_part[..=pos], &dir_part[pos + 1..]),
+            None => ("", dir_part),
+        };
+
+        if !path_exists(sftp, hugo_config, dir_part) {
+            return file_path.to_string();
+        }
+
+        for n in 1..1000 {
+            let candidate = format!("{}{}_{}", parent, name, n);
+            if !path_exists(sftp, hugo_config, &candidate) {
+                return format!("{}/_index.md", candidate);
+            }
+        }
+        // fallback (사실상 도달 불가)
+        file_path.to_string()
+    } else {
+        // e.g. "/parent/new_file.md" → 파일 중복 확인
+        let (parent, file_name) = match file_path.rfind('/') {
+            Some(pos) => (&file_path[..=pos], &file_path[pos + 1..]),
+            None => ("", file_path),
+        };
+        let (stem, ext) = match file_name.rfind('.') {
+            Some(pos) => (&file_name[..pos], &file_name[pos..]),
+            None => (file_name, ""),
+        };
+
+        if !path_exists(sftp, hugo_config, file_path) {
+            return file_path.to_string();
+        }
+
+        for n in 1..1000 {
+            let candidate = format!("{}{}_{}{}", parent, stem, n, ext);
+            if !path_exists(sftp, hugo_config, &candidate) {
+                return candidate;
+            }
+        }
+        file_path.to_string()
+    }
+}
+
+/// content 경로와 hidden 경로 양쪽 모두 존재 여부 확인
+fn path_exists(sftp: &Sftp, hugo_config: &HugoConfig, rel_path: &str) -> bool {
+    sftp.stat(Path::new(&hugo_config.content_abs(rel_path))).is_ok()
+        || sftp.stat(Path::new(&hugo_config.hidden_abs(rel_path))).is_ok()
+}
+
 #[tauri::command]
-pub fn new_content_for_hugo(file_path: &str) -> Result<(), InvokeError> {
+pub fn new_content_for_hugo(file_path: &str) -> Result<String, InvokeError> {
+    let sftp = get_sftp_session().into_invoke_err()?;
     let mut channel = get_channel_session().into_invoke_err()?;
     let hugo_config = get_hugo_config().into_invoke_err()?;
+
+    let unique_path = find_unique_path(&sftp, &hugo_config, file_path);
 
     execute_ssh_command(
         &mut channel,
@@ -94,10 +155,10 @@ pub fn new_content_for_hugo(file_path: &str) -> Result<(), InvokeError> {
             &hugo_config.base_path,
             &hugo_config.hugo_cmd_path,
             &hugo_config.content_path,
-            file_path,
+            unique_path,
         ),
     ).into_invoke_err()?;
-    Ok(())
+    Ok(unique_path)
 }
 
 #[tauri::command]

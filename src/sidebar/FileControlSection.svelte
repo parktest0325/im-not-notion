@@ -35,9 +35,8 @@
     async function createFolder(event: MouseEvent) {
         event.stopPropagation();
         try {
-            const createdPath = "/new_folder/_index.md";
-            await invoke("new_content_for_hugo", {
-                filePath: createdPath,
+            const createdPath: string = await invoke("new_content_for_hugo", {
+                filePath: "/new_folder/_index.md",
             });
             selectedCursor.set(createdPath);
             relativeFilePath.set(createdPath);
@@ -45,7 +44,6 @@
         } catch (error) {
             console.error("failed to make directory:", error);
         }
-        console.log("Create folder");
     }
 </script>
 

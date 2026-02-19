@@ -44,18 +44,12 @@
     async function createItem(event: MouseEvent, createType: string) {
         event.stopPropagation();
         try {
-            let createdPath: string;
-            if (createType === "Directory") {
-                createdPath = filePath + "/new_folder/_index.md";
-                await invoke("new_content_for_hugo", {
-                    filePath: createdPath,
-                });
-            } else {
-                createdPath = filePath + "/new_file.md";
-                await invoke("new_content_for_hugo", {
-                    filePath: createdPath,
-                });
-            }
+            const basePath = createType === "Directory"
+                ? filePath + "/new_folder/_index.md"
+                : filePath + "/new_file.md";
+            const createdPath: string = await invoke("new_content_for_hugo", {
+                filePath: basePath,
+            });
             isExpanded.set(true);
             selectedCursor.set(createdPath);
             relativeFilePath.set(createdPath);
@@ -63,7 +57,6 @@
         } catch (error) {
             console.error("failed to create item:", error);
         }
-        console.log("Create item");
     }
 
     $: if ($selectedCursor) {
