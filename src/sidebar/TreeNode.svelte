@@ -4,7 +4,8 @@
     import FaFolderPlus from "svelte-icons/fa/FaFolderPlus.svelte";
     import { writable } from "svelte/store";
     import TreeNode from "./TreeNode.svelte";
-    import { relativeFilePath, selectedCursor, draggingInfo, isEditingFileName, addToast, type GlobalFunctions, GLOBAL_FUNCTIONS } from "../stores";
+    import { relativeFilePath, selectedCursor, draggingInfo, isEditingFileName, addToast } from "../stores";
+    import { type GlobalFunctions, GLOBAL_FUNCTIONS } from "../context";
     import { invoke } from "@tauri-apps/api/core";
     import { getContext, onDestroy, onMount } from "svelte";
     import { slide } from "svelte/transition";

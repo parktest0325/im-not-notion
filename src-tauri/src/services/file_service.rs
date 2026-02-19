@@ -1,9 +1,213 @@
 use std::path::{Path, PathBuf};
-use anyhow::Result;
+use anyhow::{Result, bail};
 use serde::{Deserialize, Serialize};
 use ssh2::Sftp;
 use std::io::prelude::*;
 use indexmap::IndexMap;
+
+use crate::services::ssh_service::{get_sftp_session, get_channel_session, execute_ssh_command};
+use crate::services::config_service::get_hugo_config;
+use crate::types::config::cms_config::HugoConfig;
+
+// ============================================================
+// 고수준 Hugo 파일 작업
+// ============================================================
+
+const FILE_TREE_MAX_DEPTH: usize = 5;
+
+/// SFTP 세션 + Hugo 설정을 한 번에 가져옴
+fn sftp_and_config() -> Result<(Sftp, HugoConfig)> {
+    let sftp = get_sftp_session()?;
+    let config = get_hugo_config()?;
+    Ok((sftp, config))
+}
+
+/// content/hidden 양쪽 경로에서 작업 시도. 하나라도 성공하면 Ok, 모두 실패하면 마지막 에러 반환.
+fn try_both<T, F>(items: impl IntoIterator<Item = T>, mut op: F) -> Result<()>
+where
+    F: FnMut(T) -> Result<()>,
+{
+    let mut last_err: Option<anyhow::Error> = None;
+    let mut ok = false;
+    for item in items {
+        match op(item) {
+            Ok(_) => { ok = true; }
+            Err(e) => { last_err = Some(e); }
+        }
+    }
+    if ok {
+        Ok(())
+    } else {
+        bail!("{}", last_err.unwrap_or_else(|| anyhow::anyhow!("operation failed")))
+    }
+}
+
+/// content/hidden 양쪽을 확인하여 중복되지 않는 경로를 반환.
+/// 이미 존재하면 _1, _2, ... suffix를 붙인다.
+fn find_unique_path(sftp: &Sftp, hugo_config: &HugoConfig, file_path: &str) -> String {
+    let is_dir = file_path.ends_with("/_index.md");
+
+    if is_dir {
+        // e.g. "/new_folder/_index.md" → 디렉토리 "/new_folder" 중복 확인
+        let dir_part = &file_path[..file_path.len() - "/_index.md".len()];
+        let (parent, name) = match dir_part.rfind('/') {
+            Some(pos) => (&dir_part[..=pos], &dir_part[pos + 1..]),
+            None => ("", dir_part),
+        };
+
+        if !path_exists(sftp, hugo_config, dir_part) {
+            return file_path.to_string();
+        }
+
+        for n in 1..1000 {
+            let candidate = format!("{}{}_{}", parent, name, n);
+            if !path_exists(sftp, hugo_config, &candidate) {
+                return format!("{}/_index.md", candidate);
+            }
+        }
+        // fallback (사실상 도달 불가)
+        file_path.to_string()
+    } else {
+        // e.g. "/parent/new_file.md" → 파일 중복 확인
+        let (parent, file_name) = match file_path.rfind('/') {
+            Some(pos) => (&file_path[..=pos], &file_path[pos + 1..]),
+            None => ("", file_path),
+        };
+        let (stem, ext) = match file_name.rfind('.') {
+            Some(pos) => (&file_name[..pos], &file_name[pos..]),
+            None => (file_name, ""),
+        };
+
+        if !path_exists(sftp, hugo_config, file_path) {
+            return file_path.to_string();
+        }
+
+        for n in 1..1000 {
+            let candidate = format!("{}{}_{}{}", parent, stem, n, ext);
+            if !path_exists(sftp, hugo_config, &candidate) {
+                return candidate;
+            }
+        }
+        file_path.to_string()
+    }
+}
+
+/// content 경로와 hidden 경로 양쪽 모두 존재 여부 확인
+fn path_exists(sftp: &Sftp, hugo_config: &HugoConfig, rel_path: &str) -> bool {
+    sftp.stat(Path::new(&hugo_config.content_abs(rel_path))).is_ok()
+        || sftp.stat(Path::new(&hugo_config.hidden_abs(rel_path))).is_ok()
+}
+
+/// 파일 트리 구성: content + hidden 병합
+pub fn build_file_tree() -> Result<FileSystemNode> {
+    let (sftp, hugo_config) = sftp_and_config()?;
+
+    let mut main_root = get_file_list(
+        &sftp,
+        Path::new(&hugo_config.content_abs("")),
+        FILE_TREE_MAX_DEPTH, false
+    )?;
+
+    let hidden_root_path = PathBuf::from(hugo_config.hidden_abs(""));
+    if sftp.stat(&hidden_root_path).is_ok() {
+        let hidden_root = get_file_list(&sftp, &hidden_root_path, FILE_TREE_MAX_DEPTH, true)?;
+        merge_tree(&mut main_root, hidden_root);
+    }
+
+    Ok(main_root)
+}
+
+/// 파일 내용 읽기 (fullFilePath 기반, content_path 포함 상태)
+pub fn read_content(file_path: &str) -> Result<String> {
+    let (sftp, hugo_config) = sftp_and_config()?;
+    get_file(&sftp, Path::new(&format!("{}/content/{}", &hugo_config.base_path, file_path)))
+}
+
+/// 파일 내용 저장 (fullFilePath 기반, content_path 포함 상태)
+pub fn write_content(file_path: &str, data: &str) -> Result<()> {
+    let (sftp, hugo_config) = sftp_and_config()?;
+    save_file(
+        &sftp,
+        Path::new(&format!("{}/content/{}", &hugo_config.base_path, file_path)),
+        data.to_string(),
+    )
+}
+
+/// 이미지 저장
+pub fn write_image(file_path: &str, file_name: &str, data: Vec<u8>) -> Result<String> {
+    let (sftp, hugo_config) = sftp_and_config()?;
+
+    // TODO: extract image_ext from image raw data
+    let image_ext = "";
+    let ret_path = format!("{}/{}{}", file_path, file_name, image_ext);
+
+    save_image(
+        &sftp,
+        Path::new(&format!("{}/{}/{}", &hugo_config.base_path, &hugo_config.image_path, ret_path)),
+        data,
+    )?;
+    Ok(ret_path)
+}
+
+/// Hugo 새 콘텐츠 생성 (중복 이름 자동 처리)
+pub fn create_content(file_path: &str) -> Result<String> {
+    let (sftp, hugo_config) = sftp_and_config()?;
+    let mut channel = get_channel_session()?;
+
+    let unique_path = find_unique_path(&sftp, &hugo_config, file_path);
+
+    execute_ssh_command(
+        &mut channel,
+        &format!(
+            "cd {} ; {} new {}/{}",
+            &hugo_config.base_path,
+            &hugo_config.hugo_cmd_path,
+            &hugo_config.content_path,
+            unique_path,
+        ),
+    )?;
+    Ok(unique_path)
+}
+
+/// 파일/폴더 삭제 (content + hidden 양쪽 시도)
+pub fn remove_content(path: &str) -> Result<()> {
+    let (mut sftp, hugo_config) = sftp_and_config()?;
+    let targets = [hugo_config.content_abs(path), hugo_config.hidden_abs(path)];
+    try_both(targets, |p| rmrf_file(&mut sftp, Path::new(&p)))
+}
+
+/// 파일/폴더 이동 (content + hidden 양쪽 시도)
+pub fn move_content(src: &str, dst: &str) -> Result<()> {
+    let (sftp, hugo_config) = sftp_and_config()?;
+    let combos = [
+        (hugo_config.content_abs(src), hugo_config.content_abs(dst)),
+        (hugo_config.hidden_abs(src), hugo_config.hidden_abs(dst)),
+    ];
+    try_both(combos, |(s, d)| move_file(&sftp, Path::new(&s), Path::new(&d)))
+}
+
+/// 숨김 상태 토글
+pub fn toggle_hidden(path: &str, state: bool) -> Result<()> {
+    let (sftp, hugo_config) = sftp_and_config()?;
+
+    let (src, dst) = if state {
+        (hugo_config.hidden_abs(path), hugo_config.content_abs(path))
+    } else {
+        (hugo_config.content_abs(path), hugo_config.hidden_abs(path))
+    };
+
+    move_file(&sftp, Path::new(&src), Path::new(&dst))
+}
+
+/// 숨김 상태 확인
+pub fn check_hidden(path: &str) -> Result<bool> {
+    let (sftp, hugo_config) = sftp_and_config()?;
+    Ok(sftp.stat(Path::new(&hugo_config.hidden_abs(path))).is_ok())
+}
+
+// ============================================================
+// 저수준 SFTP 작업
+// ============================================================
 
 fn serialize_values<S>(
     map: &IndexMap<String, FileSystemNode>,

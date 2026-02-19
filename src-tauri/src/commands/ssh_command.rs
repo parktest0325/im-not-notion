@@ -1,6 +1,5 @@
 use tauri::ipc::InvokeError;
-use crate::services::config_service::get_hugo_config;
-use crate::services::ssh_service::{get_channel_session, execute_ssh_command};
+use crate::services::{config_service::get_hugo_config, ssh_service::{get_channel_session, execute_ssh_command}};
 use crate::utils::IntoInvokeError;
 
 #[tauri::command]

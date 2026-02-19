@@ -3,7 +3,8 @@
   export let toggleMenu: () => void;
   import MdArrowForward from "svelte-icons/md/MdArrowForward.svelte";
   import DiIe from 'svelte-icons/di/DiIe.svelte'
-  import { relativeFilePath, url, contentPath, hiddenPath, fullFilePath, addToast, type GlobalFunctions, GLOBAL_FUNCTIONS } from "../stores";
+  import { relativeFilePath, url, contentPath, hiddenPath, fullFilePath, addToast } from "../stores";
+  import { type GlobalFunctions, GLOBAL_FUNCTIONS } from "../context";
   import { invoke } from "@tauri-apps/api/core";
   import { open } from "@tauri-apps/plugin-shell";
   import { getContext } from "svelte";

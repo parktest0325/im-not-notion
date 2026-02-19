@@ -1,12 +1,16 @@
 use tauri::ipc::{Channel, InvokeError};
 use crate::services::pty_service;
+use crate::services::config_service::get_app_config;
 use crate::utils::IntoInvokeError;
 use std::thread;
 use std::time::Duration;
 
 #[tauri::command]
 pub fn start_pty_cmd(cols: u32, rows: u32, on_event: Channel<String>) -> Result<(), InvokeError> {
-    pty_service::start_pty(cols, rows).into_invoke_err()?;
+    let config = get_app_config().into_invoke_err()?;
+    let ssh = &config.ssh_config;
+    pty_service::start_pty(&ssh.host, &ssh.port, &ssh.username, &ssh.password, cols, rows)
+        .into_invoke_err()?;
 
     // 백그라운드 읽기 루프
     thread::spawn(move || {

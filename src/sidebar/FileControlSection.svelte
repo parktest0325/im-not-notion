@@ -20,7 +20,8 @@
     import { writable } from "svelte/store";
     import TreeNode from "./TreeNode.svelte";
     import { setContext, onMount } from "svelte";
-    import { selectedCursor, relativeFilePath, GLOBAL_FUNCTIONS, isConnected, addToast } from "../stores";
+    import { selectedCursor, relativeFilePath, isConnected, addToast } from "../stores";
+    import { GLOBAL_FUNCTIONS } from "../context";
     import type { FileSystemNode } from "../types/setting";
 
     let searchTerm: string = "";
