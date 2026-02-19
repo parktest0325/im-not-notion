@@ -15,6 +15,7 @@ export const draggingInfo = writable<{
 export const isEditingFileName = writable(false);
 
 // ---------- 토스트 ----------
+
 export interface ToastItem {
   id: number;
   message: string;
@@ -30,10 +31,4 @@ export function addToast(message: string, type: ToastItem["type"] = "error") {
   setTimeout(() => {
     toasts.update(t => t.filter(item => item.id !== id));
   }, 3000);
-}
-
-// ---------- 컨텍스트 ----------
-export const GLOBAL_FUNCTIONS = Symbol('globalFunctions');
-export interface GlobalFunctions {
-  refreshList: () => Promise<void>;
 }

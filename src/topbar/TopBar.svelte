@@ -3,11 +3,11 @@
   export let toggleMenu: () => void;
   import MdArrowForward from "svelte-icons/md/MdArrowForward.svelte";
   import DiIe from 'svelte-icons/di/DiIe.svelte'
-  import { relativeFilePath, url, contentPath, hiddenPath, fullFilePath, addToast, type GlobalFunctions, GLOBAL_FUNCTIONS } from "../stores";
+  import { relativeFilePath, url, contentPath, hiddenPath, fullFilePath, addToast } from "../stores";
+  import { type GlobalFunctions, GLOBAL_FUNCTIONS } from "../context";
   import { invoke } from "@tauri-apps/api/core";
   import { open } from "@tauri-apps/plugin-shell";
-  import { getContext, onMount } from "svelte";
-  import type { AppConfig } from "../types/setting";
+  import { getContext } from "svelte";
 
   let isHidden = false;
   let isLoading = false;
@@ -25,18 +25,14 @@
   }
 
   async function checkHidden() {
-    // if (!$relativeFilePath || $relativeFilePath.endsWith('_index.md')) return;
     try {
       isHidden = await invoke("check_file_hidden", { path: $relativeFilePath });
-      console.log(isHidden);
     } catch (error) {
       console.error("Failed to check hidden status:", error);
       isHidden = false;
       addToast("Failed to check hidden status.");
     }
   }
-
-  let config: AppConfig;
 
   async function toggleHidden() {
     if (!$relativeFilePath || isLoading) return;
@@ -64,17 +60,6 @@
     fullFilePath.set(newPath);
   }
 
-  // onMount(async () => {
-  //   try {
-  //     config = await invoke("get_config");
-  //     url.set(config.cms_config.hugo_config.url);
-  //     contentPath.set(config.cms_config.hugo_config.content_path);
-  //     hiddenPath.set(config.cms_config.hugo_config.hidden_path);
-  //   } catch (error) {
-  //     console.error("Failed to get config:", error);
-  //   }
-  // });
-
 
 </script>
 
@@ -89,25 +74,11 @@
   </div>
   <div class="flex items-center gap-2">
     {#if $relativeFilePath && !$relativeFilePath.endsWith('_index.md')}
-      <button 
+      <button
         on:click={toggleHidden}
         class="px-3 py-1 text-sm rounded border transition-colors duration-200"
-        class:bg-blue-100={!isHidden}
-        class:text-blue-800={!isHidden}
-        class:border-blue-300={!isHidden}
-        class:hover:bg-blue-200={!isHidden}
-        class:bg-orange-100={isHidden}
-        class:text-orange-800={isHidden}
-        class:border-orange-300={isHidden}
-        class:hover:bg-orange-200={isHidden}
-        class:dark:bg-blue-800={!isHidden}
-        class:dark:text-blue-100={!isHidden}
-        class:dark:border-blue-600={!isHidden}
-        class:dark:hover:bg-blue-700={!isHidden}
-        class:dark:bg-orange-800={isHidden}
-        class:dark:text-orange-100={isHidden}
-        class:dark:border-orange-600={isHidden}
-        class:dark:hover:bg-orange-700={isHidden}
+        class:btn-visible={!isHidden}
+        class:btn-hidden={isHidden}
       >
         {isHidden ? "Show" : "Hide"}
       </button>
@@ -117,3 +88,14 @@
     </button>
   </div>
 </div>
+
+<style>
+  .btn-visible {
+    @apply bg-blue-100 text-blue-800 border-blue-300 hover:bg-blue-200
+           dark:bg-blue-800 dark:text-blue-100 dark:border-blue-600 dark:hover:bg-blue-700;
+  }
+  .btn-hidden {
+    @apply bg-orange-100 text-orange-800 border-orange-300 hover:bg-orange-200
+           dark:bg-orange-800 dark:text-orange-100 dark:border-orange-600 dark:hover:bg-orange-700;
+  }
+</style>

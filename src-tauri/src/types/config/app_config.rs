@@ -1,16 +1,17 @@
 use serde::{Deserialize, Serialize};
 use anyhow::Result;
 use ssh2::Sftp;
+use typeshare::typeshare;
 
 use super::{ClientConfig, CmsConfig, ServerConfig, SshConfig};
 
 /// 프론트엔드와 통신하는 통합 설정 구조체
 /// 실제 저장은 ClientConfig(로컬)와 ServerConfig(서버)로 분리됨
+#[typeshare]
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
 pub struct AppConfig {
-    #[serde(default)]
     pub ssh_config: SshConfig,
-    #[serde(default)]
     pub cms_config: CmsConfig,
 }
 

@@ -1,26 +1,16 @@
 use tauri::ipc::InvokeError;
-use crate::services::config_service::get_hugo_config;
-use crate::services::ssh_service::{get_channel_session, execute_ssh_command};
+use crate::services::{config_service::get_hugo_config, ssh_service::{get_channel_session, execute_ssh_command}};
 use crate::utils::IntoInvokeError;
 
-// [Session(-39)] Channel can not be reused.. so need to reconnect ssh session.
 #[tauri::command]
 pub fn kill_server() -> Result<(), InvokeError> {
     let mut channel = get_channel_session().into_invoke_err()?;
     let hugo_config = get_hugo_config().into_invoke_err()?;
-    let pid = execute_ssh_command(
+    // pkill은 프로세스가 없어도 에러를 반환하지만, 무시해도 안전함
+    let _ = execute_ssh_command(
         &mut channel,
-        &format!("ps -ef | grep '{} server' | grep -v grep | awk '{{print$2}}'", &hugo_config.hugo_cmd_path)
-    ).into_invoke_err()?;
-    let pid = pid.trim();
-    if !pid.is_empty() {
-        channel = get_channel_session().into_invoke_err()?;
-        execute_ssh_command(
-            &mut channel,
-            &format!("kill -9 {}", pid)
-        ).into_invoke_err()?;
-    }
-
+        &format!("pkill -f '{} server'", &hugo_config.hugo_cmd_path)
+    );
     Ok(())
 }
 

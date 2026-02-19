@@ -1,78 +1,33 @@
-interface SshConfig {
-    host: string;
-    port: string;
-    username: string;
-    password: string;
-    // key_path: string;
-    [key: string]: string;
-}
+/*
+ * 타입 정의는 typeshare에 의해 generated.ts에서 자동 생성됩니다.
+ * Rust 타입 변경 시: npm run typeshare
+ */
+export type {
+    SshConfig,
+    HugoConfig,
+    CmsConfig,
+    AppConfig,
+    FileSystemNode,
+    PrerequisiteResult,
+} from "./generated";
 
-interface HugoConfig {
-    url: string,
-    hugo_cmd_path: string,
-    base_path: string,
-    content_path: string,
-    image_path: string,
-    hidden_path: string,
-    [key: string]: string;
-}
+export { NodeType } from "./generated";
 
-interface CmsConfig {
-    hugo_config: HugoConfig;
-}
-
-interface AppConfig {
-    ssh_config: SshConfig;
-    cms_config: CmsConfig;
-}
-
-interface FileSystemNode {
-    name: string;
-    type_: 'File' | 'Directory';
-    is_hidden: boolean;
-    children: FileSystemNode[];
-}
+import type { SshConfig, HugoConfig, CmsConfig, AppConfig } from "./generated";
 
 // 기본값이 포함된 객체 생성 함수
 function createDefaultSshConfig(): SshConfig {
-    return {
-        host: "",
-        port: "",
-        username: "",
-        password: "",
-        // key_path: "",
-    };
+    return { host: "", port: "", username: "", password: "" };
 }
 
 function createDefaultHugoConfig(): HugoConfig {
-    return {
-        url: "",
-        hugo_cmd_path: "",
-        base_path: "",
-        content_path: "",
-        image_path: "",
-        hidden_path: "",
-    };
+    return { url: "", hugo_cmd_path: "", base_path: "", content_path: "", image_path: "", hidden_path: "" };
 }
 
 function createDefaultCmsConfig(): CmsConfig {
-    return {
-        hugo_config: createDefaultHugoConfig(),
-    };
+    return { hugo_config: createDefaultHugoConfig() };
 }
 
-function createDefaultAppConfig(): AppConfig {
-    return {
-        ssh_config: createDefaultSshConfig(),
-        cms_config: createDefaultCmsConfig(),
-    };
+export function createDefaultAppConfig(): AppConfig {
+    return { ssh_config: createDefaultSshConfig(), cms_config: createDefaultCmsConfig() };
 }
-
-interface PrerequisiteResult {
-    curl: boolean;
-    tar: boolean;
-    git: boolean;
-}
-
-export type { SshConfig, HugoConfig, CmsConfig, AppConfig, FileSystemNode, PrerequisiteResult };
-export { createDefaultAppConfig };

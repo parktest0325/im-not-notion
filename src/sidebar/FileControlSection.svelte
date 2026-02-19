@@ -4,10 +4,9 @@
     let directoryStructure = writable<FileSystemNode[]>([]);
     export async function refreshList() {
         try {
-            const data: FileSystemNode = await invoke("get_file_list_");
+            const data: FileSystemNode = await invoke("get_file_tree");
             directoryStructure.set(data.children);
             isConnected.set(true); // 파일 리스트를 정상적으로 가져온 경우
-            console.log(data);
         } catch (error) {
             console.error("Failed to update file list:", error);
             isConnected.set(false); // 파일 리스트를 가져오지 못한 경우
@@ -21,7 +20,8 @@
     import { writable } from "svelte/store";
     import TreeNode from "./TreeNode.svelte";
     import { setContext, onMount } from "svelte";
-    import { selectedCursor, relativeFilePath, GLOBAL_FUNCTIONS, isConnected, addToast } from "../stores";
+    import { selectedCursor, relativeFilePath, isConnected, addToast } from "../stores";
+    import { GLOBAL_FUNCTIONS } from "../context";
     import type { FileSystemNode } from "../types/setting";
 
     let searchTerm: string = "";

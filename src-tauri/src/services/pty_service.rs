@@ -5,7 +5,6 @@ use std::time::Duration;
 use ssh2::Session;
 use anyhow::{Result, Context};
 use once_cell::sync::Lazy;
-use crate::services::config_service::get_app_config;
 
 const TCP_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 
@@ -18,15 +17,13 @@ struct PtyState {
 static PTY_STATE: Lazy<Mutex<Option<PtyState>>> = Lazy::new(|| Mutex::new(None));
 
 /// PTY 세션 시작 (기존 SSH_CLIENT와 별도 연결)
-pub fn start_pty(cols: u32, rows: u32) -> Result<()> {
+pub fn start_pty(host: &str, port: &str, username: &str, password: &str, cols: u32, rows: u32) -> Result<()> {
     // 기존 PTY가 있으면 먼저 정리
     stop_pty().ok();
 
-    let config = get_app_config()?;
-
     // 별도 SSH 세션 생성
     let mut session = Session::new().context("Failed to create PTY SSH session")?;
-    let addr = format!("{}:{}", config.ssh_config.host, config.ssh_config.port);
+    let addr = format!("{}:{}", host, port);
     let sock_addr = addr.to_socket_addrs()
         .context("Failed to resolve SSH address for PTY")?
         .next()
@@ -35,7 +32,7 @@ pub fn start_pty(cols: u32, rows: u32) -> Result<()> {
         .context("Failed to connect to SSH server for PTY (timeout)")?;
     session.set_tcp_stream(tcp);
     session.handshake().context("PTY SSH handshake failed")?;
-    session.userauth_password(&config.ssh_config.username, &config.ssh_config.password)
+    session.userauth_password(username, password)
         .context("PTY SSH authentication failed")?;
 
     // PTY 할당 + 쉘 시작 (blocking 모드에서)

@@ -7,7 +7,6 @@
 
   async function handleReboot() {
     try {
-      console.log("Rebooting the server...");
       await invoke("kill_server");
       await invoke("start_server");
       addToast("Server rebooted.", "success");
