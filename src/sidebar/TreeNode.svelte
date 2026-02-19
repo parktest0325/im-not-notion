@@ -9,7 +9,7 @@
     import { invoke } from "@tauri-apps/api/core";
     import { getContext, onDestroy, onMount } from "svelte";
     import { slide } from "svelte/transition";
-    import type { FileSystemNode } from "../types/setting";
+    import { NodeType, type FileSystemNode } from "../types/setting";
     import FolderClose from '../resource/InvaderClose.svelte';
     import FolderOpen from '../resource/InvaderOpen.svelte';
 
@@ -26,7 +26,7 @@
 
     function toggleExpand(event: MouseEvent) {
         event.stopPropagation();
-        if (node.type_ === "Directory") {
+        if (node.type_ === NodeType.Directory) {
             isExpanded.update((value) => !value);
         }
     }
@@ -34,7 +34,7 @@
     function onFileClick(event: MouseEvent) {
         event.stopPropagation();
         selectedCursor.set(filePath);
-        if (node.type_ === "File") {
+        if (node.type_ === NodeType.File) {
             relativeFilePath.set(filePath);
         } else {
             relativeFilePath.set(filePath + "/_index.md");
@@ -115,7 +115,7 @@
                 node.name = editableName;
                 selectedCursor.set(dstPath);
                 relativeFilePath.set(
-                    node.type_ === "Directory"
+                    node.type_ === NodeType.Directory
                         ? dstPath + "/_index.md"
                         : dstPath,
                 );
@@ -181,7 +181,7 @@
     function onDragOver(event: DragEvent) {
         if (dragDisabled) return;
         event.stopPropagation();
-        if (node.type_ === 'Directory') {
+        if (node.type_ === NodeType.Directory) {
             event.preventDefault();
             event.dataTransfer!.dropEffect = 'move';
         }
@@ -190,7 +190,7 @@
     function onDragEnter(event: DragEvent) {
         if (dragDisabled) return;
         event.stopPropagation();
-        if (node.type_ === 'Directory') {
+        if (node.type_ === NodeType.Directory) {
             event.preventDefault();
             isDragOver = true;
         }
@@ -203,7 +203,7 @@
     }
 
     async function onDrop(event: DragEvent) {
-        if (dragDisabled || node.type_ !== 'Directory') return;
+        if (dragDisabled || node.type_ !== NodeType.Directory) return;
         event.stopPropagation();
         event.preventDefault();
 
@@ -239,7 +239,7 @@
     on:drop={onDrop}
     >
     <div class="flex items-center">
-        {#if node.type_ === "Directory"}
+        {#if node.type_ === NodeType.Directory}
             <button
                 on:click={(event) => {
                     toggleExpand(event);
@@ -280,7 +280,7 @@
         {/if}
 
         {#if $selectedCursor === filePath && !$isEditingFileName}
-            {#if node.type_ === "Directory"}
+            {#if node.type_ === NodeType.Directory}
                 <button
                     on:click={(event) => createItem(event, "File")}
                     class="cursor-pointer w-4 h-4 ml-1"
@@ -325,7 +325,7 @@
             </div>
         </div>
     {/if}
-    {#if node.type_ === "Directory" && $isExpanded}
+    {#if node.type_ === NodeType.Directory && $isExpanded}
         <ul class="pl-4">
             {#each node.children as child}
                 <TreeNode path={`${filePath}/`} node={child} />

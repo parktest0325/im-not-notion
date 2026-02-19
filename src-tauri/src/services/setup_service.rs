@@ -1,6 +1,7 @@
 use std::path::Path;
 use anyhow::{Result, bail};
 use serde::{Deserialize, Serialize};
+use typeshare::typeshare;
 use crate::services::ssh_service::{get_channel_session, get_sftp_session, execute_ssh_command, get_server_home_path};
 
 /// channel 생성 + 명령 실행을 한 줄로 처리
@@ -16,6 +17,7 @@ const GREEK_NAMES: [&str; 24] = [
     "tau", "upsilon", "phi", "chi", "psi", "omega",
 ];
 
+#[typeshare]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PrerequisiteResult {
     pub curl: bool,

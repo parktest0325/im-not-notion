@@ -1,17 +1,16 @@
 use serde::{Deserialize, Serialize};
 use anyhow::{Result, Context};
+use typeshare::typeshare;
 
 use crate::utils;
 
+#[typeshare]
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
+#[serde(default)]
 pub struct SshConfig {
-    #[serde(default)]
     pub host: String,
-    #[serde(default)]
     pub port: String,
-    #[serde(default)]
     pub username: String,
-    #[serde(default)]
     pub password: String,
 }
 

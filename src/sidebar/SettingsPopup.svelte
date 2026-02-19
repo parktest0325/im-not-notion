@@ -10,6 +10,9 @@
   export let show: boolean;
   export let closeSettings: () => void;
 
+  const asFields = (obj: object): Record<string, string> =>
+    obj as unknown as Record<string, string>;
+
   let config: AppConfig;
   let isLoading = true;
   let activeTab = "ssh";
@@ -79,14 +82,14 @@
   {#if activeTab === "ssh"}
     <div class="space-y-4">
       {#each Object.keys(config.ssh_config) as key}
-        <DynamicField config={config.ssh_config} configKey={key} />
+        <DynamicField config={asFields(config.ssh_config)} configKey={key} />
       {/each}
     </div>
   {:else if activeTab === "hugo"}
     <div class="space-y-4">
       <HugoSetup bind:config bind:isSetupRunning />
       {#each Object.keys(config.cms_config.hugo_config) as key}
-        <DynamicField config={config.cms_config.hugo_config} configKey={key} />
+        <DynamicField config={asFields(config.cms_config.hugo_config)} configKey={key} />
       {/each}
     </div>
   {/if}

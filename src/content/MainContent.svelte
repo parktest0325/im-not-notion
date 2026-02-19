@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { fullFilePath, isConnected, relativeFilePath, addToast } from "../stores";
+  import { isConnected, relativeFilePath, addToast } from "../stores";
   import { invoke } from "@tauri-apps/api/core";
   import { v4 as uuidv4 } from "uuid";
   import { tick, onMount, onDestroy } from "svelte";
@@ -18,8 +18,8 @@
   let autoSaveInterval = 1000 * 5;
   let autoSaveTimer: number | null = null;
 
-  $: if ($fullFilePath) {
-    getFileContent($fullFilePath);
+  $: if ($relativeFilePath) {
+    getFileContent($relativeFilePath);
     scrollPosition = 0;
     contentDiv?.scrollTo(0, 0);
     editable = false;
@@ -74,7 +74,7 @@
     }
     try {
       await invoke("save_file_content", {
-        filePath: $fullFilePath,
+        filePath: $relativeFilePath,
         fileData: fileContent,
       });
       isContentChanged = false;
@@ -184,7 +184,7 @@
       role="button"
       class="break-all w-full h-full whitespace-pre-wrap p-4"
       on:dblclick={() => {
-        if ($fullFilePath != "") {
+        if ($relativeFilePath != "") {
           scrollPosition = contentDiv.scrollTop;
           editable = true;
         }

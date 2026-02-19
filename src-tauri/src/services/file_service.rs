@@ -5,6 +5,8 @@ use ssh2::Sftp;
 use std::io::prelude::*;
 use indexmap::IndexMap;
 
+use typeshare::typeshare;
+
 use crate::services::ssh_service::{get_sftp_session, get_channel_session, execute_ssh_command};
 use crate::services::config_service::get_hugo_config;
 use crate::types::config::cms_config::HugoConfig;
@@ -117,20 +119,24 @@ pub fn build_file_tree() -> Result<FileSystemNode> {
     Ok(main_root)
 }
 
-/// 파일 내용 읽기 (fullFilePath 기반, content_path 포함 상태)
+/// 파일 내용 읽기 (relativeFilePath 기반)
 pub fn read_content(file_path: &str) -> Result<String> {
     let (sftp, hugo_config) = sftp_and_config()?;
-    get_file(&sftp, Path::new(&format!("{}/content/{}", &hugo_config.base_path, file_path)))
+    let content_path = hugo_config.content_abs(file_path);
+    let hidden_path = hugo_config.hidden_abs(file_path);
+
+    get_file(&sftp, Path::new(&content_path))
+        .or_else(|_| get_file(&sftp, Path::new(&hidden_path)))
 }
 
-/// 파일 내용 저장 (fullFilePath 기반, content_path 포함 상태)
+/// 파일 내용 저장 (relativeFilePath 기반)
 pub fn write_content(file_path: &str, data: &str) -> Result<()> {
     let (sftp, hugo_config) = sftp_and_config()?;
-    save_file(
-        &sftp,
-        Path::new(&format!("{}/content/{}", &hugo_config.base_path, file_path)),
-        data.to_string(),
-    )
+    let content_path = hugo_config.content_abs(file_path);
+    let hidden_path = hugo_config.hidden_abs(file_path);
+
+    save_file(&sftp, Path::new(&content_path), data.to_string())
+        .or_else(|_| save_file(&sftp, Path::new(&hidden_path), data.to_string()))
 }
 
 /// 이미지 저장
@@ -221,15 +227,18 @@ where
 }
 
 // children 을 IndexMap 으로 가진 구조체
+#[typeshare]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct FileSystemNode {
     pub name:       String,
     pub type_:      NodeType,
     pub is_hidden:  bool,
+    #[typeshare(serialized_as = "Vec<FileSystemNode>")]
     #[serde(serialize_with = "serialize_values")]
     pub children:   IndexMap<String, FileSystemNode>,
 }
 
+#[typeshare]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum NodeType {
     File,
