@@ -20,6 +20,8 @@ pub enum Trigger {
     Manual {
         label: String,
         input: Vec<InputField>,
+        #[serde(default)]
+        shortcut: Option<String>,
     },
     #[serde(rename = "hook")]
     Hook {

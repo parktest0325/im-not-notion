@@ -2,8 +2,10 @@
   import { invoke } from "@tauri-apps/api/core";
   import Popup from "../component/Popup.svelte";
   import PluginInputPopup from "./PluginInputPopup.svelte";
-  import { addToast } from "../stores";
+  import { addToast, triggerPluginShortcut } from "../stores";
   import type { PluginInfo, InputField } from "../types/setting";
+  import { registerAction, unregisterAction, pluginShortcutDefs, buildShortcutMap } from "../shortcut";
+  import { onDestroy } from "svelte";
 
   export let show: boolean;
   export let closePlugin: () => void;
@@ -17,14 +19,74 @@
   let selectedPlugin: PluginInfo | null = null;
   let selectedInputFields: InputField[] = [];
 
+  // 현재 등록된 플러그인 shortcut action ids (cleanup용)
+  let registeredActionIds: string[] = [];
+
   $: if (show) {
     loadPlugins();
+  }
+
+  // triggerPluginShortcut store 감지 — 단축키로 플러그인 실행 요청
+  $: if ($triggerPluginShortcut) {
+    const req = $triggerPluginShortcut;
+    triggerPluginShortcut.set(null);
+    const plugin = plugins.find(p => p.manifest.name === req.pluginName);
+    if (plugin) {
+      if (!plugin.installed || !plugin.enabled) {
+        addToast(`Plugin "${req.pluginName}" is not installed or enabled.`);
+      } else {
+        for (const trigger of plugin.manifest.triggers) {
+          if (trigger.type === "manual" && trigger.content.label === req.triggerLabel) {
+            openManualInput(plugin, trigger.content.input);
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  function registerPluginShortcuts() {
+    // 기존 등록 해제
+    for (const id of registeredActionIds) {
+      unregisterAction(id);
+    }
+    registeredActionIds = [];
+
+    const defs: Array<{ id: string; shortcut: string; description: string }> = [];
+
+    // 모든 플러그인의 manual shortcut을 등록 (설정용)
+    // 실행 시점에 installed+enabled 체크
+    for (const p of plugins) {
+      for (const trigger of p.manifest.triggers) {
+        if (trigger.type === "manual" && trigger.content.shortcut) {
+          const actionId = `plugin:${p.manifest.name}:${trigger.content.label}`;
+          const pluginName = p.manifest.name;
+          const triggerLabel = trigger.content.label;
+
+          defs.push({
+            id: actionId,
+            shortcut: trigger.content.shortcut,
+            description: `${pluginName} - ${triggerLabel}`,
+          });
+
+          registerAction(actionId, () => {
+            triggerPluginShortcut.set({ pluginName, triggerLabel });
+          });
+          registeredActionIds.push(actionId);
+        }
+      }
+    }
+
+    pluginShortcutDefs.set(defs);
+    // Rebuild shortcut map (uses cached client overrides + new plugin defs)
+    buildShortcutMap();
   }
 
   async function loadPlugins() {
     isLoading = true;
     try {
       plugins = await invoke("list_plugins", { localPath });
+      registerPluginShortcuts();
     } catch (error) {
       console.error("Failed to load plugins:", error);
       plugins = [];
@@ -32,6 +94,12 @@
       isLoading = false;
     }
   }
+
+  onDestroy(() => {
+    for (const id of registeredActionIds) {
+      unregisterAction(id);
+    }
+  });
 
   async function installPlugin(name: string) {
     try {

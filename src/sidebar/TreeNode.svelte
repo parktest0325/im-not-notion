@@ -4,10 +4,10 @@
     import FaFolderPlus from "svelte-icons/fa/FaFolderPlus.svelte";
     import { writable } from "svelte/store";
     import TreeNode from "./TreeNode.svelte";
-    import { relativeFilePath, selectedCursor, draggingInfo, isEditingFileName, addToast } from "../stores";
+    import { relativeFilePath, selectedCursor, draggingInfo, isEditingFileName, renamingPath, addToast } from "../stores";
     import { type GlobalFunctions, GLOBAL_FUNCTIONS } from "../context";
     import { invoke } from "@tauri-apps/api/core";
-    import { getContext, onDestroy, onMount } from "svelte";
+    import { getContext } from "svelte";
     import { slide } from "svelte/transition";
     import { NodeType, type FileSystemNode } from "../types/setting";
     import FolderClose from '../resource/InvaderClose.svelte';
@@ -137,28 +137,13 @@
         filenameInput?.focus();
     }
 
-    // 선택된 파일명 편집을 위해 F2 또는 Enter 키 이벤트 활성화
-    function onKeyDown(event: KeyboardEvent) {
-        if (
-            $selectedCursor === filePath &&
-            !isEditing &&
-            (event.key === "F2" || event.key === "Enter")
-        ) {
-            isEditing = true;
-            isEditingFileName.set(true);
-            // 위의 노드가 삭제됐을때 리렌더링이 되면서
-            // editableName이 기존 input 위치의 editableName으로 변해서 강제로 저
-            editableName = node.name;
-        }
+    // renamingPath store가 이 노드의 경로와 일치하면 편집 모드 진입
+    $: if ($renamingPath === filePath && !isEditing) {
+        isEditing = true;
+        isEditingFileName.set(true);
+        editableName = node.name;
+        renamingPath.set("");
     }
-
-    onMount(() => {
-        document.addEventListener("keydown", onKeyDown);
-    });
-
-    onDestroy(() => {
-        document.removeEventListener("keydown", onKeyDown);
-    });
 
     let isDragOver = false;
     $: isDragging = $draggingInfo?.path === filePath;

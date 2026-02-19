@@ -1,10 +1,11 @@
 <script lang="ts">
-  import { isConnected, relativeFilePath, addToast } from "../stores";
+  import { isConnected, relativeFilePath, isEditingContent, addToast } from "../stores";
   import { invoke } from "@tauri-apps/api/core";
   import { v4 as uuidv4 } from "uuid";
   import { tick, onMount, onDestroy } from "svelte";
   import { writable } from "svelte/store";
   import SavePopup from "./SavePopup.svelte";
+  import { registerAction, unregisterAction } from "../shortcut";
 
   let fileContent: string = "";
   let editable: boolean = false;
@@ -26,17 +27,29 @@
   }
 
   $: if (editable) {
+    isEditingContent.set(true);
     tick().then(() => {
       contentTextArea?.focus();
       contentTextArea?.scrollTo(0, scrollPosition);
       startAutoSave();
     });
   } else {
+    isEditingContent.set(false);
     tick().then(() => {
       contentDiv?.scrollTo(0, scrollPosition);
       stopAutoSave();
     });
   }
+
+  // Register shortcut actions
+  onMount(() => {
+    registerAction("save", () => {
+      if (editable) showDialog = true;
+    });
+    registerAction("exit-edit", () => {
+      if (editable) editable = false;
+    });
+  });
 
   async function getFileContent(filePath: string) {
     try {
@@ -86,20 +99,10 @@
     }
   }
 
-  function handleKeyDown(event: KeyboardEvent) {
+  function handleKeyDown(_event: KeyboardEvent) {
     if (editable) {
       scrollPosition = contentTextArea.scrollTop;
-      event.stopPropagation();
-      if ((event.ctrlKey || event.metaKey) && event.key === "s") {
-        event.preventDefault();
-        showDialog = true;
-        // editable = false;
-      } else if (event.key === "Escape") {
-        event.preventDefault();
-        editable = false;
-      } else {
-        isContentChanged = true; // 키 입력 시 내용 변경 여부를 true로 설정
-      }
+      isContentChanged = true;
     }
   }
 
@@ -153,6 +156,8 @@
 
   onDestroy(() => {
     stopAutoSave();
+    unregisterAction("save");
+    unregisterAction("exit-edit");
   });
 </script>
 

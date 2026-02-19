@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use anyhow::Result;
 use ssh2::Sftp;
 use typeshare::typeshare;
@@ -13,6 +14,8 @@ use super::{ClientConfig, CmsConfig, ServerConfig, SshConfig};
 pub struct AppConfig {
     pub ssh_config: SshConfig,
     pub cms_config: CmsConfig,
+    #[serde(default)]
+    pub shortcuts: HashMap<String, Vec<String>>,
 }
 
 impl AppConfig {
@@ -32,6 +35,7 @@ impl AppConfig {
     pub fn to_server_config(&self) -> ServerConfig {
         ServerConfig {
             cms_config: self.cms_config.clone(),
+            shortcuts: self.shortcuts.clone(),
         }
     }
 
@@ -41,6 +45,7 @@ impl AppConfig {
         Ok(AppConfig {
             ssh_config: client.ssh_config,
             cms_config: CmsConfig::default(),
+            shortcuts: HashMap::new(),
         })
     }
 
@@ -48,6 +53,7 @@ impl AppConfig {
     pub fn load_server_config(&mut self, sftp: &Sftp, home_path: &str) -> Result<()> {
         let server = ServerConfig::load_from_sftp(sftp, home_path)?;
         self.cms_config = server.cms_config;
+        self.shortcuts = server.shortcuts;
         Ok(())
     }
 

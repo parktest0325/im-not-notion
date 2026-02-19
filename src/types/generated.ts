@@ -29,6 +29,7 @@ export interface CmsConfig {
 export interface AppConfig {
 	ssh_config: SshConfig;
 	cms_config: CmsConfig;
+	shortcuts?: Record<string, string[]>;
 }
 
 export enum NodeType {
@@ -54,6 +55,7 @@ export type Trigger =
 	| { type: "manual", content: {
 	label: string;
 	input: InputField[];
+	shortcut?: string;
 }}
 	| { type: "hook", content: {
 	event: HookEvent;
