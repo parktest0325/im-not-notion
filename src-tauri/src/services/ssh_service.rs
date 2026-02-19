@@ -1,8 +1,10 @@
 use ssh2::{Session, Channel, Sftp};
-use std::{net::TcpStream, sync::Mutex, io::Read};
+use std::{net::{TcpStream, ToSocketAddrs}, sync::Mutex, io::Read, time::Duration};
 use anyhow::{Result, Context};
 use crate::types::config::AppConfig;
 use once_cell::sync::Lazy;
+
+const TCP_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 
 static SSH_CLIENT: Lazy<Mutex<Option<Session>>> = Lazy::new(|| Mutex::new(None));
 
@@ -21,8 +23,13 @@ pub fn connect_ssh_inner(config: &AppConfig, force: bool) -> Result<()> {
     }
 
     let mut session = Session::new().context("Failed to create SSH session")?;
-    let tcp = TcpStream::connect(format!("{}:{}", config.ssh_config.host, config.ssh_config.port))
-        .context("Failed to connect to SSH server")?;
+    let addr = format!("{}:{}", config.ssh_config.host, config.ssh_config.port);
+    let sock_addr = addr.to_socket_addrs()
+        .context("Failed to resolve SSH address")?
+        .next()
+        .context("No address found for SSH host")?;
+    let tcp = TcpStream::connect_timeout(&sock_addr, TCP_CONNECT_TIMEOUT)
+        .context("Failed to connect to SSH server (timeout)")?;
     session.set_tcp_stream(tcp);
     session.handshake().context("Failed to perform SSH handshake")?;
 

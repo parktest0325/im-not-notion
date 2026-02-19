@@ -14,15 +14,12 @@ pub fn get_file_list_() -> Result<FileSystemNode, InvokeError> {
     // 1) 메인 트리
     let mut main_root = get_file_list(
         &sftp,
-        Path::new(&format!("{}/content/{}", hugo_config.base_path, hugo_config.content_path)),
+        Path::new(&hugo_config.content_abs("")),
         5, false
     ).into_invoke_err()?;
 
     // 2) 숨김 트리 (있으면)
-    let hidden_root_path = PathBuf::from(format!(
-        "{}/content/{}/{}",
-        hugo_config.base_path, hugo_config.hidden_path, hugo_config.content_path
-    ));
+    let hidden_root_path = PathBuf::from(hugo_config.hidden_abs(""));
     if sftp.stat(&hidden_root_path).is_ok() {
         let hidden_root = get_file_list(&sftp, &hidden_root_path, 5, true)
             .into_invoke_err()?;
@@ -39,6 +36,7 @@ pub fn get_file_content(file_path: &str) -> Result<String, InvokeError> {
     let sftp = get_sftp_session().into_invoke_err()?;
     let hugo_config = get_hugo_config().into_invoke_err()?;
 
+    // file_path는 프론트엔드에서 content_path를 이미 포함한 상태로 전달됨
     let file_data = get_file(
         &sftp,
         Path::new(&format!("{}/content/{}", &hugo_config.base_path, file_path)),
@@ -51,12 +49,10 @@ pub fn save_file_content(file_path: &str, file_data: &str) -> Result<(), InvokeE
     let sftp = get_sftp_session().into_invoke_err()?;
     let hugo_config = get_hugo_config().into_invoke_err()?;
 
+    // file_path는 프론트엔드에서 content_path를 이미 포함한 상태로 전달됨
     save_file(
         &sftp,
-        Path::new(&format!(
-            "{}/content/{}",
-            &hugo_config.base_path, file_path
-        )),
+        Path::new(&format!("{}/content/{}", &hugo_config.base_path, file_path)),
         file_data.to_string(),
     ).into_invoke_err()?;
     Ok(())
@@ -109,35 +105,18 @@ pub fn remove_file(path: &str) -> Result<(), InvokeError> {
     let mut sftp = get_sftp_session().into_invoke_err()?;
     let hugo_config = get_hugo_config().into_invoke_err()?;
 
-    let normal_path = format!(
-        "{}/content/{}{}",
-        &hugo_config.base_path, &hugo_config.content_path, path
-    );
-
-    // Hidden 폴더에 있는 파일/폴더도 삭제
-    let hidden_path = format!(
-        "{}/content/{}/{}{}",
-        &hugo_config.base_path, &hugo_config.hidden_path, &hugo_config.content_path, path
-    );
-
-    println!("DEBUG - remove_file:");
-    println!("  path: {}", path);
-    println!("  normal_path: {}", normal_path);
-    println!("  hidden_path: {}", hidden_path);
+    let targets = [
+        hugo_config.content_abs(path),
+        hugo_config.hidden_abs(path),
+    ];
 
     let mut last_err: Option<anyhow::Error> = None;
     let mut removed = false;
 
-    for p in [&normal_path, &hidden_path] {
+    for p in &targets {
         match rmrf_file(&mut sftp, Path::new(p)) {
-            Ok(_) => {
-                println!("deleted: {p}");
-                removed = true;
-            }
-            Err(e) => {
-                println!("failed: {p} ({e})");
-                last_err = Some(e);
-            }
+            Ok(_) => { removed = true; }
+            Err(e) => { last_err = Some(e); }
         }
     }
 
@@ -156,14 +135,8 @@ pub fn move_file_or_folder(src: &str, dst: &str) -> Result<(), InvokeError> {
     let hugo_config = get_hugo_config().into_invoke_err()?;
 
     let combos = [
-        ( // 일반 영역
-          format!("{}/content/{}{}", hugo_config.base_path, hugo_config.content_path, src),
-          format!("{}/content/{}{}", hugo_config.base_path, hugo_config.content_path, dst)
-        ),
-        ( // Hidden 영역
-          format!("{}/content/{}/{}{}", hugo_config.base_path, hugo_config.hidden_path, hugo_config.content_path, src),
-          format!("{}/content/{}/{}{}", hugo_config.base_path, hugo_config.hidden_path, hugo_config.content_path, dst)
-        ),
+        (hugo_config.content_abs(src), hugo_config.content_abs(dst)),
+        (hugo_config.hidden_abs(src), hugo_config.hidden_abs(dst)),
     ];
 
     let mut moved = false;
@@ -171,14 +144,8 @@ pub fn move_file_or_folder(src: &str, dst: &str) -> Result<(), InvokeError> {
 
     for (src_full, dst_full) in combos {
         match move_file(&sftp, Path::new(&src_full), Path::new(&dst_full)) {
-            Ok(_) => {
-                println!("moved: {src_full} -> {dst_full}");
-                moved = true;
-            }
-            Err(e) => {
-                println!("failed: {src_full} ({e})");
-                last_err = Some(e);
-            }
+            Ok(_) => { moved = true; }
+            Err(e) => { last_err = Some(e); }
         }
     }
 
@@ -196,26 +163,13 @@ pub fn toggle_hidden_file(path: &str, state: bool) -> Result<(), InvokeError> {
     let sftp = get_sftp_session().into_invoke_err()?;
     let hugo_config = get_hugo_config().into_invoke_err()?;
 
-    let hidden_file = format!("{}/content/{}/{}{}", &hugo_config.base_path, &hugo_config.hidden_path, &hugo_config.content_path, path);
-    let content_file = format!("{}/content/{}{}", &hugo_config.base_path, &hugo_config.content_path, path);
-
     let (src, dst) = if state {
-        (hidden_file, content_file)
+        (hugo_config.hidden_abs(path), hugo_config.content_abs(path))
     } else {
-        (content_file, hidden_file)
+        (hugo_config.content_abs(path), hugo_config.hidden_abs(path))
     };
 
-    println!("DEBUG - toggle_hidden_file:");
-    println!("  path: {}", path);
-    println!("  src: {}", src);
-    println!("  dst: {}", dst);
-
-    move_file(&sftp, Path::new(&src), Path::new(&dst)).map_err(|e| {
-        println!("ERROR - Failed to toggle file: {}", e);
-        InvokeError::from(e.to_string())
-    })?;
-
-    println!("SUCCESS - File toggled successfully");
+    move_file(&sftp, Path::new(&src), Path::new(&dst)).into_invoke_err()?;
     Ok(())
 }
 
@@ -224,8 +178,7 @@ pub fn check_file_hidden(path: &str) -> Result<bool, InvokeError> {
     let sftp = get_sftp_session().into_invoke_err()?;
     let hugo_config = get_hugo_config().into_invoke_err()?;
 
-    let hidden_path = format!("{}/content/{}/{}{}", &hugo_config.base_path, &hugo_config.hidden_path, &hugo_config.content_path, path);
-    match sftp.stat(Path::new(&hidden_path)) {
+    match sftp.stat(Path::new(&hugo_config.hidden_abs(path))) {
         Ok(_) => Ok(true),
         Err(_) => Ok(false),
     }

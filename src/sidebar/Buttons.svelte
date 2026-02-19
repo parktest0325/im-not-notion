@@ -36,13 +36,13 @@
     </div>
   </button>
 
-  <button class="p-2" on:click={toggleSettings}>
+  <button class="p-2 opacity-30 cursor-not-allowed" disabled>
     <div class="w-6 h-6">
       <FaServer />
     </div>
   </button>
 
-  <button class="p-2" on:click={toggleSettings}>
+  <button class="p-2 opacity-30 cursor-not-allowed" disabled>
     <div class="w-6 h-6">
       <IoMdTrash />
     </div>

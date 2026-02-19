@@ -115,12 +115,10 @@ pub fn install_hugo(os: &str, arch: &str, version: &str) -> Result<String> {
 
     // Download
     let mut channel = get_channel_session()?;
-    let dl_result = execute_ssh_command(
+    execute_ssh_command(
         &mut channel,
         &format!("curl -sL '{}' -o /tmp/hugo_extended.tar.gz", url)
     )?;
-    println!("Hugo download result: {}", dl_result);
-
     // Extract
     let mut channel = get_channel_session()?;
     execute_ssh_command(
@@ -142,8 +140,6 @@ pub fn install_hugo(os: &str, arch: &str, version: &str) -> Result<String> {
     if verify.trim().is_empty() {
         bail!("Hugo installation verification failed");
     }
-    println!("Hugo installed: {}", verify.trim());
-
     // Get absolute path
     let mut channel = get_channel_session()?;
     let home = execute_ssh_command(&mut channel, "echo $HOME")?;
@@ -187,12 +183,10 @@ pub fn generate_site_name() -> Result<(String, String)> {
 /// Create a new Hugo site at the given path
 pub fn create_hugo_site(hugo_cmd_path: &str, site_path: &str) -> Result<()> {
     let mut channel = get_channel_session()?;
-    let output = execute_ssh_command(
+    execute_ssh_command(
         &mut channel,
         &format!("{} new site {}", hugo_cmd_path, site_path)
     )?;
-    println!("Hugo new site output: {}", output);
-
     // Verify site was created
     let sftp = get_sftp_session()?;
     if sftp.stat(Path::new(site_path)).is_err() {
@@ -205,11 +199,10 @@ pub fn create_hugo_site(hugo_cmd_path: &str, site_path: &str) -> Result<()> {
 /// Initialize git repo in the site directory
 pub fn git_init_site(site_path: &str) -> Result<()> {
     let mut channel = get_channel_session()?;
-    let output = execute_ssh_command(
+    execute_ssh_command(
         &mut channel,
         &format!("cd {} && git init", site_path)
     )?;
-    println!("git init output: {}", output);
     Ok(())
 }
 
@@ -229,15 +222,13 @@ pub fn install_theme(theme_url: &str, site_path: &str) -> Result<String> {
 
     // git submodule add
     let mut channel = get_channel_session()?;
-    let output = execute_ssh_command(
+    execute_ssh_command(
         &mut channel,
         &format!(
             "cd {} && git submodule add {} themes/{}",
             site_path, theme_url, theme_name
         )
     )?;
-    println!("git submodule add output: {}", output);
-
     // Verify theme directory exists
     let sftp = get_sftp_session()?;
     let theme_path = format!("{}/themes/{}", site_path, theme_name);

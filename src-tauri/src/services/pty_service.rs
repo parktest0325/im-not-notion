@@ -1,19 +1,19 @@
 use std::io::{Read, Write};
-use std::net::TcpStream;
+use std::net::{TcpStream, ToSocketAddrs};
 use std::sync::Mutex;
+use std::time::Duration;
 use ssh2::Session;
 use anyhow::{Result, Context};
 use once_cell::sync::Lazy;
 use crate::services::config_service::get_app_config;
+
+const TCP_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 
 struct PtyState {
     session: Session,
     channel: ssh2::Channel,
     running: bool,
 }
-
-// Safety: ssh2::Channel is Send but not Sync. Mutex provides Sync.
-unsafe impl Send for PtyState {}
 
 static PTY_STATE: Lazy<Mutex<Option<PtyState>>> = Lazy::new(|| Mutex::new(None));
 
@@ -26,8 +26,13 @@ pub fn start_pty(cols: u32, rows: u32) -> Result<()> {
 
     // 별도 SSH 세션 생성
     let mut session = Session::new().context("Failed to create PTY SSH session")?;
-    let tcp = TcpStream::connect(format!("{}:{}", config.ssh_config.host, config.ssh_config.port))
-        .context("Failed to connect to SSH server for PTY")?;
+    let addr = format!("{}:{}", config.ssh_config.host, config.ssh_config.port);
+    let sock_addr = addr.to_socket_addrs()
+        .context("Failed to resolve SSH address for PTY")?
+        .next()
+        .context("No address found for PTY SSH host")?;
+    let tcp = TcpStream::connect_timeout(&sock_addr, TCP_CONNECT_TIMEOUT)
+        .context("Failed to connect to SSH server for PTY (timeout)")?;
     session.set_tcp_stream(tcp);
     session.handshake().context("PTY SSH handshake failed")?;
     session.userauth_password(&config.ssh_config.username, &config.ssh_config.password)

@@ -99,7 +99,6 @@ pub fn set_hidden_path(new_hidden_path: &str) -> Result<String> {
     if old_hidden_path.is_empty() || old_hidden_path == final_hidden {
         // 이미 같은 경로 or
         // 이전 설정이 없는경우에도 move를 안해도됨. hidden 파일이 없다는 뜻이니까
-        println!("same path or no previous config");
         return Ok(final_hidden);
     }
 
@@ -112,18 +111,13 @@ pub fn set_hidden_path(new_hidden_path: &str) -> Result<String> {
     let new_path = Path::new(&new_hidden_abs);
 
     if sftp.stat(new_path).is_ok() {
-        // 대상 폴더가 이미 존재 - move 불필요
-        println!("target path already exists: {}", new_hidden_abs);
         return Ok(final_hidden);
     }
 
     // 소스가 존재할 때만 이동
     let old_path = Path::new(&old_hidden_abs);
     if sftp.stat(old_path).is_ok() {
-        println!("{old_hidden_abs} -> {new_hidden_abs}");
         move_file(&sftp, old_path, new_path)?;
-    } else {
-        println!("source path does not exist: {}", old_hidden_abs);
     }
 
     Ok(final_hidden)

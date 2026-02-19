@@ -43,12 +43,9 @@
       const content: string = await invoke("get_file_content", {
         filePath,
       });
-      console.log("content: ", content);
       fileContent = content;
-      isContentChanged = false; // 파일 내용을 불러올 때 변경 여부 초기화
-      // 성공적으로 파일 내용을 불러온 경우 연결 상태를 갱신
+      isContentChanged = false;
       isConnected.set(true);
-      console.log("filecontent: ", fileContent);
     } catch (error) {
       console.error("Failed to get file content", error);
       fileContent = "파일을 불러오는데 실패했습니다.";
@@ -61,7 +58,6 @@
       autoSaveTimer = setInterval(() => {
         saveContent();
       }, autoSaveInterval);
-      console.log(autoSaveTimer);
     }
   }
 
@@ -81,23 +77,20 @@
         filePath: $fullFilePath,
         fileData: fileContent,
       });
-      console.log("저장되었습니다.");
-      isContentChanged = false; // 저장 후 내용 변경 여부를 false로 설정
+      isContentChanged = false;
       isConnected.set(true);
     } catch (error) {
-      console.log("저장에 실패했습니다. reason => ", error);
+      console.error("Failed to save content:", error);
       isConnected.set(false);
     }
   }
 
   function handleKeyDown(event: KeyboardEvent) {
-    console.log("onKeyDown");
     if (editable) {
       scrollPosition = contentTextArea.scrollTop;
       event.stopPropagation();
       if ((event.ctrlKey || event.metaKey) && event.key === "s") {
         event.preventDefault();
-        console.log("ctrl+ s");
         showDialog = true;
         // editable = false;
       } else if (event.key === "Escape") {
@@ -127,17 +120,15 @@
           const afterText = fileContent.slice(currentPosition);
 
           const uuidValue = uuidv4();
-          console.log("uuid: ", uuidValue);
           const savedPath = await invoke("save_file_image", {
             filePath: $relativeFilePath,
             fileName: uuidValue,
             fileData: Array.from(fileData),
           });
-          console.log("savedPath: ", savedPath);
 
           fileContent = `${beforeText}\n![${uuidValue}](${savedPath})${afterText}`;
         } catch (e) {
-          console.log("error: ", e);
+          console.error("Image paste failed:", e);
         }
       }
     }

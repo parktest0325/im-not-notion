@@ -144,7 +144,7 @@
       config = config;
       updateStep(4, "done", "Config fields populated");
 
-    } catch (e: any) {
+    } catch (e: unknown) {
       const failIdx = steps.findIndex((s) => s.status === "running");
       if (failIdx >= 0) updateStep(failIdx, "error", String(e));
       errorMessage = String(e);
@@ -182,7 +182,7 @@
       }
 
       successMessage = "Connected successfully. Click Save and Exit.";
-    } catch (e: any) {
+    } catch (e: unknown) {
       errorMessage = String(e);
     }
   }
