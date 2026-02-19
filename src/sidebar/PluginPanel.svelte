@@ -1,6 +1,5 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { onMount } from "svelte";
   import Popup from "../component/Popup.svelte";
   import PluginInputPopup from "./PluginInputPopup.svelte";
   import { addToast } from "../stores";
@@ -56,6 +55,31 @@
     } catch (error) {
       console.error("Failed to toggle cron:", error);
       addToast("Failed to toggle cron.");
+    }
+  }
+
+  let isDeploying = false;
+  let deployPath = "";
+
+  async function deployPlugins() {
+    if (!deployPath.trim()) {
+      addToast("Enter the local plugins path.");
+      return;
+    }
+    isDeploying = true;
+    try {
+      const deployed: string[] = await invoke("deploy_plugins", { localPath: deployPath.trim() });
+      if (deployed.length > 0) {
+        addToast(`Deployed: ${deployed.join(", ")}`, "success");
+        await loadPlugins();
+      } else {
+        addToast("No plugins found to deploy.", "info");
+      }
+    } catch (error) {
+      console.error("Failed to deploy plugins:", error);
+      addToast("Failed to deploy plugins.");
+    } finally {
+      isDeploying = false;
     }
   }
 
@@ -130,6 +154,26 @@
       {/each}
     </div>
   {/if}
+
+  <!-- Deploy -->
+  <div class="space-y-2 pt-2" style="border-top: 1px solid var(--border-color);">
+    <p class="text-xs opacity-50">Deploy plugins to server</p>
+    <input
+      type="text"
+      class="w-full p-2 rounded text-sm"
+      style="background-color: var(--input-bg-color); border: 1px solid var(--border-color);"
+      bind:value={deployPath}
+      placeholder="/path/to/local/plugins"
+    />
+    <button
+      class="w-full p-2 rounded"
+      style="background-color: var(--button-active-bg-color);"
+      on:click={deployPlugins}
+      disabled={isDeploying}
+    >
+      {isDeploying ? "Deploying..." : "Deploy to Server"}
+    </button>
+  </div>
 
   <button class="w-full p-2 rounded mt-2 opacity-60" on:click={closePlugin}>
     Close

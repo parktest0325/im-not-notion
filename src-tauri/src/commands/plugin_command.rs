@@ -22,3 +22,8 @@ pub fn register_plugin_cron(name: &str, schedule: &str, entry: &str) -> Result<(
 pub fn unregister_plugin_cron(name: &str) -> Result<(), InvokeError> {
     plugin_service::unregister_cron(name).into_invoke_err()
 }
+
+#[tauri::command]
+pub fn deploy_plugins(local_path: &str) -> Result<Vec<String>, InvokeError> {
+    plugin_service::deploy_plugins(local_path).into_invoke_err()
+}

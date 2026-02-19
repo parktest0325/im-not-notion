@@ -1,0 +1,3 @@
+[submodule "plugins"]
+	path = plugins
+	url = https://git.dongkim.dev/user_kdh/im-not-notion-plugins.git
