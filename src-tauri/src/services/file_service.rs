@@ -182,9 +182,14 @@ pub fn remove_content(path: &str) -> Result<()> {
     try_both(targets, |p| rmrf_file(&mut sftp, Path::new(&p)))
 }
 
-/// 파일/폴더 이동 (content + hidden 양쪽 시도)
+/// 파일/폴더 이동 (content + hidden 양쪽 시도, 이동 전 대상 경로 중복 체크)
 pub fn move_content(src: &str, dst: &str) -> Result<()> {
     let (sftp, hugo_config) = sftp_and_config()?;
+
+    if path_exists(&sftp, &hugo_config, dst) {
+        bail!("Destination already exists: {}", dst);
+    }
+
     let combos = [
         (hugo_config.content_abs(src), hugo_config.content_abs(dst)),
         (hugo_config.hidden_abs(src), hugo_config.hidden_abs(dst)),
@@ -192,7 +197,7 @@ pub fn move_content(src: &str, dst: &str) -> Result<()> {
     try_both(combos, |(s, d)| move_file(&sftp, Path::new(&s), Path::new(&d)))
 }
 
-/// 숨김 상태 토글
+/// 숨김 상태 토글 (토글 전 대상 경로 존재 여부 체크)
 pub fn toggle_hidden(path: &str, state: bool) -> Result<()> {
     let (sftp, hugo_config) = sftp_and_config()?;
 
@@ -201,6 +206,10 @@ pub fn toggle_hidden(path: &str, state: bool) -> Result<()> {
     } else {
         (hugo_config.content_abs(path), hugo_config.hidden_abs(path))
     };
+
+    if sftp.stat(Path::new(&dst)).is_ok() {
+        bail!("Destination already exists: {}", dst);
+    }
 
     move_file(&sftp, Path::new(&src), Path::new(&dst))
 }
