@@ -6,7 +6,8 @@
   import Popup from "../component/Popup.svelte";
   import { url, contentPath, hiddenPath, addToast } from "../stores";
   import { onMount } from "svelte";
-  import { buildShortcutMap, getEffectiveShortcuts, eventToShortcutString, isRecordingShortcut } from "../shortcut";
+  import { buildShortcutMap, getEffectiveShortcuts, eventToShortcutString, isRecordingShortcut, pluginShortcutDefs, registerAction, unregisterAction } from "../shortcut";
+  import type { PluginInfo } from "../types/setting";
 
   export let show: boolean;
   export let closeSettings: () => void;
@@ -26,6 +27,31 @@
 
   function refreshShortcutEntries() {
     shortcutEntries = getEffectiveShortcuts(config?.shortcuts ?? {});
+  }
+
+  async function loadPluginShortcuts() {
+    try {
+      const plugins: PluginInfo[] = await invoke("list_plugins", { localPath: "" });
+      const defs: Array<{ id: string; shortcut?: string; description: string }> = [];
+
+      for (const p of plugins) {
+        for (const trigger of p.manifest.triggers) {
+          if (trigger.type === "manual") {
+            defs.push({
+              id: `plugin:${p.manifest.name}:${trigger.content.label}`,
+              shortcut: trigger.content.shortcut,  // undefined if not set
+              description: `${p.manifest.name} - ${trigger.content.label}`,
+            });
+          }
+        }
+      }
+
+      pluginShortcutDefs.set(defs);
+      buildShortcutMap();
+      refreshShortcutEntries();
+    } catch (_) {
+      // SSH 미연결 등 — 플러그인 없이 빌트인만 표시
+    }
   }
 
   function startRecording(actionId: string, index: number) {
@@ -103,6 +129,10 @@
   $: if (show) {
     // show가 true일 때만 설정 로드
     loadConfig();
+  }
+
+  $: if (activeTab === "shortcuts") {
+    loadPluginShortcuts();
   }
 
   async function loadConfig() {

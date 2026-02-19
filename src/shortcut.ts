@@ -36,7 +36,7 @@ export const isRecordingShortcut = writable(false);
 // Plugin shortcut definitions — set when plugins load
 export interface PluginShortcutDef {
   id: string;
-  shortcut: string;
+  shortcut?: string;  // optional — plugin.json may not have a default
   description: string;
 }
 export const pluginShortcutDefs = writable<PluginShortcutDef[]>([]);
@@ -149,10 +149,11 @@ export function getEffectiveShortcuts(
   const plugins = get(pluginShortcutDefs);
   for (const ps of plugins) {
     if (!seen.has(ps.id)) {
+      const defaults = ps.shortcut ? [ps.shortcut] : [];
       result.push({
         id: ps.id,
         description: ps.description,
-        shortcuts: clientOverrides[ps.id] ? [...clientOverrides[ps.id]] : [ps.shortcut],
+        shortcuts: clientOverrides[ps.id] ? [...clientOverrides[ps.id]] : defaults,
       });
       seen.add(ps.id);
     }
@@ -179,18 +180,12 @@ export function unregisterAction(id: string): void {
 }
 
 /**
- * Build the resolved shortcut map by merging 3 sources:
- * 1. Built-in defaults
- * 2. Plugin defaults (from manifest shortcut field)
- * 3. Client overrides (highest priority, replaces entire array)
- */
-/**
  * Build the resolved shortcut map by merging 3 sources.
  * Either parameter can be omitted to reuse cached values.
  */
 export function buildShortcutMap(
   clientOverrides?: Record<string, string[]>,
-  pluginShortcuts?: Array<{ id: string; shortcut: string }>,
+  pluginShortcuts?: Array<{ id: string; shortcut?: string }>,
 ): void {
   if (clientOverrides !== undefined) {
     cachedClientOverrides = clientOverrides;
@@ -206,7 +201,7 @@ export function buildShortcutMap(
 
   // Step 2: Add plugin defaults (only if not already in builtins)
   for (const ps of plugins) {
-    if (!(ps.id in actionToKeys)) {
+    if (!(ps.id in actionToKeys) && ps.shortcut) {
       actionToKeys[ps.id] = [ps.shortcut];
     }
   }

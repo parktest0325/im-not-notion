@@ -52,20 +52,20 @@
     }
     registeredActionIds = [];
 
-    const defs: Array<{ id: string; shortcut: string; description: string }> = [];
+    const defs: Array<{ id: string; shortcut?: string; description: string }> = [];
 
-    // 모든 플러그인의 manual shortcut을 등록 (설정용)
+    // 모든 플러그인의 manual trigger를 등록 (shortcut 유무 상관없이)
     // 실행 시점에 installed+enabled 체크
     for (const p of plugins) {
       for (const trigger of p.manifest.triggers) {
-        if (trigger.type === "manual" && trigger.content.shortcut) {
+        if (trigger.type === "manual") {
           const actionId = `plugin:${p.manifest.name}:${trigger.content.label}`;
           const pluginName = p.manifest.name;
           const triggerLabel = trigger.content.label;
 
           defs.push({
             id: actionId,
-            shortcut: trigger.content.shortcut,
+            shortcut: trigger.content.shortcut,  // undefined if not set
             description: `${pluginName} - ${triggerLabel}`,
           });
 
