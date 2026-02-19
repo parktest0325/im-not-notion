@@ -54,6 +54,7 @@
             selectedCursor.set(createdPath);
             relativeFilePath.set(createdPath);
             await refreshList();
+            addToast("Item created.", "success");
         } catch (error) {
             console.error("failed to create item:", error);
             addToast("Failed to create item.");
@@ -89,6 +90,7 @@
             selectedCursor.set("");
             relativeFilePath.set("");
             await refreshList();
+            addToast("Item deleted.", "success");
         } catch (error) {
             console.error("failed to rmrf:", error);
             addToast("Failed to delete item.");
@@ -120,6 +122,7 @@
                         : dstPath,
                 );
                 await refreshList();
+                addToast("Item renamed.", "success");
             } catch (error) {
                 console.error("Failed to rename file:", error);
                 addToast("Failed to rename item.");
@@ -227,6 +230,7 @@
             selectedCursor.set(dst);
             relativeFilePath.set(dst);
             await refreshList();
+            addToast("Item moved.", "success");
         } catch (e) {
             console.error('Failed to move file:', e);
             addToast("Failed to move item.");

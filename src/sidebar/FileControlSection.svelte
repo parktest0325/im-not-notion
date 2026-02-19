@@ -41,6 +41,7 @@
             selectedCursor.set(createdPath);
             relativeFilePath.set(createdPath);
             await refreshList();
+            addToast("Folder created.", "success");
         } catch (error) {
             console.error("failed to make directory:", error);
             addToast("Failed to create folder.");

@@ -45,10 +45,8 @@
     try {
       await invoke("toggle_hidden_file", { path: $relativeFilePath, state: isHidden });
       isHidden = !isHidden;
-      // // 토글 후 전체 파일 경로 갱신 없어도 잘만됨
-      // const newPath = (isHidden ? `/${$hiddenPath}` : '') + `/${$contentPath}${$relativeFilePath}`;
-      // fullFilePath.set(newPath);
       await refreshList();
+      addToast(isHidden ? "File hidden." : "File visible.", "success");
     } catch (error) {
       console.error("Failed to toggle hidden status:", error);
       addToast("Failed to toggle hidden status.");

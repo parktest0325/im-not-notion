@@ -161,8 +161,9 @@
     showDialog = false;
     editable = true;
   }}
-  handleSave={() => {
-    saveContent();
+  handleSave={async () => {
+    await saveContent();
+    addToast("File saved.", "success");
     editable = false;
     showDialog = false;
   }}

@@ -10,6 +10,7 @@
       console.log("Rebooting the server...");
       await invoke("kill_server");
       await invoke("start_server");
+      addToast("Server rebooted.", "success");
     } catch (error) {
       console.error("Failed to reboot the server:", error);
       addToast("Failed to reboot server.");

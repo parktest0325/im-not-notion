@@ -46,6 +46,7 @@
     try {
       await invoke("save_config", { config });
       await loadConfig(); // 저장 후 최신 상태 로드
+      addToast("Settings saved.", "success");
     } catch (error) {
       console.error("Failed to save config:", error);
       addToast("Failed to save settings.");
