@@ -3,7 +3,7 @@
   export let toggleMenu: () => void;
   import MdArrowForward from "svelte-icons/md/MdArrowForward.svelte";
   import DiIe from 'svelte-icons/di/DiIe.svelte'
-  import { relativeFilePath, url, contentPath, hiddenPath, fullFilePath, type GlobalFunctions, GLOBAL_FUNCTIONS } from "../stores";
+  import { relativeFilePath, url, contentPath, hiddenPath, fullFilePath, addToast, type GlobalFunctions, GLOBAL_FUNCTIONS } from "../stores";
   import { invoke } from "@tauri-apps/api/core";
   import { open } from "@tauri-apps/plugin-shell";
   import { getContext, onMount } from "svelte";
@@ -31,7 +31,8 @@
       console.log(isHidden);
     } catch (error) {
       console.error("Failed to check hidden status:", error);
-      isHidden = false; // 오류 시 기본값 설정
+      isHidden = false;
+      addToast("Failed to check hidden status.");
     }
   }
 
@@ -50,6 +51,7 @@
       await refreshList();
     } catch (error) {
       console.error("Failed to toggle hidden status:", error);
+      addToast("Failed to toggle hidden status.");
     } finally {
       isLoading = false;
     }

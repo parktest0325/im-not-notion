@@ -4,7 +4,7 @@
   import HugoSetup from "./HugoSetup.svelte";
   import { createDefaultAppConfig, type AppConfig } from "../types/setting";
   import Popup from "../component/Popup.svelte";
-  import { url, contentPath, hiddenPath } from "../stores";
+  import { url, contentPath, hiddenPath, addToast } from "../stores";
   import { onMount } from "svelte";
 
   export let show: boolean;
@@ -34,8 +34,9 @@
       contentPath.set(config.cms_config.hugo_config.content_path);
       hiddenPath.set(config.cms_config.hugo_config.hidden_path);
     } catch (error) {
-      console.log("Failed to load config:", error);
+      console.error("Failed to load config:", error);
       config = createDefaultAppConfig();
+      addToast("Failed to load settings.");
     } finally {
       isLoading = false; // 로딩 완료
     }
@@ -46,7 +47,8 @@
       await invoke("save_config", { config });
       await loadConfig(); // 저장 후 최신 상태 로드
     } catch (error) {
-      console.error(error);
+      console.error("Failed to save config:", error);
+      addToast("Failed to save settings.");
     } finally {
       closeSettings();
     }

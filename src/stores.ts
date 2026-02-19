@@ -14,6 +14,24 @@ export const draggingInfo = writable<{
 // Indicates whether any filename is currently being edited.
 export const isEditingFileName = writable(false);
 
+// ---------- 토스트 ----------
+export interface ToastItem {
+  id: number;
+  message: string;
+  type: "error" | "success" | "info";
+}
+
+export const toasts = writable<ToastItem[]>([]);
+
+let toastId = 0;
+export function addToast(message: string, type: ToastItem["type"] = "error") {
+  const id = ++toastId;
+  toasts.update(t => [...t, { id, message, type }]);
+  setTimeout(() => {
+    toasts.update(t => t.filter(item => item.id !== id));
+  }, 3000);
+}
+
 // ---------- 컨텍스트 ----------
 export const GLOBAL_FUNCTIONS = Symbol('globalFunctions');
 export interface GlobalFunctions {

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { fullFilePath, isConnected, relativeFilePath } from "../stores";
+  import { fullFilePath, isConnected, relativeFilePath, addToast } from "../stores";
   import { invoke } from "@tauri-apps/api/core";
   import { v4 as uuidv4 } from "uuid";
   import { tick, onMount, onDestroy } from "svelte";
@@ -8,15 +8,15 @@
 
   let fileContent: string = "";
   let editable: boolean = false;
-  let showDialog: boolean = false; // 대화상자 표시 상태를 위한 일반 boolean 변수
+  let showDialog: boolean = false;
   let contentTextArea: HTMLTextAreaElement;
   let contentDiv: HTMLDivElement;
-  let scrollPosition: number = 0; // 스크롤 위치를 저장할 변수 추가
+  let scrollPosition: number = 0;
 
-  let isContentChanged: boolean = false; // 내용 변경 여부를 추적하는 변수
-  let autoSaveEnabled = writable(true); // 자동 저장 기능 활성화 여부
-  let autoSaveInterval = 1000 * 5; //* 60; // 자동 저장 주기 (5분)
-  let autoSaveTimer: number | null = null; // 자동 저장 타이머
+  let isContentChanged: boolean = false;
+  let autoSaveEnabled = writable(true);
+  let autoSaveInterval = 1000 * 5;
+  let autoSaveTimer: number | null = null;
 
   $: if ($fullFilePath) {
     getFileContent($fullFilePath);
@@ -29,12 +29,12 @@
     tick().then(() => {
       contentTextArea?.focus();
       contentTextArea?.scrollTo(0, scrollPosition);
-      startAutoSave(); // editable이 true일 때 자동 저장 시작
+      startAutoSave();
     });
   } else {
     tick().then(() => {
       contentDiv?.scrollTo(0, scrollPosition);
-      stopAutoSave(); // editable이 false일 때 자동 저장 중지
+      stopAutoSave();
     });
   }
 
@@ -48,7 +48,7 @@
       isConnected.set(true);
     } catch (error) {
       console.error("Failed to get file content", error);
-      fileContent = "파일을 불러오는데 실패했습니다.";
+      fileContent = "Failed to load file.";
       isConnected.set(false);
     }
   }
@@ -82,6 +82,7 @@
     } catch (error) {
       console.error("Failed to save content:", error);
       isConnected.set(false);
+      addToast("Failed to save file.");
     }
   }
 
@@ -129,6 +130,7 @@
           fileContent = `${beforeText}\n![${uuidValue}](${savedPath})${afterText}`;
         } catch (e) {
           console.error("Image paste failed:", e);
+        addToast("Failed to save image.");
         }
       }
     }

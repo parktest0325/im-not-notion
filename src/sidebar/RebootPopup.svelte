@@ -1,6 +1,7 @@
 <script lang="ts">
   import Popup from "../component/Popup.svelte";
   import { invoke } from "@tauri-apps/api/core";
+  import { addToast } from "../stores";
   export let show: boolean;
   export let closeReboot: () => void;
 
@@ -10,7 +11,8 @@
       await invoke("kill_server");
       await invoke("start_server");
     } catch (error) {
-      console.log("Failed to reboot the server:", error);
+      console.error("Failed to reboot the server:", error);
+      addToast("Failed to reboot server.");
     } finally {
       closeReboot();
     }

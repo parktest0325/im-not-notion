@@ -2,6 +2,7 @@
   import Popup from "../component/Popup.svelte";
   import { invoke, Channel } from "@tauri-apps/api/core";
   import { onDestroy, tick } from "svelte";
+  import { addToast } from "../stores";
   import { Terminal } from "@xterm/xterm";
   import { FitAddon } from "@xterm/addon-fit";
   import "@xterm/xterm/css/xterm.css";
@@ -48,6 +49,7 @@
       started = true;
     } catch (e) {
       terminal.write(`\r\nError: ${e}\r\n`);
+      addToast("Failed to connect terminal.");
       return;
     }
 

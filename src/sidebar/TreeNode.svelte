@@ -4,7 +4,7 @@
     import FaFolderPlus from "svelte-icons/fa/FaFolderPlus.svelte";
     import { writable } from "svelte/store";
     import TreeNode from "./TreeNode.svelte";
-    import { relativeFilePath, selectedCursor, draggingInfo, isEditingFileName, type GlobalFunctions, GLOBAL_FUNCTIONS } from "../stores";
+    import { relativeFilePath, selectedCursor, draggingInfo, isEditingFileName, addToast, type GlobalFunctions, GLOBAL_FUNCTIONS } from "../stores";
     import { invoke } from "@tauri-apps/api/core";
     import { getContext, onDestroy, onMount } from "svelte";
     import { slide } from "svelte/transition";
@@ -56,6 +56,7 @@
             await refreshList();
         } catch (error) {
             console.error("failed to create item:", error);
+            addToast("Failed to create item.");
         }
     }
 
@@ -90,6 +91,7 @@
             await refreshList();
         } catch (error) {
             console.error("failed to rmrf:", error);
+            addToast("Failed to delete item.");
         }
         console.log("Delete item");
     }
@@ -120,6 +122,7 @@
                 await refreshList();
             } catch (error) {
                 console.error("Failed to rename file:", error);
+                addToast("Failed to rename item.");
             }
         } else if (event.key === "Escape") {
             isEditing = false;
@@ -226,6 +229,7 @@
             await refreshList();
         } catch (e) {
             console.error('Failed to move file:', e);
+            addToast("Failed to move item.");
         }
     }
 </script>

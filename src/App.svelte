@@ -5,6 +5,7 @@
   import Sidebar from "./sidebar/Sidebar.svelte";
   import TopBar from "./topbar/TopBar.svelte";
   import { GLOBAL_FUNCTIONS } from "./stores";
+  import Toast from "./component/Toast.svelte";
 
   let isMenuOpen: boolean = true;
 
@@ -22,3 +23,5 @@
     <MainContent />
   </div>
 </div>
+
+<Toast />

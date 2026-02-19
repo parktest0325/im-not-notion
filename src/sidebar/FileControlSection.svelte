@@ -21,7 +21,7 @@
     import { writable } from "svelte/store";
     import TreeNode from "./TreeNode.svelte";
     import { setContext, onMount } from "svelte";
-    import { selectedCursor, relativeFilePath, GLOBAL_FUNCTIONS, isConnected } from "../stores";
+    import { selectedCursor, relativeFilePath, GLOBAL_FUNCTIONS, isConnected, addToast } from "../stores";
     import type { FileSystemNode } from "../types/setting";
 
     let searchTerm: string = "";
@@ -43,6 +43,7 @@
             await refreshList();
         } catch (error) {
             console.error("failed to make directory:", error);
+            addToast("Failed to create folder.");
         }
     }
 </script>
