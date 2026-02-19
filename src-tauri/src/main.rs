@@ -24,7 +24,11 @@ use commands::{
         git_init_site_cmd, install_theme_cmd,
     },
     pty_command::{start_pty_cmd, write_pty_cmd, resize_pty_cmd, stop_pty_cmd},
-    plugin_command::{list_plugins, run_plugin, register_plugin_cron, unregister_plugin_cron, deploy_plugins},
+    plugin_command::{
+        list_plugins, install_plugin, uninstall_plugin,
+        enable_plugin, disable_plugin, run_plugin,
+        register_plugin_cron, unregister_plugin_cron,
+    },
 };
 
 fn main() -> Result<()> {
@@ -67,10 +71,13 @@ fn main() -> Result<()> {
             resize_pty_cmd,
             stop_pty_cmd,
             list_plugins,
+            install_plugin,
+            uninstall_plugin,
+            enable_plugin,
+            disable_plugin,
             run_plugin,
             register_plugin_cron,
             unregister_plugin_cron,
-            deploy_plugins,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

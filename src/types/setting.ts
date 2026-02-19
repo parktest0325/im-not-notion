@@ -10,6 +10,7 @@ export type {
     FileSystemNode,
     PrerequisiteResult,
     PluginManifest,
+    PluginInfo,
     Trigger,
     InputField,
     PluginResult,

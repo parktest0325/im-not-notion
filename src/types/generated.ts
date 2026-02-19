@@ -72,6 +72,13 @@ export interface PluginManifest {
 	triggers: Trigger[];
 }
 
+/** 프론트엔드에 전달되는 플러그인 정보 (로컬+서버 병합) */
+export interface PluginInfo {
+	manifest: PluginManifest;
+	installed: boolean;
+	enabled: boolean;
+}
+
 export type PluginAction = 
 	| { type: "refresh_tree", content?: undefined }
 	| { type: "toast", content: {

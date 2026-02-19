@@ -51,6 +51,15 @@ pub struct InputField {
     pub default: Option<String>,
 }
 
+/// 프론트엔드에 전달되는 플러그인 정보 (로컬+서버 병합)
+#[typeshare]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PluginInfo {
+    pub manifest: PluginManifest,
+    pub installed: bool,
+    pub enabled: bool,
+}
+
 /// 스크립트 stdout JSON 파싱 결과
 #[typeshare]
 #[derive(Serialize, Deserialize, Debug, Clone)]
