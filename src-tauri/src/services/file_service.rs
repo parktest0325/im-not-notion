@@ -9,7 +9,9 @@ use typeshare::typeshare;
 
 use crate::services::ssh_service::{get_sftp_session, get_channel_session, execute_ssh_command};
 use crate::services::config_service::get_hugo_config;
+use crate::services::plugin_service;
 use crate::types::config::cms_config::HugoConfig;
+use crate::types::plugin::HookEvent;
 
 // ============================================================
 // 고수준 Hugo 파일 작업
@@ -136,7 +138,14 @@ pub fn write_content(file_path: &str, data: &str) -> Result<()> {
     let hidden_path = hugo_config.hidden_abs(file_path);
 
     save_file(&sftp, Path::new(&content_path), data.to_string())
-        .or_else(|_| save_file(&sftp, Path::new(&hidden_path), data.to_string()))
+        .or_else(|_| save_file(&sftp, Path::new(&hidden_path), data.to_string()))?;
+
+    plugin_service::run_hooks(
+        HookEvent::AfterFileSave,
+        serde_json::json!({ "path": file_path }),
+    ).ok();
+
+    Ok(())
 }
 
 /// 이미지 저장
@@ -172,6 +181,12 @@ pub fn create_content(file_path: &str) -> Result<String> {
             unique_path,
         ),
     )?;
+
+    plugin_service::run_hooks(
+        HookEvent::AfterFileCreate,
+        serde_json::json!({ "path": &unique_path }),
+    ).ok();
+
     Ok(unique_path)
 }
 
@@ -179,7 +194,14 @@ pub fn create_content(file_path: &str) -> Result<String> {
 pub fn remove_content(path: &str) -> Result<()> {
     let (mut sftp, hugo_config) = sftp_and_config()?;
     let targets = [hugo_config.content_abs(path), hugo_config.hidden_abs(path)];
-    try_both(targets, |p| rmrf_file(&mut sftp, Path::new(&p)))
+    try_both(targets, |p| rmrf_file(&mut sftp, Path::new(&p)))?;
+
+    plugin_service::run_hooks(
+        HookEvent::AfterFileDelete,
+        serde_json::json!({ "path": path }),
+    ).ok();
+
+    Ok(())
 }
 
 /// 파일/폴더 이동 (content + hidden 양쪽 시도, 이동 전 대상 경로 중복 체크)
@@ -194,7 +216,14 @@ pub fn move_content(src: &str, dst: &str) -> Result<()> {
         (hugo_config.content_abs(src), hugo_config.content_abs(dst)),
         (hugo_config.hidden_abs(src), hugo_config.hidden_abs(dst)),
     ];
-    try_both(combos, |(s, d)| move_file(&sftp, Path::new(&s), Path::new(&d)))
+    try_both(combos, |(s, d)| move_file(&sftp, Path::new(&s), Path::new(&d)))?;
+
+    plugin_service::run_hooks(
+        HookEvent::AfterFileMove,
+        serde_json::json!({ "src": src, "dst": dst }),
+    ).ok();
+
+    Ok(())
 }
 
 /// 숨김 상태 토글 (토글 전 대상 경로 존재 여부 체크)

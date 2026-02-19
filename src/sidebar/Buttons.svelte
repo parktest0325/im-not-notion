@@ -2,15 +2,17 @@
   import MdSettings from "svelte-icons/md/MdSettings.svelte";
   import SettingsPopup from "./SettingsPopup.svelte";
   import IoMdTrash from "svelte-icons/io/IoMdTrash.svelte";
-  import FaServer from "svelte-icons/fa/FaServer.svelte";
+  import FaPuzzlePiece from "svelte-icons/fa/FaPuzzlePiece.svelte";
   import GiNuclear from "svelte-icons/gi/GiNuclear.svelte";
   import RebootPopup from "./RebootPopup.svelte";
   import FaTerminal from "svelte-icons/fa/FaTerminal.svelte";
   import TerminalPopup from "./TerminalPopup.svelte";
+  import PluginPanel from "./PluginPanel.svelte";
 
   let bSetting: boolean;
   let bReboot: boolean;
   let bTerminal: boolean;
+  let bPlugin: boolean;
 
   function toggleSettings() {
     bSetting = !bSetting;
@@ -20,6 +22,9 @@
   }
   function toggleTerminal() {
     bTerminal = !bTerminal;
+  }
+  function togglePlugin() {
+    bPlugin = !bPlugin;
   }
 </script>
 
@@ -36,9 +41,9 @@
     </div>
   </button>
 
-  <button class="p-2 opacity-30 cursor-not-allowed" disabled>
+  <button class="p-2" on:click={togglePlugin}>
     <div class="w-6 h-6">
-      <FaServer />
+      <FaPuzzlePiece />
     </div>
   </button>
 
@@ -58,3 +63,4 @@
 <SettingsPopup show={bSetting} closeSettings={toggleSettings} />
 <RebootPopup show={bReboot} closeReboot={toggleReboot} />
 <TerminalPopup show={bTerminal} closeTerminal={toggleTerminal} />
+<PluginPanel show={bPlugin} closePlugin={togglePlugin} />

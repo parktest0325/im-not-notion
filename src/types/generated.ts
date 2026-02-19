@@ -43,9 +43,63 @@ export interface FileSystemNode {
 	children: FileSystemNode[];
 }
 
+export interface InputField {
+	name: string;
+	type: string;
+	label: string;
+	default?: string;
+}
+
+export type Trigger = 
+	| { type: "manual", content: {
+	label: string;
+	input: InputField[];
+}}
+	| { type: "hook", content: {
+	event: HookEvent;
+}}
+	| { type: "cron", content: {
+	schedule: string;
+	label: string;
+}};
+
+/** 서버의 plugin.json 파싱 결과 */
+export interface PluginManifest {
+	name: string;
+	description: string;
+	version: string;
+	entry: string;
+	triggers: Trigger[];
+}
+
+export type PluginAction = 
+	| { type: "refresh_tree", content?: undefined }
+	| { type: "toast", content: {
+	message: string;
+	toast_type: string;
+}}
+	| { type: "open_file", content: {
+	path: string;
+}};
+
+/** 스크립트 stdout JSON 파싱 결과 */
+export interface PluginResult {
+	success: boolean;
+	message?: string;
+	error?: string;
+	actions?: PluginAction[];
+}
+
 export interface PrerequisiteResult {
 	curl: boolean;
 	tar: boolean;
 	git: boolean;
+}
+
+export enum HookEvent {
+	AfterFileMove = "AfterFileMove",
+	AfterFileSave = "AfterFileSave",
+	AfterFileDelete = "AfterFileDelete",
+	AfterFileCreate = "AfterFileCreate",
 }
 
