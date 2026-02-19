@@ -10,7 +10,7 @@ use anyhow::Result;
 use tauri_plugin_shell::init as shell_init;
 use commands::{
     file_command::{
-        get_file_content, get_file_list_, move_file_or_folder,
+        get_file_content, get_file_tree, move_file_or_folder,
         new_content_for_hugo, remove_file, save_file_content, save_file_image,
         toggle_hidden_file, check_file_hidden,
     },
@@ -39,7 +39,7 @@ fn main() -> Result<()> {
         .invoke_handler(tauri::generate_handler![
             load_config,
             save_config,
-            get_file_list_,
+            get_file_tree,
             get_file_content,
             save_file_content,
             save_file_image,

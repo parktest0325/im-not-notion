@@ -8,7 +8,7 @@ use rand::{distributions::Alphanumeric, thread_rng, Rng};
 static APP_CONFIG: Lazy<Mutex<Option<AppConfig>>> = Lazy::new(|| Mutex::new(None));
 
 /// SSH 서버의 홈 디렉토리 경로를 가져옴
-fn get_server_home_path() -> Result<String> {
+pub fn get_server_home_path() -> Result<String> {
     let mut channel = get_channel_session()?;
     let output = execute_ssh_command(&mut channel, "echo $HOME")?;
     Ok(output.trim().to_string())

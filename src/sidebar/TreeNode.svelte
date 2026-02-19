@@ -33,7 +33,6 @@
     function onFileClick(event: MouseEvent) {
         event.stopPropagation();
         selectedCursor.set(filePath);
-        console.log(`File clicked: ${filePath}`);
         if (node.type_ === "File") {
             relativeFilePath.set(filePath);
         } else {
@@ -83,7 +82,6 @@
 
     async function deleteItem() {
         try {
-            // await invoke("move_to_trashcan", {
             await invoke("remove_file", {
                 path: filePath,
             });
@@ -95,7 +93,6 @@
             console.error("failed to rmrf:", error);
             addToast("Failed to delete item.");
         }
-        console.log("Delete item");
     }
 
     let isEditing = false;
@@ -169,17 +166,13 @@
     function onDragStart(event: DragEvent) {
         if (dragDisabled) return;
         event.stopPropagation();
-        console.log('dragstart', filePath);
-
         event.dataTransfer?.setData('application/x-imnotnotion-path', filePath);
-
         draggingInfo.set({ path: filePath });
     }
 
     function onDragEnd(event: DragEvent) {
         if (dragDisabled) return;
         event.stopPropagation();
-        console.log('dragend', filePath);
         draggingInfo.set(null);
         isDragOver = false;
     }
@@ -197,7 +190,6 @@
         if (dragDisabled) return;
         event.stopPropagation();
         if (node.type_ === 'Directory') {
-            console.log('dragenter', filePath);
             event.preventDefault();
             isDragOver = true;
         }
@@ -206,7 +198,6 @@
     function onDragLeave(event: DragEvent) {
         if (dragDisabled) return;
         event.stopPropagation();
-        console.log('dragleave', filePath);
         isDragOver = false;
     }
 
@@ -214,8 +205,6 @@
         if (dragDisabled || node.type_ !== 'Directory') return;
         event.stopPropagation();
         event.preventDefault();
-
-        console.log('drop', filePath);
 
         isDragOver = false;
         const info = $draggingInfo;
