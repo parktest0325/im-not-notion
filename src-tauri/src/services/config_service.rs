@@ -2,7 +2,7 @@ use std::{path::Path, sync::Mutex};
 use anyhow::{Result, Context};
 use once_cell::sync::Lazy;
 use crate::{services::{execute_ssh_command, get_channel_session, get_sftp_session, move_file}, types::config::{cms_config::HugoConfig, AppConfig}};
-use crate::services::ssh_service::connect_ssh;
+use crate::services::ssh_service::{connect_ssh, reconnect_ssh};
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 
 static APP_CONFIG: Lazy<Mutex<Option<AppConfig>>> = Lazy::new(|| Mutex::new(None));
@@ -40,8 +40,8 @@ pub fn save_app_config(mut new_config: AppConfig) -> Result<()> {
     // 1. 로컬에 먼저 저장 (SSH 설정)
     new_config.save_client_config()?;
 
-    // 2. SSH 연결
-    connect_ssh(&new_config)?;
+    // 2. SSH 연결 (설정 변경됐을 수 있으므로 강제 재연결)
+    reconnect_ssh(&new_config)?;
 
     // 3. 서버 설정이 비어있지 않으면 저장
     if !new_config.cms_config.hugo_config.is_empty() {

@@ -6,7 +6,20 @@ use once_cell::sync::Lazy;
 
 static SSH_CLIENT: Lazy<Mutex<Option<Session>>> = Lazy::new(|| Mutex::new(None));
 
-pub fn connect_ssh(config: &AppConfig) -> Result<()> {
+/// Connect SSH. If `force` is false, reuses existing live session.
+pub fn connect_ssh_inner(config: &AppConfig, force: bool) -> Result<()> {
+    if !force {
+        let client = SSH_CLIENT.lock().unwrap();
+        if let Some(ref session) = *client {
+            if session.authenticated() {
+                // Try opening a channel to verify connection is alive
+                if session.channel_session().is_ok() {
+                    return Ok(());
+                }
+            }
+        }
+    }
+
     let mut session = Session::new().context("Failed to create SSH session")?;
     let tcp = TcpStream::connect(format!("{}:{}", config.ssh_config.host, config.ssh_config.port))
         .context("Failed to connect to SSH server")?;
@@ -30,6 +43,16 @@ pub fn connect_ssh(config: &AppConfig) -> Result<()> {
     *ssh_client = Some(session);
 
     Ok(())
+}
+
+/// Connect SSH, reusing existing session if alive
+pub fn connect_ssh(config: &AppConfig) -> Result<()> {
+    connect_ssh_inner(config, false)
+}
+
+/// Force reconnect SSH (used when credentials may have changed)
+pub fn reconnect_ssh(config: &AppConfig) -> Result<()> {
+    connect_ssh_inner(config, true)
 }
 
 pub fn get_channel_session() -> Result<Channel> {
