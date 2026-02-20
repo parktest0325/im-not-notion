@@ -336,6 +336,9 @@
     .text-hidden {
         color: var(--reverse-third-color);
     }
+    .bg-selected-file.text-hidden {
+        color: var(--reverse-third-color-selected);
+    }
     .btn-danger {
         background-color: var(--btn-danger-bg);
         color: var(--btn-danger-text);

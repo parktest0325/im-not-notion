@@ -434,12 +434,16 @@ fn sync_images_on_save(sftp: &Sftp, config: &HugoConfig, file_path: &str, conten
         modified = true;
     }
 
-    // 수정된 내용 저장
+    // 수정된 내용 저장 (hidden 파일이면 hidden 경로에 저장)
     if modified {
         let content_path = config.content_abs(file_path);
         let hidden_path = config.hidden_abs(file_path);
-        save_file(sftp, Path::new(&content_path), updated_content.clone())
-            .or_else(|_| save_file(sftp, Path::new(&hidden_path), updated_content.clone()))?;
+        let save_path = if sftp.stat(Path::new(&hidden_path)).is_ok() {
+            hidden_path
+        } else {
+            content_path
+        };
+        save_file(sftp, Path::new(&save_path), updated_content.clone())?;
     }
 
     // 2. 고아 이미지 삭제

@@ -22,6 +22,7 @@
   --reverse-primary-color: #1c1e21;
   --reverse-secondary-color: #4a4f57;
   --reverse-third-color: #7c3aed;
+  --reverse-third-color-selected: #5b21b6;
 
   /* ========== Semantic colors ========== */
   --success-color: #0d9668;
@@ -111,7 +112,8 @@
     /* ========== Foreground (text hierarchy) ========== */
     --reverse-primary-color: #f0f1f3;
     --reverse-secondary-color: #c0c4cc;
-    --reverse-third-color: #c4b5fd;
+    --reverse-third-color: #7c3aed;
+    --reverse-third-color-selected: #a78bfa;
 
     /* ========== Semantic colors ========== */
     --success-color: #22c55e;
