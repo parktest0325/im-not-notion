@@ -37,23 +37,23 @@
     font-size: 0.85rem;
     text-align: left;
     cursor: pointer;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    box-shadow: var(--shadow-toast);
     border: none;
     width: 100%;
   }
 
   .toast-error {
     background: var(--error-color);
-    color: #fff;
+    color: var(--toast-text);
   }
 
   .toast-success {
     background: var(--success-color);
-    color: #fff;
+    color: var(--toast-text);
   }
 
   .toast-info {
     background: var(--info-color);
-    color: #fff;
+    color: var(--toast-text);
   }
 </style>

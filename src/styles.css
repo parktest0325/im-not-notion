@@ -13,41 +13,183 @@
 }
 
 :root {
-  /* color palette */
-  --primary-color: #ffffff;
-  --secondary-color: #f1f3f4;
-  --tertiary-color: #e8f0fe;
+  /* ========== Background (surface hierarchy) ========== */
+  --primary-color: #f8f9fb;
+  --secondary-color: #eef0f4;
+  --tertiary-color: #dfe2e8;
 
-  --reverse-primary-color: #000000;
-  --reverse-secondary-color: #333333;
-  --reverse-third-color: #4c2b5c;
-  
-  --success-color: #16A085;
-  --warning-color: #FFF59D;
-  --error-color: #FF4C4C;
-  --info-color: #669df6;
-  --highlight-color: #16A085;
-  --accent-color: #FFEB3B;
+  /* ========== Foreground (text hierarchy) ========== */
+  --reverse-primary-color: #1c1e21;
+  --reverse-secondary-color: #4a4f57;
+  --reverse-third-color: #7c3aed;
+
+  /* ========== Semantic colors ========== */
+  --success-color: #0d9668;
+  --warning-color: #d97706;
+  --error-color: #dc2626;
+  --info-color: #2563eb;
+  --highlight-color: #0d7c87;
+  --accent-color: #a3d5c3;
+
+  /* ========== Status ========== */
+  --status-connected-color: #0d9668;
+  --status-disconnected-color: #dc2626;
+
+  /* ========== Toggle switch ========== */
+  --toggle-off-bg: #c4c9d2;
+  --toggle-on-bg: var(--success-color);
+
+  /* ========== Active/Enabled border ========== */
+  --active-border-color: var(--success-color);
+
+  /* ========== Badges ========== */
+  --badge-local-bg: #7e22ce;
+  --badge-local-text: #f3e8ff;
+  --badge-server-bg: #166534;
+  --badge-server-text: #dcfce7;
+
+  /* ========== Confirm/Danger buttons ========== */
+  --btn-danger-bg: #dc2626;
+  --btn-danger-hover-bg: #b91c1c;
+  --btn-danger-text: #ffffff;
+  --btn-confirm-bg: #2563eb;
+  --btn-confirm-hover-bg: #1d4ed8;
+  --btn-confirm-text: #ffffff;
+  --btn-cancel-bg: #6b7280;
+  --btn-cancel-hover-bg: #4b5563;
+  --btn-cancel-text: #ffffff;
+
+  /* ========== Inline confirm (TreeNode delete) ========== */
+  --confirm-box-bg: #374151;
+  --confirm-box-text: #f9fafb;
+  --confirm-box-border: var(--error-color);
+
+  /* ========== Toast ========== */
+  --toast-text: #ffffff;
+
+  /* ========== Recording state (SettingsPopup) ========== */
+  --recording-border: var(--info-color);
+  --recording-bg: #dbeafe;
+
+  /* ========== TopBar visibility toggle ========== */
+  --btn-visible-bg: #dbeafe;
+  --btn-visible-text: #1e40af;
+  --btn-visible-border: #93c5fd;
+  --btn-visible-hover-bg: #bfdbfe;
+  --btn-hidden-bg: #ffedd5;
+  --btn-hidden-text: #9a3412;
+  --btn-hidden-border: #fdba74;
+  --btn-hidden-hover-bg: #fed7aa;
+
+  /* ========== Create folder button ========== */
+  --btn-create-bg: var(--tertiary-color);
+  --btn-create-border: var(--info-color);
+  --btn-create-hover-bg: var(--info-color);
+  --btn-create-hover-border: var(--reverse-secondary-color);
+
+  /* ========== Sync warning icon ========== */
+  --sync-warn-color: #d97706;
+
+  /* ========== Terminal ========== */
+  --terminal-bg: #1e1e1e;
+  --terminal-fg: #d4d4d4;
+  --terminal-cursor: #d4d4d4;
+
+  /* ========== Shortcut remove hover ========== */
+  --shortcut-remove-hover: var(--error-color);
+
+  /* ========== Input background ========== */
+  --input-bg-color: #ffffff;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    /* color palette */
-    --primary-color: #1e1e1e;
-    --secondary-color: #202124;
-    --tertiary-color: #303134;
+:root.dark {
+    /* ========== Background (surface hierarchy) ========== */
+    --primary-color: #1a1b1e;
+    --secondary-color: #212225;
+    --tertiary-color: #2c2d31;
 
-    --reverse-primary-color: #ffffff;
-    --reverse-secondary-color: #e0e0e0;
-    --reverse-third-color: #ba9be4;
+    /* ========== Foreground (text hierarchy) ========== */
+    --reverse-primary-color: #e4e5e7;
+    --reverse-secondary-color: #a1a5ad;
+    --reverse-third-color: #c4b5fd;
 
-    --success-color: #16A085;
-    --warning-color: hsl(40, 100%, 50%);
-    --error-color: #FF4C4C;
-    --info-color: #669df6;
-    --highlight-color: hsl(202, 100%, 24%);
-    --accent-color: #2d6e61;
-  }
+    /* ========== Semantic colors ========== */
+    --success-color: #22c55e;
+    --warning-color: #f59e0b;
+    --error-color: #f87171;
+    --info-color: #60a5fa;
+    --highlight-color: #0e7490;
+    --accent-color: #2d5a42;
+
+    /* ========== Status ========== */
+    --status-connected-color: #34d399;
+    --status-disconnected-color: #f87171;
+
+    /* ========== Toggle ========== */
+    --toggle-off-bg: #4b5563;
+    --toggle-on-bg: #22c55e;
+
+    /* ========== Active border ========== */
+    --active-border-color: #22c55e;
+
+    /* ========== Badges ========== */
+    --badge-local-bg: #581c87;
+    --badge-local-text: #d8b4fe;
+    --badge-server-bg: #14532d;
+    --badge-server-text: #86efac;
+
+    /* ========== Confirm/Danger ========== */
+    --btn-danger-bg: #b91c1c;
+    --btn-danger-hover-bg: #7f1d1d;
+    --btn-danger-text: #ffffff;
+    --btn-confirm-bg: #1d4ed8;
+    --btn-confirm-hover-bg: #1e3a8a;
+    --btn-confirm-text: #ffffff;
+    --btn-cancel-bg: #4b5563;
+    --btn-cancel-hover-bg: #374151;
+    --btn-cancel-text: #ffffff;
+
+    /* ========== Inline confirm ========== */
+    --confirm-box-bg: #1f2937;
+    --confirm-box-text: #f9fafb;
+    --confirm-box-border: #ef4444;
+
+    /* ========== Toast ========== */
+    --toast-text: #ffffff;
+
+    /* ========== Recording ========== */
+    --recording-border: #3b82f6;
+    --recording-bg: #1e3a5f;
+
+    /* ========== TopBar visibility ========== */
+    --btn-visible-bg: #1e3a5f;
+    --btn-visible-text: #93c5fd;
+    --btn-visible-border: #1d4ed8;
+    --btn-visible-hover-bg: #1e40af;
+    --btn-hidden-bg: #431407;
+    --btn-hidden-text: #fdba74;
+    --btn-hidden-border: #9a3412;
+    --btn-hidden-hover-bg: #7c2d12;
+
+    /* ========== Create folder ========== */
+    --btn-create-bg: var(--tertiary-color);
+    --btn-create-border: var(--info-color);
+    --btn-create-hover-bg: var(--info-color);
+    --btn-create-hover-border: var(--reverse-secondary-color);
+
+    /* ========== Sync warning ========== */
+    --sync-warn-color: #fbbf24;
+
+    /* ========== Terminal ========== */
+    --terminal-bg: #1a1b1e;
+    --terminal-fg: #d4d4d4;
+    --terminal-cursor: #d4d4d4;
+
+    /* ========== Shortcut remove hover ========== */
+    --shortcut-remove-hover: #f87171;
+
+    /* ========== Input background ========== */
+    --input-bg-color: var(--secondary-color);
 }
 
 :root {
@@ -92,6 +234,10 @@
 /* etc */
   --border-color: var(--tertiary-color);
   --hover-border-color: var(--reverse-secondary-color);
+
+/* shadows */
+  --shadow-popup: 0 10px 20px rgba(0, 0, 0, 0.25);
+  --shadow-toast: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 body {
@@ -123,7 +269,7 @@ button:hover {
 
 textarea {
   background-color: var(--content-bg-color);
-  border: 2px solid var(--hover-boder-color);
+  border: 2px solid var(--hover-border-color);
   border-radius: 8px;
   box-shadow: 0 2px 2px rgba(0, 0, 0, 0.2);
 }

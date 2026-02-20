@@ -91,11 +91,19 @@
 
 <style>
   .btn-visible {
-    @apply bg-blue-100 text-blue-800 border-blue-300 hover:bg-blue-200
-           dark:bg-blue-800 dark:text-blue-100 dark:border-blue-600 dark:hover:bg-blue-700;
+    background-color: var(--btn-visible-bg);
+    color: var(--btn-visible-text);
+    border-color: var(--btn-visible-border);
+  }
+  .btn-visible:hover {
+    background-color: var(--btn-visible-hover-bg);
   }
   .btn-hidden {
-    @apply bg-orange-100 text-orange-800 border-orange-300 hover:bg-orange-200
-           dark:bg-orange-800 dark:text-orange-100 dark:border-orange-600 dark:hover:bg-orange-700;
+    background-color: var(--btn-hidden-bg);
+    color: var(--btn-hidden-text);
+    border-color: var(--btn-hidden-border);
+  }
+  .btn-hidden:hover {
+    background-color: var(--btn-hidden-hover-bg);
   }
 </style>

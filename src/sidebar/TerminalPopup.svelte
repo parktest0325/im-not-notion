@@ -20,14 +20,15 @@
     await tick();
     if (!termContainer) return;
 
+    const cs = getComputedStyle(document.documentElement);
     terminal = new Terminal({
       cursorBlink: true,
       fontSize: 14,
       fontFamily: "'Menlo', 'Monaco', 'Courier New', monospace",
       theme: {
-        background: "#1e1e1e",
-        foreground: "#d4d4d4",
-        cursor: "#d4d4d4",
+        background: cs.getPropertyValue('--terminal-bg').trim() || "#1e1e1e",
+        foreground: cs.getPropertyValue('--terminal-fg').trim() || "#d4d4d4",
+        cursor: cs.getPropertyValue('--terminal-cursor').trim() || "#d4d4d4",
       },
     });
 

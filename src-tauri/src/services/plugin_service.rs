@@ -19,10 +19,10 @@ fn resolve_plugin_dir() -> Result<String> {
 // 조회
 // ============================================================
 
-/// 서버에 설치된 플러그인 목록 (enabled 상태 포함)
-fn discover_server_plugins() -> Result<Vec<(PluginManifest, bool)>> {
+/// 서버에 설치된 플러그인 목록 (enabled 상태 + 해시 포함)
+fn discover_server_plugins() -> Result<Vec<(PluginManifest, bool, String)>> {
     let mut channel = get_channel_session()?;
-    // plugin.json 내용 + .disabled 존재 여부를 한 번에 조회
+    // plugin.json 내용 + .disabled 여부 + 디렉토리 해시를 한 번에 조회
     let cmd = format!(
         "for d in {0}/*/plugin.json; do \
             [ -f \"$d\" ] || continue; \
@@ -30,8 +30,10 @@ fn discover_server_plugins() -> Result<Vec<(PluginManifest, bool)>> {
             name=$(basename \"$dir\"); \
             disabled=\"false\"; \
             [ -f \"$dir/.disabled\" ] && disabled=\"true\"; \
+            hash=$(cd \"$dir\" && find . -type f ! -path '*/.*' -exec sha256sum {{}} + 2>/dev/null | sort | sha256sum | awk '{{print $1}}'); \
             echo \"---ENTRY---\"; \
             echo \"$disabled\"; \
+            echo \"$hash\"; \
             cat \"$d\"; \
         done",
         PLUGIN_DIR
@@ -43,15 +45,16 @@ fn discover_server_plugins() -> Result<Vec<(PluginManifest, bool)>> {
         let trimmed = chunk.trim();
         if trimmed.is_empty() { continue; }
 
-        // 첫 줄: disabled 여부, 나머지: plugin.json
-        let mut lines = trimmed.splitn(2, '\n');
+        // 첫 줄: disabled, 둘째 줄: hash, 나머지: plugin.json
+        let mut lines = trimmed.splitn(3, '\n');
         let disabled_str = lines.next().unwrap_or("false").trim();
+        let hash_str = lines.next().unwrap_or("").trim().to_string();
         let json_str = lines.next().unwrap_or("").trim();
 
         if json_str.is_empty() { continue; }
         if let Ok(manifest) = serde_json::from_str::<PluginManifest>(json_str) {
             let enabled = disabled_str != "true";
-            plugins.push((manifest, enabled));
+            plugins.push((manifest, enabled, hash_str));
         }
     }
     Ok(plugins)
@@ -83,47 +86,76 @@ fn discover_local_plugins(local_path: &str) -> Result<Vec<PluginManifest>> {
     Ok(plugins)
 }
 
+/// 로컬 플러그인 디렉토리의 해시 계산
+fn compute_local_hash(plugin_dir: &Path) -> String {
+    let hash_cmd = if cfg!(target_os = "macos") {
+        "shasum -a 256"
+    } else {
+        "sha256sum"
+    };
+    let script = format!(
+        "cd '{}' && find . -type f ! -path '*/.*' -exec {} {{}} + 2>/dev/null | sort | {} | awk '{{print $1}}'",
+        plugin_dir.display(), hash_cmd, hash_cmd
+    );
+    std::process::Command::new("sh")
+        .arg("-c")
+        .arg(&script)
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+        .unwrap_or_default()
+}
+
 /// 로컬 + 서버 플러그인 병합 리스트
 pub fn list_all_plugins(local_path: &str) -> Result<Vec<PluginInfo>> {
     let server_plugins = discover_server_plugins().unwrap_or_default();
     let local_plugins = discover_local_plugins(local_path).unwrap_or_default();
 
-    // 서버 플러그인을 name → (manifest, enabled) 맵으로
-    let mut server_map: HashMap<String, (PluginManifest, bool)> = HashMap::new();
-    for (manifest, enabled) in server_plugins {
-        server_map.insert(manifest.name.clone(), (manifest, enabled));
+    // 서버 플러그인을 name → (manifest, enabled, hash) 맵으로
+    let mut server_map: HashMap<String, (PluginManifest, bool, String)> = HashMap::new();
+    for (manifest, enabled, hash) in server_plugins {
+        server_map.insert(manifest.name.clone(), (manifest, enabled, hash));
     }
 
     let mut result: Vec<PluginInfo> = Vec::new();
     let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let has_local_path = !local_path.is_empty();
 
     // 로컬 플러그인 우선 순회
     for local_manifest in &local_plugins {
         seen.insert(local_manifest.name.clone());
-        if let Some((_, enabled)) = server_map.get(&local_manifest.name) {
-            // 로컬 + 서버 양쪽 존재 → installed, 서버 enabled 상태 사용
+        if let Some((_, enabled, server_hash)) = server_map.get(&local_manifest.name) {
+            let local_hash = compute_local_hash(
+                &Path::new(local_path).join(&local_manifest.name)
+            );
+            let synced = !local_hash.is_empty() && !server_hash.is_empty()
+                && local_hash == *server_hash;
             result.push(PluginInfo {
                 manifest: local_manifest.clone(),
+                local: true,
                 installed: true,
                 enabled: *enabled,
+                synced,
             });
         } else {
-            // 로컬에만 존재 → not installed
             result.push(PluginInfo {
                 manifest: local_manifest.clone(),
+                local: true,
                 installed: false,
                 enabled: false,
+                synced: false,
             });
         }
     }
 
     // 서버에만 있는 플러그인
-    for (name, (manifest, enabled)) in &server_map {
+    for (name, (manifest, enabled, _)) in &server_map {
         if !seen.contains(name) {
             result.push(PluginInfo {
                 manifest: manifest.clone(),
+                local: false,
                 installed: true,
                 enabled: *enabled,
+                synced: !has_local_path, // localPath 미설정이면 비교 불가 → true 취급
             });
         }
     }
@@ -242,12 +274,12 @@ pub fn run_hooks(event: HookEvent, data: serde_json::Value) -> Result<Vec<Plugin
     let hugo_config = get_hugo_config()?;
     let mut results = Vec::new();
 
-    for (plugin, enabled) in &server_plugins {
+    for (plugin, enabled, _hash) in &server_plugins {
         if !enabled { continue; }
 
         for trigger in &plugin.triggers {
             if let Trigger::Hook { event: hook_event } = trigger {
-                if *hook_event == event {
+                if hook_event == &event {
                     let input = serde_json::json!({
                         "trigger": "hook",
                         "event": format!("{:?}", event),
@@ -311,8 +343,47 @@ pub fn unregister_cron(plugin_name: &str) -> Result<()> {
 }
 
 // ============================================================
-// SFTP 업로드 헬퍼
+// Pull (서버 → 로컬)
 // ============================================================
+
+/// 서버에서 플러그인 전체를 로컬로 다운로드
+pub fn pull_plugin(local_path: &str, plugin_name: &str) -> Result<()> {
+    let sftp = get_sftp_session()?;
+    let remote_dir = format!("{}/{}", resolve_plugin_dir()?, plugin_name);
+    let local_dir = Path::new(local_path).join(plugin_name);
+    download_dir_recursive(&sftp, &remote_dir, &local_dir)?;
+    Ok(())
+}
+
+// ============================================================
+// SFTP 업로드/다운로드 헬퍼
+// ============================================================
+
+fn download_dir_recursive(sftp: &ssh2::Sftp, remote_dir: &str, local_dir: &Path) -> Result<()> {
+    std::fs::create_dir_all(local_dir)?;
+
+    let entries = sftp.readdir(Path::new(remote_dir))
+        .context(format!("Failed to list remote dir: {}", remote_dir))?;
+
+    for (remote_path, stat) in entries {
+        let name = remote_path.file_name()
+            .unwrap_or_default().to_string_lossy().to_string();
+        if name.starts_with('.') { continue; }
+
+        let local_path = local_dir.join(&name);
+        let remote_str = format!("{}/{}", remote_dir, name);
+
+        if stat.is_dir() {
+            download_dir_recursive(sftp, &remote_str, &local_path)?;
+        } else {
+            let mut remote_file = sftp.open(Path::new(&remote_path))?;
+            let mut data = Vec::new();
+            remote_file.read_to_end(&mut data)?;
+            std::fs::write(&local_path, &data)?;
+        }
+    }
+    Ok(())
+}
 
 fn upload_dir_recursive(sftp: &ssh2::Sftp, local_dir: &Path, remote_dir: &str) -> Result<()> {
     mkdir_recursive(sftp, Path::new(remote_dir))?;

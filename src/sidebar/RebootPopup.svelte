@@ -24,10 +24,17 @@
   <p>Are you sure you want to reboot the server?</p>
   <div class="flex justify-end space-x-2 mt-4">
     <button
-      class="bg-red-600 hover:bg-red-800 font-bold py-2 px-4 rounded"
+      class="btn-danger font-bold py-2 px-4 rounded"
       on:click={handleReboot}>Yes</button>
     <button
-      class="bg-gray-600 hover:bg-gray-800 font-bold py-2 px-4 rounded"
+      class="btn-cancel font-bold py-2 px-4 rounded"
       on:click={closeReboot}>No</button>
   </div>
 </Popup>
+
+<style>
+  .btn-danger { background-color: var(--btn-danger-bg); color: var(--btn-danger-text); }
+  .btn-danger:hover { background-color: var(--btn-danger-hover-bg); }
+  .btn-cancel { background-color: var(--btn-cancel-bg); color: var(--btn-cancel-text); }
+  .btn-cancel:hover { background-color: var(--btn-cancel-hover-bg); }
+</style>

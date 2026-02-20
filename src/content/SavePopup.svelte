@@ -11,10 +11,17 @@
     <p>Are you Saving?</p>
     <div class="flex justify-end space-x-2 mt-4">
         <button
-        class="bg-blue-600 hover:bg-blue-800 font-bold py-2 px-4 rounded"
+        class="btn-confirm font-bold py-2 px-4 rounded"
         on:click={handleSave}>Yes</button>
         <button
-        class="bg-gray-600 hover:bg-gray-800 font-bold py-2 px-4 rounded"
+        class="btn-cancel font-bold py-2 px-4 rounded"
         on:click={closeSave}>No</button>
     </div>
 </Popup>
+
+<style>
+  .btn-confirm { background-color: var(--btn-confirm-bg); color: var(--btn-confirm-text); }
+  .btn-confirm:hover { background-color: var(--btn-confirm-hover-bg); }
+  .btn-cancel { background-color: var(--btn-cancel-bg); color: var(--btn-cancel-text); }
+  .btn-cancel:hover { background-color: var(--btn-cancel-hover-bg); }
+</style>

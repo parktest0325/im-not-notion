@@ -28,6 +28,7 @@ use commands::{
         list_plugins, install_plugin, uninstall_plugin,
         enable_plugin, disable_plugin, run_plugin,
         register_plugin_cron, unregister_plugin_cron,
+        pull_plugin, open_plugin_in_editor,
     },
 };
 
@@ -78,6 +79,8 @@ fn main() -> Result<()> {
             run_plugin,
             register_plugin_cron,
             unregister_plugin_cron,
+            pull_plugin,
+            open_plugin_in_editor,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
