@@ -26,11 +26,15 @@ pub enum Trigger {
     #[serde(rename = "hook")]
     Hook {
         event: HookEvent,
+        #[serde(default)]
+        priority: Option<u32>,
     },
     #[serde(rename = "cron")]
     Cron {
         schedule: String,
         label: String,
+        #[serde(default)]
+        priority: Option<u32>,
     },
 }
 
@@ -85,4 +89,6 @@ pub enum PluginAction {
     Toast { message: String, toast_type: String },
     #[serde(rename = "open_file")]
     OpenFile { path: String },
+    #[serde(rename = "show_result")]
+    ShowResult { title: String, body: String },
 }
