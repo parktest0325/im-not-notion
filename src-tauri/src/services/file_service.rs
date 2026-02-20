@@ -140,10 +140,12 @@ pub fn write_content(file_path: &str, data: &str) -> Result<()> {
     save_file(&sftp, Path::new(&content_path), data.to_string())
         .or_else(|_| save_file(&sftp, Path::new(&hidden_path), data.to_string()))?;
 
-    plugin_service::run_hooks(
+    if let Ok(results) = plugin_service::run_hooks(
         HookEvent::AfterFileSave,
         serde_json::json!({ "path": file_path }),
-    ).ok();
+    ) {
+        crate::emit_hook_actions(results);
+    }
 
     Ok(())
 }
@@ -182,10 +184,12 @@ pub fn create_content(file_path: &str) -> Result<String> {
         ),
     )?;
 
-    plugin_service::run_hooks(
+    if let Ok(results) = plugin_service::run_hooks(
         HookEvent::AfterFileCreate,
         serde_json::json!({ "path": &unique_path }),
-    ).ok();
+    ) {
+        crate::emit_hook_actions(results);
+    }
 
     Ok(unique_path)
 }
@@ -196,10 +200,15 @@ pub fn remove_content(path: &str) -> Result<()> {
     let targets = [hugo_config.content_abs(path), hugo_config.hidden_abs(path)];
     try_both(targets, |p| rmrf_file(&mut sftp, Path::new(&p)))?;
 
-    plugin_service::run_hooks(
+    // 이미지 디렉토리 정리
+    cleanup_images_on_delete(&mut sftp, &hugo_config, path).ok();
+
+    if let Ok(results) = plugin_service::run_hooks(
         HookEvent::AfterFileDelete,
         serde_json::json!({ "path": path }),
-    ).ok();
+    ) {
+        crate::emit_hook_actions(results);
+    }
 
     Ok(())
 }
@@ -218,10 +227,17 @@ pub fn move_content(src: &str, dst: &str) -> Result<()> {
     ];
     try_both(combos, |(s, d)| move_file(&sftp, Path::new(&s), Path::new(&d)))?;
 
-    plugin_service::run_hooks(
+    // 이미지 디렉토리 동기화 (상대경로가 다를 때만)
+    if src != dst {
+        sync_images_on_move(&sftp, &hugo_config, src, dst).ok();
+    }
+
+    if let Ok(results) = plugin_service::run_hooks(
         HookEvent::AfterFileMove,
         serde_json::json!({ "src": src, "dst": dst }),
-    ).ok();
+    ) {
+        crate::emit_hook_actions(results);
+    }
 
     Ok(())
 }
@@ -247,6 +263,105 @@ pub fn toggle_hidden(path: &str, state: bool) -> Result<()> {
 pub fn check_hidden(path: &str) -> Result<bool> {
     let (sftp, hugo_config) = sftp_and_config()?;
     Ok(sftp.stat(Path::new(&hugo_config.hidden_abs(path))).is_ok())
+}
+
+// ============================================================
+// 이미지 동기화
+// ============================================================
+
+/// 이미지 절대경로: {base_path}/{image_path}/{rel}
+fn image_abs(config: &HugoConfig, rel: &str) -> String {
+    format!("{}/{}/{}", config.base_path, config.image_path, rel.trim_start_matches('/'))
+}
+
+/// SFTP로 폴더 내 모든 .md 파일의 절대경로를 재귀 수집
+fn find_md_files_recursive(sftp: &Sftp, dir: &Path) -> Result<Vec<PathBuf>> {
+    let mut result = Vec::new();
+    let entries = match sftp.readdir(dir) {
+        Ok(e) => e,
+        Err(_) => return Ok(result),
+    };
+    for (child_path, stat) in entries {
+        if stat.is_dir() {
+            result.extend(find_md_files_recursive(sftp, &child_path)?);
+        } else if child_path.extension().and_then(|e| e.to_str()) == Some("md") {
+            result.push(child_path);
+        }
+    }
+    Ok(result)
+}
+
+/// md 파일 내 이미지 참조 경로를 치환 (old_prefix → new_prefix)
+/// content 또는 hidden 경로에서 파일을 찾아 읽기/쓰기
+fn update_image_refs_in_file(sftp: &Sftp, config: &HugoConfig, rel_path: &str, old_prefix: &str, new_prefix: &str) -> Result<()> {
+    let content_path = config.content_abs(rel_path);
+    let hidden_path = config.hidden_abs(rel_path);
+
+    let (abs_path, content) = get_file(sftp, Path::new(&content_path))
+        .map(|c| (content_path, c))
+        .or_else(|_| get_file(sftp, Path::new(&hidden_path)).map(|c| (hidden_path, c)))?;
+
+    let updated = content.replace(old_prefix, new_prefix);
+    if content != updated {
+        save_file(sftp, Path::new(&abs_path), updated)?;
+    }
+    Ok(())
+}
+
+/// 파일/폴더 이동 시 이미지 디렉토리 이동 + md 내 참조 업데이트
+fn sync_images_on_move(sftp: &Sftp, config: &HugoConfig, src: &str, dst: &str) -> Result<()> {
+    let src_img = image_abs(config, src);
+    let dst_img = image_abs(config, dst);
+
+    // 1. 이미지 디렉토리 이동 (존재하는 경우만)
+    if sftp.stat(Path::new(&src_img)).is_ok() {
+        move_file(sftp, Path::new(&src_img), Path::new(&dst_img))?;
+    }
+
+    // 2. md 파일 내 이미지 참조 경로 업데이트
+    let old_prefix = src.trim_start_matches('/');
+    let new_prefix = dst.trim_start_matches('/');
+
+    if dst.ends_with(".md") {
+        // 단일 파일 이동
+        let _ = update_image_refs_in_file(sftp, config, dst, old_prefix, new_prefix);
+    } else {
+        // 폴더 이동 — content 와 hidden 양쪽에서 md 파일 탐색
+        let content_dir = config.content_abs(dst);
+        let hidden_dir = config.hidden_abs(dst);
+
+        let mut md_files = find_md_files_recursive(sftp, Path::new(&content_dir))?;
+        md_files.extend(find_md_files_recursive(sftp, Path::new(&hidden_dir))?);
+
+        // 각 md 파일의 상대경로를 구해서 참조 업데이트
+        let content_base = config.content_abs("");
+        let hidden_base = config.hidden_abs("");
+
+        for abs_md in md_files {
+            let abs_str = abs_md.to_string_lossy();
+            let rel = if abs_str.starts_with(&content_base) {
+                abs_str.strip_prefix(&content_base).unwrap_or(&abs_str)
+            } else if abs_str.starts_with(&hidden_base) {
+                abs_str.strip_prefix(&hidden_base).unwrap_or(&abs_str)
+            } else {
+                continue;
+            };
+            let _ = update_image_refs_in_file(sftp, config, rel, old_prefix, new_prefix);
+        }
+    }
+
+    Ok(())
+}
+
+/// 파일/폴더 삭제 시 대응하는 이미지 디렉토리 삭제
+fn cleanup_images_on_delete(sftp: &mut Sftp, config: &HugoConfig, path: &str) -> Result<()> {
+    let img_dir = image_abs(config, path);
+
+    if sftp.stat(Path::new(&img_dir)).is_ok() {
+        rmrf_file(sftp, Path::new(&img_dir))?;
+    }
+
+    Ok(())
 }
 
 // ============================================================

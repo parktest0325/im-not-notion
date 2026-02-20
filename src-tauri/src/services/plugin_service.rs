@@ -245,6 +245,7 @@ pub fn execute_plugin(plugin_name: &str, input_json: &str) -> Result<PluginResul
     input["context"] = serde_json::json!({
         "base_path": hugo_config.base_path,
         "content_path": hugo_config.content_path,
+        "image_path": hugo_config.image_path,
     });
 
     // manifest에서 entry 읽기
@@ -268,45 +269,59 @@ pub fn execute_plugin(plugin_name: &str, input_json: &str) -> Result<PluginResul
     Ok(result)
 }
 
-/// Hook 이벤트에 등록된 **enabled** 플러그인만 실행
+/// Hook 이벤트에 등록된 **enabled** 플러그인만 priority 순으로 실행
 pub fn run_hooks(event: HookEvent, data: serde_json::Value) -> Result<Vec<PluginResult>> {
     let server_plugins = discover_server_plugins().unwrap_or_default();
     let hugo_config = get_hugo_config()?;
-    let mut results = Vec::new();
 
+    // 매칭되는 hook 수집: (priority, plugin_name, entry)
+    let mut matched: Vec<(u32, String, String)> = Vec::new();
     for (plugin, enabled, _hash) in &server_plugins {
         if !enabled { continue; }
 
         for trigger in &plugin.triggers {
-            if let Trigger::Hook { event: hook_event } = trigger {
+            if let Trigger::Hook { event: hook_event, priority } = trigger {
                 if hook_event == &event {
-                    let input = serde_json::json!({
-                        "trigger": "hook",
-                        "event": format!("{:?}", event),
-                        "data": data,
-                        "context": {
-                            "base_path": hugo_config.base_path,
-                            "content_path": hugo_config.content_path,
-                        }
-                    });
-
-                    let mut channel = get_channel_session()?;
-                    let cmd = format!(
-                        "printf '%s' '{}' | {}/{}/{}",
-                        serde_json::to_string(&input)?.replace('\'', "'\\''"),
-                        PLUGIN_DIR, plugin.name, plugin.entry
-                    );
-
-                    match execute_ssh_command(&mut channel, &cmd) {
-                        Ok(output) => {
-                            if let Ok(result) = serde_json::from_str::<PluginResult>(&output) {
-                                results.push(result);
-                            }
-                        }
-                        Err(e) => eprintln!("Hook plugin {} failed: {}", plugin.name, e),
-                    }
+                    matched.push((
+                        priority.unwrap_or(50),
+                        plugin.name.clone(),
+                        plugin.entry.clone(),
+                    ));
                 }
             }
+        }
+    }
+
+    // priority 오름차순, 동일 시 이름순
+    matched.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)));
+
+    let mut results = Vec::new();
+    for (_, name, entry) in &matched {
+        let input = serde_json::json!({
+            "trigger": "hook",
+            "event": format!("{:?}", event),
+            "data": data,
+            "context": {
+                "base_path": hugo_config.base_path,
+                "content_path": hugo_config.content_path,
+                "image_path": hugo_config.image_path,
+            }
+        });
+
+        let mut channel = get_channel_session()?;
+        let cmd = format!(
+            "printf '%s' '{}' | {}/{}/{}",
+            serde_json::to_string(&input)?.replace('\'', "'\\''"),
+            PLUGIN_DIR, name, entry
+        );
+
+        match execute_ssh_command(&mut channel, &cmd) {
+            Ok(output) => {
+                if let Ok(result) = serde_json::from_str::<PluginResult>(&output) {
+                    results.push(result);
+                }
+            }
+            Err(e) => eprintln!("Hook plugin {} failed: {}", name, e),
         }
     }
     Ok(results)

@@ -6,8 +6,21 @@ mod types;
 mod utils;
 mod services;
 
+use std::sync::OnceLock;
 use anyhow::Result;
+use tauri::Emitter;
 use tauri_plugin_shell::init as shell_init;
+
+static APP_HANDLE: OnceLock<tauri::AppHandle> = OnceLock::new();
+
+pub fn emit_hook_actions(results: Vec<types::plugin::PluginResult>) {
+    let Some(handle) = APP_HANDLE.get() else { return };
+    for result in results {
+        for action in result.actions {
+            let _ = handle.emit("plugin-hook-action", &action);
+        }
+    }
+}
 use commands::{
     file_command::{
         get_file_content, get_file_tree, move_file_or_folder,
@@ -35,7 +48,8 @@ use commands::{
 fn main() -> Result<()> {
     tauri::Builder::default()
         .plugin(shell_init())
-        .setup(|_app| {
+        .setup(|app| {
+            APP_HANDLE.set(app.handle().clone()).ok();
             // 앱 시작 시 설정 로드 (SSH 연결 포함)
             if let Err(e) = load_config() {
                 eprintln!("Failed to load config: {:?}", e);

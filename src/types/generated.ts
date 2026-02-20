@@ -59,10 +59,12 @@ export type Trigger =
 }}
 	| { type: "hook", content: {
 	event: HookEvent;
+	priority?: number;
 }}
 	| { type: "cron", content: {
 	schedule: string;
 	label: string;
+	priority?: number;
 }};
 
 /** 서버의 plugin.json 파싱 결과 */
@@ -91,6 +93,10 @@ export type PluginAction =
 }}
 	| { type: "open_file", content: {
 	path: string;
+}}
+	| { type: "show_result", content: {
+	title: string;
+	body: string;
 }};
 
 /** 스크립트 stdout JSON 파싱 결과 */

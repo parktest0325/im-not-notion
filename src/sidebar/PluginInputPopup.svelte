@@ -9,6 +9,7 @@
   export let inputFields: InputField[] = [];
   export let onClose: () => void;
   export let onRefreshTree: () => void;
+  export let onShowResult: (title: string, body: string) => void = () => {};
 
   let values: Record<string, string> = {};
   let isExecuting = false;
@@ -49,6 +50,8 @@
               action.content.message,
               action.content.toast_type === "success" ? "success" : "error"
             );
+          } else if (action.type === "show_result" && action.content) {
+            onShowResult(action.content.title, action.content.body);
           }
         }
       }

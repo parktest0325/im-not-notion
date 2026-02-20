@@ -2,10 +2,11 @@
   import { invoke } from "@tauri-apps/api/core";
   import Popup from "../component/Popup.svelte";
   import PluginInputPopup from "./PluginInputPopup.svelte";
+  import PluginResultPopup from "./PluginResultPopup.svelte";
   import { addToast, triggerPluginShortcut } from "../stores";
   import type { PluginInfo, InputField } from "../types/setting";
   import { registerAction, unregisterAction, pluginShortcutDefs, buildShortcutMap } from "../shortcut";
-  import { onDestroy } from "svelte";
+  import { onMount, onDestroy } from "svelte";
 
   export let show: boolean;
   export let closePlugin: () => void;
@@ -19,8 +20,16 @@
   let selectedPlugin: PluginInfo | null = null;
   let selectedInputFields: InputField[] = [];
 
+  // 결과 팝업 상태
+  let showResultPopup = false;
+  let resultTitle = "";
+  let resultBody = "";
+
   // 현재 등록된 플러그인 shortcut action ids (cleanup용)
   let registeredActionIds: string[] = [];
+
+  // 마운트 시 바로 플러그인 로드 → 숏컷 등록 (패널 열기 전에도 동작)
+  onMount(() => { loadPlugins(); });
 
   $: if (show) {
     loadPlugins();
@@ -190,6 +199,12 @@
       await invoke("get_file_tree");
     } catch (_) {}
   }
+
+  function handleShowResult(title: string, body: string) {
+    resultTitle = title;
+    resultBody = body;
+    showResultPopup = true;
+  }
 </script>
 
 <PluginInputPopup
@@ -198,6 +213,14 @@
   inputFields={selectedInputFields}
   onClose={() => { showInputPopup = false; }}
   onRefreshTree={handleRefreshTree}
+  onShowResult={handleShowResult}
+/>
+
+<PluginResultPopup
+  show={showResultPopup}
+  title={resultTitle}
+  body={resultBody}
+  onClose={() => { showResultPopup = false; }}
 />
 
 <Popup {show} {isLoading} closePopup={closePlugin}>
