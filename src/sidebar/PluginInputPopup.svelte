@@ -11,13 +11,17 @@
   export let onRefreshTree: () => void;
   export let onShowResult: (title: string, body: string) => void = () => {};
 
-  let values: Record<string, string> = {};
+  let values: Record<string, string | boolean> = {};
   let isExecuting = false;
 
   $: if (show && inputFields.length > 0) {
     values = {};
     for (const field of inputFields) {
-      values[field.name] = field.default ?? "";
+      if (field.type === "boolean") {
+        values[field.name] = field.default === "true";
+      } else {
+        values[field.name] = field.default ?? "";
+      }
     }
   }
 
@@ -27,7 +31,7 @@
     try {
       const inputJson = JSON.stringify({
         trigger: "manual",
-        input: values,
+        ...values,
       });
       const result: PluginResult = await invoke("run_plugin", {
         name: plugin.name,
@@ -74,15 +78,26 @@
     <div class="space-y-3">
       {#each inputFields as field}
         <div>
-          <label class="block text-sm mb-1" for={field.name}>{field.label}</label>
-          <input
-            id={field.name}
-            type="text"
-            class="w-full p-2 rounded border"
-            style="background-color: var(--input-bg-color); border-color: var(--border-color);"
-            bind:value={values[field.name]}
-            placeholder={field.default ?? ""}
-          />
+          {#if field.type === "boolean"}
+            <label class="flex items-center gap-2 text-sm cursor-pointer" for={field.name}>
+              <input
+                id={field.name}
+                type="checkbox"
+                bind:checked={values[field.name]}
+              />
+              {field.label}
+            </label>
+          {:else}
+            <label class="block text-sm mb-1" for={field.name}>{field.label}</label>
+            <input
+              id={field.name}
+              type="text"
+              class="w-full p-2 rounded border"
+              style="background-color: var(--input-bg-color); border-color: var(--border-color);"
+              bind:value={values[field.name]}
+              placeholder={field.default ?? ""}
+            />
+          {/if}
         </div>
       {/each}
     </div>
