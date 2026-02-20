@@ -58,8 +58,10 @@ pub struct InputField {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PluginInfo {
     pub manifest: PluginManifest,
+    pub local: bool,
     pub installed: bool,
     pub enabled: bool,
+    pub synced: bool,
 }
 
 /// 스크립트 stdout JSON 파싱 결과

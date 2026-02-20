@@ -42,3 +42,28 @@ pub fn register_plugin_cron(name: &str, schedule: &str, entry: &str) -> Result<(
 pub fn unregister_plugin_cron(name: &str) -> Result<(), InvokeError> {
     plugin_service::unregister_cron(name).into_invoke_err()
 }
+
+#[tauri::command]
+pub fn pull_plugin(local_path: &str, name: &str) -> Result<(), InvokeError> {
+    plugin_service::pull_plugin(local_path, name).into_invoke_err()
+}
+
+#[tauri::command]
+pub fn open_plugin_in_editor(local_path: &str, name: &str) -> Result<(), InvokeError> {
+    let dir = std::path::Path::new(local_path).join(name);
+    let dir_str = dir.to_string_lossy().to_string();
+    // Try VS Code first, fallback to system open
+    if std::process::Command::new("code").arg(&dir_str).spawn().is_ok() {
+        return Ok(());
+    }
+    #[cfg(target_os = "macos")]
+    std::process::Command::new("open").arg(&dir_str).spawn()
+        .map_err(|e| InvokeError::from(e.to_string()))?;
+    #[cfg(target_os = "windows")]
+    std::process::Command::new("explorer").arg(&dir_str).spawn()
+        .map_err(|e| InvokeError::from(e.to_string()))?;
+    #[cfg(target_os = "linux")]
+    std::process::Command::new("xdg-open").arg(&dir_str).spawn()
+        .map_err(|e| InvokeError::from(e.to_string()))?;
+    Ok(())
+}

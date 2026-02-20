@@ -77,8 +77,10 @@ export interface PluginManifest {
 /** 프론트엔드에 전달되는 플러그인 정보 (로컬+서버 병합) */
 export interface PluginInfo {
 	manifest: PluginManifest;
+	local: boolean;
 	installed: boolean;
 	enabled: boolean;
+	synced: boolean;
 }
 
 export type PluginAction = 
