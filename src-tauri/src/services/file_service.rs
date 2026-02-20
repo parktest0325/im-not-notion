@@ -139,8 +139,13 @@ pub fn write_content(file_path: &str, data: &str, manual: bool) -> Result<()> {
     let content_path = hugo_config.content_abs(file_path);
     let hidden_path = hugo_config.hidden_abs(file_path);
 
-    save_file(&sftp, Path::new(&content_path), data.to_string())
-        .or_else(|_| save_file(&sftp, Path::new(&hidden_path), data.to_string()))?;
+    // hidden 파일이면 hidden 경로에 저장, 아니면 content 경로에 저장
+    let save_path = if sftp.stat(Path::new(&hidden_path)).is_ok() {
+        hidden_path
+    } else {
+        content_path
+    };
+    save_file(&sftp, Path::new(&save_path), data.to_string())?;
 
     if manual {
         // 이미지 정합성 동기화 (외부 참조 복사 + 고아 삭제)
@@ -419,7 +424,9 @@ fn sync_images_on_save(sftp: &Sftp, config: &HugoConfig, file_path: &str, conten
             .file_name()
             .and_then(|f| f.to_str())
             .unwrap_or(ref_clean);
-        let new_ref = format!("{}{}", my_prefix, filename);
+        // 원본 참조가 /로 시작하면 새 참조도 /로 시작
+        let prefix = if img_ref.starts_with('/') { "/" } else { "" };
+        let new_ref = format!("{}{}{}", prefix, my_prefix, filename);
         let dst_abs = image_abs(config, &new_ref);
 
         copy_file(sftp, Path::new(&src_abs), Path::new(&dst_abs))?;
