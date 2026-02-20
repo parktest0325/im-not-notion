@@ -293,7 +293,7 @@ pub fn move_content(src: &str, dst: &str) -> Result<()> {
         }
 
         // === Phase 3: Update image refs ===
-        if let Err(e) = sync_images_on_move(&sftp, &hugo_config, src, dst, true) {
+        if let Err(e) = sync_images_on_move(&sftp, &hugo_config, src, dst, false) {
             // 롤백: 이미지 + content/hidden rename 되돌리기
             let src_img = image_abs(&hugo_config, src);
             let dst_img = image_abs(&hugo_config, dst);
