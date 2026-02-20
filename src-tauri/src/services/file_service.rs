@@ -132,7 +132,9 @@ pub fn read_content(file_path: &str) -> Result<String> {
 }
 
 /// 파일 내용 저장 (relativeFilePath 기반)
-pub fn write_content(file_path: &str, data: &str) -> Result<()> {
+/// manual=true: 수동 저장 → 이미지 sync + hooks 실행
+/// manual=false: 자동 저장 → 순수 저장만
+pub fn write_content(file_path: &str, data: &str, manual: bool) -> Result<()> {
     let (sftp, hugo_config) = sftp_and_config()?;
     let content_path = hugo_config.content_abs(file_path);
     let hidden_path = hugo_config.hidden_abs(file_path);
@@ -140,11 +142,16 @@ pub fn write_content(file_path: &str, data: &str) -> Result<()> {
     save_file(&sftp, Path::new(&content_path), data.to_string())
         .or_else(|_| save_file(&sftp, Path::new(&hidden_path), data.to_string()))?;
 
-    if let Ok(results) = plugin_service::run_hooks(
-        HookEvent::AfterFileSave,
-        serde_json::json!({ "path": file_path }),
-    ) {
-        crate::emit_hook_actions(results);
+    if manual {
+        // 이미지 정합성 동기화 (외부 참조 복사 + 고아 삭제)
+        sync_images_on_save(&sftp, &hugo_config, file_path, data).ok();
+
+        if let Ok(results) = plugin_service::run_hooks(
+            HookEvent::AfterFileSave,
+            serde_json::json!({ "path": file_path }),
+        ) {
+            crate::emit_hook_actions(results);
+        }
     }
 
     Ok(())
@@ -347,6 +354,118 @@ fn sync_images_on_move(sftp: &Sftp, config: &HugoConfig, src: &str, dst: &str) -
                 continue;
             };
             let _ = update_image_refs_in_file(sftp, config, rel, old_prefix, new_prefix);
+        }
+    }
+
+    Ok(())
+}
+
+/// md 내 로컬 이미지 참조 경로 추출 (외부 URL 제외)
+fn parse_image_refs(content: &str) -> Vec<String> {
+    let re = regex::Regex::new(r"!\[[^\]]*\]\(([^)]+)\)").unwrap();
+    re.captures_iter(content)
+        .filter_map(|cap| {
+            let path = cap[1].trim();
+            if path.starts_with("http://") || path.starts_with("https://") {
+                None
+            } else {
+                Some(path.to_string())
+            }
+        })
+        .collect()
+}
+
+/// SFTP로 파일 복사 (read → write)
+fn copy_file(sftp: &Sftp, src: &Path, dst: &Path) -> Result<()> {
+    let mut src_file = sftp.open(src)?;
+    let mut data = Vec::new();
+    src_file.read_to_end(&mut data)?;
+
+    if let Some(parent) = dst.parent() {
+        mkdir_recursive(sftp, parent)?;
+    }
+    let mut dst_file = sftp.create(dst)?;
+    dst_file.write_all(&data)?;
+    Ok(())
+}
+
+/// 저장 시 이미지 정합성 동기화:
+/// 1. 외부 이미지 참조 → 내 디렉토리로 복사 + 참조 수정
+/// 2. 고아 이미지 삭제 (디렉토리에 있지만 참조 안 되는 파일)
+fn sync_images_on_save(sftp: &Sftp, config: &HugoConfig, file_path: &str, content: &str) -> Result<()> {
+    if !file_path.ends_with(".md") {
+        return Ok(());
+    }
+
+    let rel = file_path.trim_start_matches('/');
+    let my_prefix = format!("{}/", rel);
+    let my_image_dir = image_abs(config, rel);
+
+    let refs = parse_image_refs(content);
+    let mut updated_content = content.to_string();
+    let mut modified = false;
+
+    // 1. 외부 이미지 참조 → 내 디렉토리로 복사
+    for img_ref in &refs {
+        let ref_clean = img_ref.trim_start_matches('/');
+        if ref_clean.starts_with(&my_prefix) {
+            continue; // 이미 내 디렉토리의 이미지
+        }
+        let src_abs = image_abs(config, ref_clean);
+        if sftp.stat(Path::new(&src_abs)).is_err() {
+            continue; // 원본 파일이 없으면 스킵
+        }
+        let filename = Path::new(ref_clean)
+            .file_name()
+            .and_then(|f| f.to_str())
+            .unwrap_or(ref_clean);
+        let new_ref = format!("{}{}", my_prefix, filename);
+        let dst_abs = image_abs(config, &new_ref);
+
+        copy_file(sftp, Path::new(&src_abs), Path::new(&dst_abs))?;
+        updated_content = updated_content.replace(img_ref, &new_ref);
+        modified = true;
+    }
+
+    // 수정된 내용 저장
+    if modified {
+        let content_path = config.content_abs(file_path);
+        let hidden_path = config.hidden_abs(file_path);
+        save_file(sftp, Path::new(&content_path), updated_content.clone())
+            .or_else(|_| save_file(sftp, Path::new(&hidden_path), updated_content.clone()))?;
+    }
+
+    // 2. 고아 이미지 삭제
+    let final_content = if modified { &updated_content } else { content };
+    let final_refs: std::collections::HashSet<String> = parse_image_refs(final_content)
+        .iter()
+        .map(|r| {
+            let clean = r.trim_start_matches('/');
+            Path::new(clean)
+                .file_name()
+                .and_then(|f| f.to_str())
+                .unwrap_or(clean)
+                .to_string()
+        })
+        .collect();
+
+    if let Ok(entries) = sftp.readdir(Path::new(&my_image_dir)) {
+        for (child_path, stat) in entries {
+            if stat.is_dir() { continue; }
+            let filename = child_path
+                .file_name()
+                .and_then(|f| f.to_str())
+                .unwrap_or("")
+                .to_string();
+            if !final_refs.contains(&filename) {
+                let _ = sftp.unlink(&child_path);
+            }
+        }
+        // 디렉토리가 비었으면 삭제
+        if let Ok(remaining) = sftp.readdir(Path::new(&my_image_dir)) {
+            if remaining.is_empty() {
+                let _ = sftp.rmdir(Path::new(&my_image_dir));
+            }
         }
     }
 

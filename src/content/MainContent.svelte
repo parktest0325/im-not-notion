@@ -81,7 +81,7 @@
     }
   }
 
-  async function saveContent() {
+  async function saveContent(manual: boolean = false) {
     if (!isContentChanged) {
       return;
     }
@@ -89,6 +89,7 @@
       await invoke("save_file_content", {
         filePath: $relativeFilePath,
         fileData: fileContent,
+        manual,
       });
       isContentChanged = false;
       isConnected.set(true);
@@ -167,7 +168,7 @@
     editable = true;
   }}
   handleSave={async () => {
-    await saveContent();
+    await saveContent(true);
     addToast("File saved.", "success");
     editable = false;
     showDialog = false;
