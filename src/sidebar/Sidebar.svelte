@@ -77,5 +77,6 @@
   }
   .theme-btn:hover {
     background-color: var(--button-hover-bg-color);
+    border-color: var(--hover-border-color);
   }
 </style>

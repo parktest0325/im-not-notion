@@ -218,9 +218,8 @@
     <div class="space-y-3 max-h-80 overflow-y-auto">
       {#each shortcutEntries as entry}
         <div class="shortcut-row">
-          <div class="shortcut-label">
+          <div class="shortcut-label" title="{entry.description} ({entry.id})">
             <span class="font-medium text-sm">{entry.description}</span>
-            <span class="text-xs opacity-40 ml-1">({entry.id})</span>
           </div>
           <div class="shortcut-keys">
             {#each entry.shortcuts as key, i}
@@ -296,18 +295,21 @@
     padding: 0.5rem;
     border-radius: 0.375rem;
     background-color: var(--sidebar-bg-color);
+    gap: 0.5rem;
   }
 
   .shortcut-label {
-    flex-shrink: 0;
-    margin-right: 0.5rem;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .shortcut-keys {
     display: flex;
     align-items: center;
     gap: 0.25rem;
-    flex-wrap: wrap;
+    flex-shrink: 0;
   }
 
   .shortcut-badge {
@@ -320,6 +322,7 @@
     cursor: pointer;
     border: 1px solid transparent;
     transition: border-color 0.15s;
+    box-shadow: none;
   }
 
   .shortcut-badge:hover {
@@ -345,6 +348,7 @@
     padding: 0 0.125rem;
     border: none;
     background: none;
+    box-shadow: none;
   }
 
   .shortcut-remove:hover {
@@ -360,6 +364,7 @@
     cursor: pointer;
     border: 1px dashed var(--border-color);
     background: none;
+    box-shadow: none;
   }
 
   .shortcut-add:hover {
@@ -374,6 +379,7 @@
     cursor: pointer;
     border: none;
     background: none;
+    box-shadow: none;
     text-decoration: underline;
   }
 

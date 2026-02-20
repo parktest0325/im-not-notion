@@ -25,6 +25,7 @@
 <style>
   .popup-overlay {
     background-color: var(--overlay-bg-color);
+    z-index: 1000;
   }
 
   .popup-content {
