@@ -237,21 +237,18 @@ pub fn remove_content(path: &str) -> Result<()> {
     Ok(())
 }
 
-/// 파일/폴더 이동 (copy-then-delete 트랜잭션 방식)
-/// 1. dst에 복사 (content/hidden + 이미지)
-/// 2. 참조 업데이트 (자기 참조 + 외부 참조)
-/// 3. 전부 성공 시 src 삭제
-/// 4. 실패 시 dst 복사본 정리, src 원본 유지
+/// 파일/폴더 이동 (rename + 실패 시 rollback)
+/// 1. content/hidden rename
+/// 2. 이미지 디렉토리 rename → 실패 시 1 되돌리기
+/// 3. 참조 업데이트 → 실패 시 2,1 되돌리기
 pub fn move_content(src: &str, dst: &str) -> Result<()> {
-    let (mut sftp, hugo_config) = sftp_and_config()?;
+    let (sftp, hugo_config) = sftp_and_config()?;
 
     if path_exists(&sftp, &hugo_config, dst) {
         bail!("Destination already exists: {}", dst);
     }
 
-    // === Phase 1: Copy content to dst ===
-    let mut copied_paths: Vec<String> = Vec::new();
-
+    // === Phase 1: Rename content/hidden ===
     let content_src = hugo_config.content_abs(src);
     let content_dst = hugo_config.content_abs(dst);
     let hidden_src = hugo_config.hidden_abs(src);
@@ -264,58 +261,52 @@ pub fn move_content(src: &str, dst: &str) -> Result<()> {
         bail!("Source does not exist: {}", src);
     }
 
-    // content 복사
     if content_exists {
-        if let Err(e) = copy_file_or_dir(&sftp, Path::new(&content_src), Path::new(&content_dst)) {
-            return Err(anyhow::anyhow!("Failed to copy content: {}", e));
-        }
-        copied_paths.push(content_dst.clone());
+        move_file(&sftp, Path::new(&content_src), Path::new(&content_dst))?;
     }
-
-    // hidden 복사
     if hidden_exists {
-        if let Err(e) = copy_file_or_dir(&sftp, Path::new(&hidden_src), Path::new(&hidden_dst)) {
-            // 롤백: content 복사본 정리
-            for p in &copied_paths { rmrf_file(&mut sftp, Path::new(p)).ok(); }
-            return Err(anyhow::anyhow!("Failed to copy hidden: {}", e));
+        if let Err(e) = move_file(&sftp, Path::new(&hidden_src), Path::new(&hidden_dst)) {
+            // 롤백: content rename 되돌리기
+            if content_exists {
+                move_file(&sftp, Path::new(&content_dst), Path::new(&content_src)).ok();
+            }
+            return Err(anyhow::anyhow!("Failed to move hidden: {}", e));
         }
-        copied_paths.push(hidden_dst.clone());
     }
 
-    // === Phase 2: Copy image directory ===
+    // === Phase 2: Rename image directory ===
     if src != dst {
         let src_img = image_abs(&hugo_config, src);
         let dst_img = image_abs(&hugo_config, dst);
-        let img_exists = sftp.stat(Path::new(&src_img)).is_ok();
 
-        if img_exists {
-            if let Err(e) = copy_file_or_dir(&sftp, Path::new(&src_img), Path::new(&dst_img)) {
-                // 롤백: content/hidden 복사본 정리
-                for p in &copied_paths { rmrf_file(&mut sftp, Path::new(p)).ok(); }
-                return Err(anyhow::anyhow!("Failed to copy images: {}", e));
+        if sftp.stat(Path::new(&src_img)).is_ok() {
+            if let Err(e) = move_file(&sftp, Path::new(&src_img), Path::new(&dst_img)) {
+                // 롤백: content/hidden rename 되돌리기
+                if hidden_exists {
+                    move_file(&sftp, Path::new(&hidden_dst), Path::new(&hidden_src)).ok();
+                }
+                if content_exists {
+                    move_file(&sftp, Path::new(&content_dst), Path::new(&content_src)).ok();
+                }
+                return Err(anyhow::anyhow!("Failed to move images: {}", e));
             }
-            copied_paths.push(dst_img);
         }
 
         // === Phase 3: Update image refs ===
-        if let Err(e) = sync_images_on_move(&sftp, &hugo_config, src, dst) {
-            // 롤백: 모든 복사본 정리
-            for p in &copied_paths { rmrf_file(&mut sftp, Path::new(p)).ok(); }
+        if let Err(e) = sync_images_on_move(&sftp, &hugo_config, src, dst, true) {
+            // 롤백: 이미지 + content/hidden rename 되돌리기
+            let src_img = image_abs(&hugo_config, src);
+            let dst_img = image_abs(&hugo_config, dst);
+            if sftp.stat(Path::new(&dst_img)).is_ok() {
+                move_file(&sftp, Path::new(&dst_img), Path::new(&src_img)).ok();
+            }
+            if hidden_exists {
+                move_file(&sftp, Path::new(&hidden_dst), Path::new(&hidden_src)).ok();
+            }
+            if content_exists {
+                move_file(&sftp, Path::new(&content_dst), Path::new(&content_src)).ok();
+            }
             return Err(anyhow::anyhow!("Failed to update refs: {}", e));
-        }
-    }
-
-    // === Phase 4: Delete originals (commit) ===
-    if content_exists {
-        rmrf_file(&mut sftp, Path::new(&content_src)).ok();
-    }
-    if hidden_exists {
-        rmrf_file(&mut sftp, Path::new(&hidden_src)).ok();
-    }
-    if src != dst {
-        let src_img = image_abs(&hugo_config, src);
-        if sftp.stat(Path::new(&src_img)).is_ok() {
-            rmrf_file(&mut sftp, Path::new(&src_img)).ok();
         }
     }
 
@@ -393,7 +384,7 @@ fn update_image_refs_in_file(sftp: &Sftp, config: &HugoConfig, rel_path: &str, o
     let re = regex::Regex::new(r"(!\[[^\]]*\]\()([^)]+)(\))").unwrap();
     let updated = re.replace_all(&content, |caps: &regex::Captures| {
         let prefix = &caps[1]; // ![alt](
-        let path = caps[2].replace(old_prefix, new_prefix);
+        let path = caps[2].replacen(old_prefix, new_prefix, 1);
         let suffix = &caps[3]; // )
         format!("{}{}{}", prefix, path, suffix)
     }).to_string();
@@ -404,24 +395,35 @@ fn update_image_refs_in_file(sftp: &Sftp, config: &HugoConfig, rel_path: &str, o
     Ok(())
 }
 
-/// 파일/폴더 이동 시 모든 이미지 참조 업데이트
-/// 1. 이동된 파일/폴더 내부의 자기 참조 업데이트
-/// 2. 다른 모든 md 파일에서 이전 경로를 참조하는 외부 참조 업데이트
-fn sync_images_on_move(sftp: &Sftp, config: &HugoConfig, src: &str, dst: &str) -> Result<()> {
+/// 파일/폴더 이동 시 이미지 참조 업데이트
+/// scan_all=false: 이동된 파일/폴더 내부의 자기 참조만 업데이트
+/// scan_all=true: 전체 md 스캔하여 외부 참조도 업데이트
+fn sync_images_on_move(sftp: &Sftp, config: &HugoConfig, src: &str, dst: &str, scan_all: bool) -> Result<()> {
     let old_prefix = src.trim_start_matches('/');
     let new_prefix = dst.trim_start_matches('/');
-
-    // 전체 content + hidden 에서 모든 md 파일을 스캔하여 old_prefix → new_prefix 치환
-    let content_root = config.content_abs("");
-    let hidden_root = config.hidden_abs("");
-
-    let mut all_md_files = find_md_files_recursive(sftp, Path::new(&content_root))?;
-    all_md_files.extend(find_md_files_recursive(sftp, Path::new(&hidden_root))?);
 
     let content_base = config.content_abs("");
     let hidden_base = config.hidden_abs("");
 
-    for abs_md in all_md_files {
+    let md_files = if scan_all {
+        // 전체 content + hidden 스캔
+        let mut files = find_md_files_recursive(sftp, Path::new(&content_base))?;
+        files.extend(find_md_files_recursive(sftp, Path::new(&hidden_base))?);
+        files
+    } else if dst.ends_with(".md") {
+        // 단일 파일 — 이동된 파일만
+        let _ = update_image_refs_in_file(sftp, config, dst, old_prefix, new_prefix);
+        return Ok(());
+    } else {
+        // 폴더 이동 — 폴더 내부만
+        let content_dir = config.content_abs(dst);
+        let hidden_dir = config.hidden_abs(dst);
+        let mut files = find_md_files_recursive(sftp, Path::new(&content_dir))?;
+        files.extend(find_md_files_recursive(sftp, Path::new(&hidden_dir))?);
+        files
+    };
+
+    for abs_md in md_files {
         let abs_str = abs_md.to_string_lossy();
         let rel = if abs_str.starts_with(&content_base) {
             abs_str.strip_prefix(&content_base).unwrap_or(&abs_str)
@@ -465,36 +467,6 @@ fn copy_file(sftp: &Sftp, src: &Path, dst: &Path) -> Result<()> {
     Ok(())
 }
 
-/// SFTP로 디렉토리 재귀 복사
-fn copy_dir_recursive(sftp: &Sftp, src: &Path, dst: &Path) -> Result<()> {
-    mkdir_recursive(sftp, dst)?;
-    for (child_path, stat) in sftp.readdir(src)? {
-        let child_name = child_path.file_name()
-            .ok_or_else(|| anyhow::anyhow!("Invalid child path"))?;
-        let dst_child = dst.join(child_name);
-        if stat.is_dir() {
-            copy_dir_recursive(sftp, &child_path, &dst_child)?;
-        } else {
-            copy_file(sftp, &child_path, &dst_child)?;
-        }
-    }
-    Ok(())
-}
-
-/// SFTP로 파일 또는 디렉토리를 복사 (존재하는 경우만)
-fn copy_file_or_dir(sftp: &Sftp, src: &Path, dst: &Path) -> Result<()> {
-    match sftp.stat(src) {
-        Ok(stat) => {
-            if stat.is_dir() {
-                copy_dir_recursive(sftp, src, dst)
-            } else {
-                copy_file(sftp, src, dst)
-            }
-        }
-        Err(_) => Ok(()), // 소스가 없으면 스킵
-    }
-}
-
 /// 저장 시 이미지 정합성 동기화:
 /// 1. 외부 이미지 참조 → 내 디렉토리로 복사 + 참조 수정
 /// 2. 고아 이미지 삭제 (디렉토리에 있지만 참조 안 되는 파일)
@@ -531,7 +503,9 @@ fn sync_images_on_save(sftp: &Sftp, config: &HugoConfig, file_path: &str, conten
         let dst_abs = image_abs(config, &new_ref);
 
         copy_file(sftp, Path::new(&src_abs), Path::new(&dst_abs))?;
-        updated_content = updated_content.replace(img_ref, &new_ref);
+        let escaped = regex::escape(img_ref);
+        let re = regex::Regex::new(&format!(r"(!\[[^\]]*\]\(){}(\))", escaped)).unwrap();
+        updated_content = re.replace_all(&updated_content, format!("${{1}}{}${{2}}", new_ref)).to_string();
         modified = true;
     }
 
