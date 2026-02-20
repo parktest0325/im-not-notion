@@ -246,6 +246,7 @@ pub fn execute_plugin(plugin_name: &str, input_json: &str) -> Result<PluginResul
         "base_path": hugo_config.base_path,
         "content_path": hugo_config.content_path,
         "image_path": hugo_config.image_path,
+        "hidden_path": hugo_config.hidden_path,
     });
 
     // manifest에서 entry 읽기
@@ -305,6 +306,7 @@ pub fn run_hooks(event: HookEvent, data: serde_json::Value) -> Result<Vec<Plugin
                 "base_path": hugo_config.base_path,
                 "content_path": hugo_config.content_path,
                 "image_path": hugo_config.image_path,
+                "hidden_path": hugo_config.hidden_path,
             }
         });
 
