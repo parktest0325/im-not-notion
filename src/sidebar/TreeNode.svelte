@@ -291,18 +291,19 @@
     {#if showDeleteConfirmation}
         <div
             transition:slide={{ duration: 300 }}
-            class="mt-2 bg-gray-800 text-white p-3 rounded-md border-2 border-red-500"
+            class="mt-2 p-3 rounded-md border-2"
+            style="background-color: var(--confirm-box-bg); color: var(--confirm-box-text); border-color: var(--confirm-box-border);"
         >
             <p class="text-sm">Are you sure you want to delete this item?</p>
             <div class="flex justify-end space-x-2 mt-2">
                 <button
-                    class="px-4 py-1 bg-red-500 text-white rounded hover:bg-red-700 focus:outline-none focus:ring focus:ring-red-300"
+                    class="px-4 py-1 rounded btn-danger focus:outline-none"
                     on:click={() => proceedDelete(true)}
                 >
                     Yes
                 </button>
                 <button
-                    class="px-4 py-1 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 focus:outline-none focus:ring focus:ring-gray-300"
+                    class="px-4 py-1 rounded btn-cancel focus:outline-none"
                     on:click={() => proceedDelete(false)}
                 >
                     No
@@ -334,5 +335,19 @@
     }
     .text-hidden {
         color: var(--reverse-third-color);
+    }
+    .btn-danger {
+        background-color: var(--btn-danger-bg);
+        color: var(--btn-danger-text);
+    }
+    .btn-danger:hover {
+        background-color: var(--btn-danger-hover-bg);
+    }
+    .btn-cancel {
+        background-color: var(--btn-cancel-bg);
+        color: var(--btn-cancel-text);
+    }
+    .btn-cancel:hover {
+        background-color: var(--btn-cancel-hover-bg);
     }
 </style>

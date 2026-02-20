@@ -9,6 +9,7 @@
   import Toast from "./component/Toast.svelte";
   import { handleShortcutEvent, buildShortcutMap, registerAction } from "./shortcut";
   import { selectedCursor, isEditingFileName, isEditingContent, renamingPath } from "./stores";
+  import "./theme"; // Initialize theme on app startup
 
   let isMenuOpen: boolean = true;
 

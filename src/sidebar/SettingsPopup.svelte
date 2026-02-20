@@ -327,8 +327,8 @@
   }
 
   .shortcut-badge.recording {
-    border-color: #3b82f6;
-    background-color: #1e3a5f;
+    border-color: var(--recording-border);
+    background-color: var(--recording-bg);
     animation: pulse 1s infinite;
     cursor: default;
   }
@@ -349,7 +349,7 @@
 
   .shortcut-remove:hover {
     opacity: 1;
-    color: #ef4444;
+    color: var(--shortcut-remove-hover);
   }
 
   .shortcut-add {

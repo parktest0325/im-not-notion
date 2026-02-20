@@ -79,6 +79,18 @@
                 <TreeNode {node} />
             {/each}
         </ul>
-        <button class="w-full mt-2 border-1 border-blue-800 bg-blue-900 hover:border-blue-200 hover:bg-blue-800" on:click={createFolder}>+</button>
+        <button class="w-full mt-2 btn-create" on:click={createFolder}>+</button>
     </div>
 </div>
+
+<style>
+    .btn-create {
+        background-color: var(--btn-create-bg);
+        border-color: var(--btn-create-border);
+    }
+    .btn-create:hover {
+        background-color: var(--btn-create-hover-bg);
+        border-color: var(--btn-create-hover-border);
+        color: #ffffff;
+    }
+</style>

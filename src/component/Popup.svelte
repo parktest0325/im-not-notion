@@ -32,7 +32,7 @@
     color: var(--popup-text-color);
     padding: 1.5rem;
     border-radius: 0.5rem;
-    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.25);
+    box-shadow: var(--shadow-popup);
     width: 100%;
     max-width: 32rem;
     display: flex;

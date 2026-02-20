@@ -235,10 +235,10 @@
             </div>
             <div class="flex gap-1">
               {#if p.local}
-                <span class="text-xs px-1.5 py-0.5 rounded bg-purple-800 text-purple-200">local</span>
+                <span class="text-xs px-1.5 py-0.5 rounded" style="background-color: var(--badge-local-bg); color: var(--badge-local-text);">local</span>
               {/if}
               {#if p.installed}
-                <span class="text-xs px-1.5 py-0.5 rounded bg-green-800 text-green-200">server</span>
+                <span class="text-xs px-1.5 py-0.5 rounded" style="background-color: var(--badge-server-bg); color: var(--badge-server-text);">server</span>
               {/if}
             </div>
           </div>
@@ -260,14 +260,15 @@
                   title={p.enabled ? "Disable" : "Enable"}
                   on:click={() => toggleEnabled(p.manifest.name, !p.enabled)}
                 ><span class="toggle-dot"></span></button>
-                <button class="text-xs px-2 py-1 rounded bg-red-900 text-red-200"
+                <button class="text-xs px-2 py-1 rounded"
+                  style="background-color: var(--btn-danger-bg); color: var(--btn-danger-text);"
                   on:click={() => uninstallPlugin(p.manifest.name)}>Uninstall</button>
               {/if}
             </div>
             <div class="flex gap-1 items-center">
               {#if p.local && p.installed && !p.synced}
                 <span class="sync-warn" title="Out of sync">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--sync-warn-color)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
                   </svg>
                 </span>
@@ -365,7 +366,7 @@
     transition: border-color 0.2s;
   }
   .plugin-card.plugin-active {
-    border-color: #22c55e;
+    border-color: var(--active-border-color);
   }
 
   .icon-btn {
@@ -391,13 +392,13 @@
     height: 18px;
     border-radius: 9px;
     border: none;
-    background-color: #4b5563;
+    background-color: var(--toggle-off-bg);
     cursor: pointer;
     padding: 0;
     transition: background-color 0.2s;
   }
   .toggle-btn.toggle-on {
-    background-color: #22c55e;
+    background-color: var(--toggle-on-bg);
   }
   .toggle-dot {
     position: absolute;
