@@ -1,15 +1,26 @@
 <script context="module" lang="ts">
     import { invoke } from "@tauri-apps/api/core";
+    import { writable } from "svelte/store";
+    import { isConnected, addToast } from "../stores";
+    import type { FileSystemNode } from "../types/setting";
 
     let directoryStructure = writable<FileSystemNode[]>([]);
     export async function refreshList() {
         try {
             const data: FileSystemNode = await invoke("get_file_tree");
             directoryStructure.set(data.children);
-            isConnected.set(true); // 파일 리스트를 정상적으로 가져온 경우
+            isConnected.set(true);
         } catch (error) {
             console.error("Failed to update file list:", error);
-            isConnected.set(false); // 파일 리스트를 가져오지 못한 경우
+            directoryStructure.set([]);
+            // SSH 연결 상태는 실제 연결로 판단
+            const connected: boolean = await invoke("check_connection");
+            isConnected.set(connected);
+            if (!connected) {
+                addToast("SSH connection lost.");
+            } else {
+                addToast("Failed to load file list.");
+            }
         }
     }
 </script>
@@ -17,12 +28,10 @@
 <script lang="ts">
     import FaSearch from "svelte-icons/fa/FaSearch.svelte";
     import IoMdRefresh from "svelte-icons/io/IoMdRefresh.svelte";
-    import { writable } from "svelte/store";
     import TreeNode from "./TreeNode.svelte";
     import { setContext, onMount } from "svelte";
-    import { selectedCursor, relativeFilePath, isConnected, addToast } from "../stores";
+    import { selectedCursor, relativeFilePath } from "../stores";
     import { GLOBAL_FUNCTIONS } from "../context";
-    import type { FileSystemNode } from "../types/setting";
 
     let searchTerm: string = "";
 

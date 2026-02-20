@@ -8,7 +8,8 @@ use std::time::Duration;
 #[tauri::command]
 pub fn start_pty_cmd(cols: u32, rows: u32, on_event: Channel<String>) -> Result<(), InvokeError> {
     let config = get_app_config().into_invoke_err()?;
-    let ssh = &config.ssh_config;
+    let ssh = config.get_active_ssh_config()
+        .ok_or_else(|| InvokeError::from("No active server SSH config".to_string()))?;
     pty_service::start_pty(&ssh.host, &ssh.port, &ssh.username, &ssh.password, cols, rows)
         .into_invoke_err()?;
 

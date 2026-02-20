@@ -15,3 +15,15 @@ pub fn load_config() -> Result<AppConfig, InvokeError> {
 pub fn save_config(config: AppConfig) -> Result<(), InvokeError> {
     save_app_config(config).into_invoke_err()
 }
+
+/// SSH 연결 상태 확인
+#[command]
+pub fn check_connection() -> bool {
+    crate::services::ssh_service::is_ssh_connected()
+}
+
+/// 서버 전환: servers 목록 반영 → active_server 변경 → 재연결 → 서버 설정 로드
+#[command]
+pub fn switch_server(servers: Vec<crate::types::config::ServerEntry>, server_id: String) -> Result<AppConfig, InvokeError> {
+    crate::services::config_service::switch_server(servers, server_id).into_invoke_err()
+}

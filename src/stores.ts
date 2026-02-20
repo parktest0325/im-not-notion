@@ -4,6 +4,7 @@ import { writable } from 'svelte/store';
 export const relativeFilePath = writable<string>("");
 export const selectedCursor = writable<string>("");
 export const isConnected = writable(false);
+export const activeServerName = writable<string>("");
 export const url = writable<string>("");
 export const contentPath = writable<string>("");
 export const hiddenPath = writable<string>("");

@@ -9,6 +9,13 @@ export interface SshConfig {
 	password: string;
 }
 
+/** 서버 항목: ID + 이름 + SSH 설정 */
+export interface ServerEntry {
+	id: string;
+	name: string;
+	ssh_config: SshConfig;
+}
+
 export interface HugoConfig {
 	url: string;
 	hugo_cmd_path: string;
@@ -27,7 +34,8 @@ export interface CmsConfig {
  * 실제 저장은 ClientConfig(로컬)와 ServerConfig(서버)로 분리됨
  */
 export interface AppConfig {
-	ssh_config: SshConfig;
+	active_server: string;
+	servers?: ServerEntry[];
 	cms_config: CmsConfig;
 	shortcuts?: Record<string, string[]>;
 }

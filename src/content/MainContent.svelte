@@ -61,8 +61,14 @@
       isConnected.set(true);
     } catch (error) {
       console.error("Failed to get file content", error);
-      fileContent = "Failed to load file.";
-      isConnected.set(false);
+      fileContent = "";
+      const connected: boolean = await invoke("check_connection");
+      isConnected.set(connected);
+      if (!connected) {
+        addToast("SSH connection lost.");
+      } else {
+        addToast("Failed to load file.");
+      }
     }
   }
 
@@ -96,8 +102,13 @@
       return syncOk;
     } catch (error) {
       console.error("Failed to save content:", error);
-      isConnected.set(false);
-      addToast("Failed to save file.");
+      const connected: boolean = await invoke("check_connection");
+      isConnected.set(connected);
+      if (!connected) {
+        addToast("SSH connection lost.");
+      } else {
+        addToast("Failed to save file.");
+      }
       return false;
     }
   }

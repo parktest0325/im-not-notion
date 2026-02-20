@@ -7,6 +7,7 @@ export type {
     HugoConfig,
     CmsConfig,
     AppConfig,
+    ServerEntry,
     FileSystemNode,
     PrerequisiteResult,
     PluginManifest,
@@ -19,10 +20,10 @@ export type {
 
 export { NodeType, HookEvent } from "./generated";
 
-import type { SshConfig, HugoConfig, CmsConfig, AppConfig } from "./generated";
+import type { SshConfig, HugoConfig, CmsConfig, AppConfig, ServerEntry } from "./generated";
 
 // 기본값이 포함된 객체 생성 함수
-function createDefaultSshConfig(): SshConfig {
+export function createDefaultSshConfig(): SshConfig {
     return { host: "", port: "", username: "", password: "" };
 }
 
@@ -35,5 +36,9 @@ function createDefaultCmsConfig(): CmsConfig {
 }
 
 export function createDefaultAppConfig(): AppConfig {
-    return { ssh_config: createDefaultSshConfig(), cms_config: createDefaultCmsConfig() };
+    return { active_server: "", servers: [], cms_config: createDefaultCmsConfig() };
+}
+
+export function createDefaultServerEntry(): ServerEntry {
+    return { id: "", name: "", ssh_config: createDefaultSshConfig() };
 }

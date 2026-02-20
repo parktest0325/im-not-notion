@@ -1,15 +1,15 @@
 use ssh2::{Session, Channel, Sftp};
 use std::{net::{TcpStream, ToSocketAddrs}, sync::Mutex, io::Read, time::Duration};
 use anyhow::{Result, Context};
-use crate::types::config::AppConfig;
+use crate::types::config::SshConfig;
 use once_cell::sync::Lazy;
 
 const TCP_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 
 static SSH_CLIENT: Lazy<Mutex<Option<Session>>> = Lazy::new(|| Mutex::new(None));
 
-/// Connect SSH. If `force` is false, reuses existing live session.
-pub fn connect_ssh_inner(config: &AppConfig, force: bool) -> Result<()> {
+/// SshConfig를 직접 받아 SSH 연결
+fn connect_inner(ssh_config: &SshConfig, force: bool) -> Result<()> {
     if !force {
         let client = SSH_CLIENT.lock().unwrap();
         if let Some(ref session) = *client {
@@ -23,7 +23,7 @@ pub fn connect_ssh_inner(config: &AppConfig, force: bool) -> Result<()> {
     }
 
     let mut session = Session::new().context("Failed to create SSH session")?;
-    let addr = format!("{}:{}", config.ssh_config.host, config.ssh_config.port);
+    let addr = format!("{}:{}", ssh_config.host, ssh_config.port);
     let sock_addr = addr.to_socket_addrs()
         .context("Failed to resolve SSH address")?
         .next()
@@ -33,18 +33,10 @@ pub fn connect_ssh_inner(config: &AppConfig, force: bool) -> Result<()> {
     session.set_tcp_stream(tcp);
     session.handshake().context("Failed to perform SSH handshake")?;
 
-    if !config.ssh_config.password.is_empty() {
-        session.userauth_password(&config.ssh_config.username, &config.ssh_config.password)
+    if !ssh_config.password.is_empty() {
+        session.userauth_password(&ssh_config.username, &ssh_config.password)
             .context("Failed to authenticate with password")?;
     }
-    // else {
-    //     session.userauth_pubkey_file(
-    //         &config.ssh_config.username,
-    //         None,
-    //         Path::new(&config.ssh_config.key_path),
-    //         None,
-    //     ).context("Failed to authenticate with public key")?;
-    // }
 
     let mut ssh_client = SSH_CLIENT.lock().unwrap();
     *ssh_client = Some(session);
@@ -52,14 +44,25 @@ pub fn connect_ssh_inner(config: &AppConfig, force: bool) -> Result<()> {
     Ok(())
 }
 
-/// Connect SSH, reusing existing session if alive
-pub fn connect_ssh(config: &AppConfig) -> Result<()> {
-    connect_ssh_inner(config, false)
+/// SshConfig를 직접 받아 연결 (기존 세션 재사용)
+pub fn connect_ssh_with_config(ssh_config: &SshConfig) -> Result<()> {
+    connect_inner(ssh_config, false)
 }
 
-/// Force reconnect SSH (used when credentials may have changed)
-pub fn reconnect_ssh(config: &AppConfig) -> Result<()> {
-    connect_ssh_inner(config, true)
+/// SshConfig를 직접 받아 강제 재연결
+pub fn reconnect_ssh_with_config(ssh_config: &SshConfig) -> Result<()> {
+    connect_inner(ssh_config, true)
+}
+
+
+/// SSH 세션이 살아있는지 확인
+pub fn is_ssh_connected() -> bool {
+    let client = SSH_CLIENT.lock().unwrap();
+    if let Some(ref session) = *client {
+        session.authenticated() && session.channel_session().is_ok()
+    } else {
+        false
+    }
 }
 
 pub fn get_channel_session() -> Result<Channel> {

@@ -141,6 +141,11 @@
       config.cms_config.hugo_config.base_path = sitePath;
       config.cms_config.hugo_config.content_path = "posts";
       config.cms_config.hugo_config.image_path = "static";
+      // URL 자동 세팅: https:// + SSH host
+      const activeServer = config.servers.find(s => s.id === config.active_server);
+      if (activeServer?.ssh_config?.host) {
+        config.cms_config.hugo_config.url = `https://${activeServer.ssh_config.host}`;
+      }
       config = config;
       updateStep(4, "done", "Config fields populated");
 

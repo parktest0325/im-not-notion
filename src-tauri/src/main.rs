@@ -27,7 +27,7 @@ use commands::{
         new_content_for_hugo, remove_file, save_file_content, save_file_image,
         toggle_hidden_file, check_file_hidden,
     },
-    config_command::{load_config, save_config},
+    config_command::{load_config, save_config, switch_server, check_connection},
     ssh_command::{kill_server, start_server, execute_ssh},
     setup_command::{
         check_prerequisites_cmd, check_hugo_installed_cmd,
@@ -59,6 +59,8 @@ fn main() -> Result<()> {
         .invoke_handler(tauri::generate_handler![
             load_config,
             save_config,
+            switch_server,
+            check_connection,
             get_file_tree,
             get_file_content,
             save_file_content,

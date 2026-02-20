@@ -1,25 +1,35 @@
 use std::{path::Path, sync::Mutex};
 use anyhow::{Result, Context};
 use once_cell::sync::Lazy;
-use crate::services::ssh_service::{connect_ssh, reconnect_ssh, get_sftp_session, get_server_home_path};
+use crate::services::ssh_service::{connect_ssh_with_config, reconnect_ssh_with_config, get_sftp_session, get_server_home_path};
 use crate::services::file_service::move_file;
-use crate::types::config::{cms_config::HugoConfig, AppConfig};
+use crate::types::config::{cms_config::HugoConfig, AppConfig, ClientConfig, CmsConfig};
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
+use std::collections::HashMap;
 
 static APP_CONFIG: Lazy<Mutex<Option<AppConfig>>> = Lazy::new(|| Mutex::new(None));
 
 /// 설정 로드: 로컬 파일 → SSH 연결 시도 → 서버 설정 병합
 pub fn load_app_config() -> Result<AppConfig> {
     // 1. 로컬 파일에서 읽기 (없으면 기본값)
-    let mut config = AppConfig::load_client_only().unwrap_or_default();
+    let client = ClientConfig::load_from_file().unwrap_or_default();
 
-    // 2. SSH 설정이 있으면 연결 시도
-    if config.has_ssh_config() {
-        if let Ok(()) = connect_ssh(&config) {
-            // 3. 연결 성공하면 서버 설정 로드
-            let sftp = get_sftp_session()?;
-            let home_path = get_server_home_path()?;
-            config.load_server_config(&sftp, &home_path)?;
+    let mut config = AppConfig {
+        active_server: client.active_server.clone(),
+        servers: client.servers.clone(),
+        cms_config: CmsConfig::default(),
+        shortcuts: HashMap::new(),
+    };
+
+    // 2. active server의 SSH 설정으로 연결 시도
+    if let Some(ssh_config) = client.get_active_ssh_config() {
+        if !ssh_config.host.is_empty() {
+            if let Ok(()) = connect_ssh_with_config(&ssh_config) {
+                // 3. 연결 성공하면 서버 설정 로드
+                let sftp = get_sftp_session()?;
+                let home_path = get_server_home_path()?;
+                config.load_server_config(&sftp, &home_path)?;
+            }
         }
     }
 
@@ -31,28 +41,55 @@ pub fn load_app_config() -> Result<AppConfig> {
 
 /// 설정 저장: 로컬 저장 → SSH 연결 → 서버 저장 (비어있지 않으면)
 pub fn save_app_config(mut new_config: AppConfig) -> Result<()> {
-    // 1. 로컬에 먼저 저장 (SSH 설정)
+    // 1. 로컬에 먼저 저장
     new_config.save_client_config()?;
 
-    // 2. SSH 연결 (설정 변경됐을 수 있으므로 강제 재연결)
-    reconnect_ssh(&new_config)?;
+    // 2. active server로 SSH 연결 (설정 변경됐을 수 있으므로 강제 재연결)
+    if let Some(ssh_config) = new_config.get_active_ssh_config() {
+        reconnect_ssh_with_config(&ssh_config)?;
 
-    // 3. 서버 설정이 비어있지 않으면 저장
-    if !new_config.cms_config.hugo_config.is_empty() {
-        // hidden_path 처리
-        new_config.cms_config.hugo_config.hidden_path
-            = set_hidden_path(new_config.cms_config.hugo_config.hidden_path.trim())?;
+        // 3. 서버 설정이 비어있지 않으면 저장
+        if !new_config.cms_config.hugo_config.is_empty() {
+            // hidden_path 처리
+            new_config.cms_config.hugo_config.hidden_path
+                = set_hidden_path(new_config.cms_config.hugo_config.hidden_path.trim())?;
 
-        // 서버에 저장
-        let sftp = get_sftp_session()?;
-        let home_path = get_server_home_path()?;
-        new_config.save_server_config(&sftp, &home_path)?;
+            // 서버에 저장
+            let sftp = get_sftp_session()?;
+            let home_path = get_server_home_path()?;
+            new_config.save_server_config(&sftp, &home_path)?;
+        }
     }
 
     // 4. 메모리에 저장
     *APP_CONFIG.lock().unwrap() = Some(new_config);
 
     Ok(())
+}
+
+/// 서버 전환: servers 목록 업데이트 → active_server 변경 → 재연결 → 서버 설정 로드
+/// servers를 함께 받아서 UI에서 새로 추가/수정한 서버 목록을 반영
+pub fn switch_server(servers: Vec<crate::types::config::ServerEntry>, server_id: String) -> Result<AppConfig> {
+    let mut config = get_app_config()?;
+    config.servers = servers;
+    config.active_server = server_id;
+
+    // cms_config 초기화 (새 서버의 설정을 로드할 것이므로)
+    config.cms_config = CmsConfig::default();
+    config.shortcuts = HashMap::new();
+
+    // 새 서버로 SSH 연결
+    if let Some(ssh_config) = config.get_active_ssh_config() {
+        reconnect_ssh_with_config(&ssh_config)?;
+        let sftp = get_sftp_session()?;
+        let home_path = get_server_home_path()?;
+        config.load_server_config(&sftp, &home_path)?;
+    }
+
+    // 로컬에 저장 (서버 목록 + active_server)
+    config.save_client_config()?;
+    *APP_CONFIG.lock().unwrap() = Some(config.clone());
+    Ok(config)
 }
 
 pub fn get_app_config() -> Result<AppConfig> {
@@ -91,8 +128,6 @@ pub fn set_hidden_path(new_hidden_path: &str) -> Result<String> {
     };
 
     if old_hidden_path.is_empty() || old_hidden_path == final_hidden {
-        // 이미 같은 경로 or
-        // 이전 설정이 없는경우에도 move를 안해도됨. hidden 파일이 없다는 뜻이니까
         return Ok(final_hidden);
     }
 
