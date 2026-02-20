@@ -81,22 +81,24 @@
     }
   }
 
-  async function saveContent(manual: boolean = false) {
+  async function saveContent(manual: boolean = false): Promise<boolean> {
     if (!isContentChanged) {
-      return;
+      return true;
     }
     try {
-      await invoke("save_file_content", {
+      const syncOk = await invoke<boolean>("save_file_content", {
         filePath: $relativeFilePath,
         fileData: fileContent,
         manual,
       });
       isContentChanged = false;
       isConnected.set(true);
+      return syncOk;
     } catch (error) {
       console.error("Failed to save content:", error);
       isConnected.set(false);
       addToast("Failed to save file.");
+      return false;
     }
   }
 
@@ -168,10 +170,15 @@
     editable = true;
   }}
   handleSave={async () => {
-    await saveContent(true);
-    addToast("File saved.", "success");
-    editable = false;
+    const syncOk = await saveContent(true);
     showDialog = false;
+    if (syncOk) {
+      await getFileContent($relativeFilePath);
+      addToast("File saved.", "success");
+      editable = false;
+    } else {
+      addToast("File saved, but image sync failed.", "warning");
+    }
   }}
 />
 

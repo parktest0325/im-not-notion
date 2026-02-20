@@ -13,7 +13,7 @@ pub fn get_file_content(file_path: &str) -> Result<String, InvokeError> {
 }
 
 #[tauri::command]
-pub fn save_file_content(file_path: &str, file_data: &str, manual: bool) -> Result<(), InvokeError> {
+pub fn save_file_content(file_path: &str, file_data: &str, manual: bool) -> Result<bool, InvokeError> {
     file_service::write_content(file_path, file_data, manual).into_invoke_err()
 }
 

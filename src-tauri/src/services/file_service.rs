@@ -134,7 +134,8 @@ pub fn read_content(file_path: &str) -> Result<String> {
 /// 파일 내용 저장 (relativeFilePath 기반)
 /// manual=true: 수동 저장 → 이미지 sync + hooks 실행
 /// manual=false: 자동 저장 → 순수 저장만
-pub fn write_content(file_path: &str, data: &str, manual: bool) -> Result<()> {
+/// 반환값: sync 성공 여부 (true=전부 성공, false=저장은 됐지만 sync 실패)
+pub fn write_content(file_path: &str, data: &str, manual: bool) -> Result<bool> {
     let (sftp, hugo_config) = sftp_and_config()?;
     let content_path = hugo_config.content_abs(file_path);
     let hidden_path = hugo_config.hidden_abs(file_path);
@@ -149,7 +150,18 @@ pub fn write_content(file_path: &str, data: &str, manual: bool) -> Result<()> {
 
     if manual {
         // 이미지 정합성 동기화 (외부 참조 복사 + 고아 삭제)
-        sync_images_on_save(&sftp, &hugo_config, file_path, data).ok();
+        if let Err(e) = sync_images_on_save(&sftp, &hugo_config, file_path, data) {
+            crate::emit_hook_actions(vec![crate::types::plugin::PluginResult {
+                success: false,
+                message: Some(format!("Image sync failed: {}", e)),
+                error: None,
+                actions: vec![crate::types::plugin::PluginAction::Toast {
+                    message: format!("Image sync failed: {}", e),
+                    toast_type: "warning".to_string(),
+                }],
+            }]);
+            return Ok(false);
+        }
 
         if let Ok(results) = plugin_service::run_hooks(
             HookEvent::AfterFileSave,
@@ -159,7 +171,7 @@ pub fn write_content(file_path: &str, data: &str, manual: bool) -> Result<()> {
         }
     }
 
-    Ok(())
+    Ok(true)
 }
 
 /// 이미지 저장
@@ -367,8 +379,8 @@ fn find_md_files_recursive(sftp: &Sftp, dir: &Path) -> Result<Vec<PathBuf>> {
     Ok(result)
 }
 
-/// md 파일 내 이미지 참조 경로를 치환 (old_prefix → new_prefix)
-/// content 또는 hidden 경로에서 파일을 찾아 읽기/쓰기
+/// md 파일 내 이미지 참조 경로만 치환 (old_prefix → new_prefix)
+/// ![...](...) 패턴 안에서만 치환하여 본문 텍스트나 일반 링크는 건드리지 않음
 fn update_image_refs_in_file(sftp: &Sftp, config: &HugoConfig, rel_path: &str, old_prefix: &str, new_prefix: &str) -> Result<()> {
     let content_path = config.content_abs(rel_path);
     let hidden_path = config.hidden_abs(rel_path);
@@ -377,7 +389,15 @@ fn update_image_refs_in_file(sftp: &Sftp, config: &HugoConfig, rel_path: &str, o
         .map(|c| (content_path, c))
         .or_else(|_| get_file(sftp, Path::new(&hidden_path)).map(|c| (hidden_path, c)))?;
 
-    let updated = content.replace(old_prefix, new_prefix);
+    // ![alt](path) 패턴을 찾아 path 부분에서만 old_prefix → new_prefix 치환
+    let re = regex::Regex::new(r"(!\[[^\]]*\]\()([^)]+)(\))").unwrap();
+    let updated = re.replace_all(&content, |caps: &regex::Captures| {
+        let prefix = &caps[1]; // ![alt](
+        let path = caps[2].replace(old_prefix, new_prefix);
+        let suffix = &caps[3]; // )
+        format!("{}{}{}", prefix, path, suffix)
+    }).to_string();
+
     if content != updated {
         save_file(sftp, Path::new(&abs_path), updated)?;
     }
