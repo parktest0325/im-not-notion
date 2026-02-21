@@ -119,6 +119,119 @@ echo '/usr/sbin/sshd' >> ~/.bashrc
 
 ---
 
+## 5. 필수 패키지 설치
+
+im-not-notion이 서버에서 사용하는 도구들입니다. 앱의 Hugo 설치 마법사가 `curl`, `tar`, `git` 존재 여부를 자동 체크합니다.
+
+```bash
+# Debian / Ubuntu
+apt update && apt install -y curl tar git cron python3
+
+# CentOS / RHEL / Fedora
+dnf install -y curl tar git cronie python3
+```
+
+| 패키지 | 용도 | 필수 여부 |
+|--------|------|-----------|
+| **curl** | Hugo 다운로드, GitHub API 호출 | 필수 (앱 체크) |
+| **tar** | Hugo 압축 해제 | 필수 (앱 체크) |
+| **git** | 사이트 초기화, 테마 설치, 플러그인 push/pull | 필수 (앱 체크) |
+| **cron** | 플러그인 예약 실행 (auto-push, backup 등) | 플러그인 cron 사용 시 |
+| **python3** | Python 플러그인 실행 | 플러그인 사용 시 |
+
+### 플러그인별 추가 패키지
+
+일부 플러그인은 Python 패키지가 필요합니다:
+
+```bash
+# web-clipper 플러그인
+pip3 install --user requests html2text
+
+# ai-draft 플러그인
+pip3 install --user openai
+# + 환경변수: export OPENAI_API_KEY="sk-..."
+```
+
+---
+
+## 6. cron 서비스 설정
+
+플러그인의 예약 실행(auto-push, backup 등)에 cron이 필요합니다.
+
+```bash
+# 설치 확인
+which crontab
+
+# 서비스 시작
+systemctl enable --now cron    # systemd 환경
+# 또는
+service cron start             # Docker 등 non-systemd 환경
+```
+
+### Docker 환경
+
+Docker에서는 cron이 자동 시작되지 않습니다. root `.bashrc`에 추가:
+
+```bash
+echo 'pgrep -x cron > /dev/null || /usr/sbin/cron -P' >> ~/.bashrc
+```
+
+> sshd도 같은 패턴을 권장합니다:
+> ```bash
+> pgrep -x sshd > /dev/null || /usr/sbin/sshd
+> ```
+
+---
+
+## 7. SSH 키 설정 (Git Push용)
+
+플러그인(git-autopush 등)이 서버에서 `git push`를 하려면 SSH 키가 필요합니다.
+
+```bash
+# 서버에서 (일반 유저로)
+ssh-keygen -t ed25519 -C "inn-autopush-plugin"
+
+# 공개 키 확인
+cat ~/.ssh/id_ed25519.pub
+```
+
+이 공개 키를 Git 호스팅에 등록:
+- **GitHub**: Settings > SSH and GPG keys > New SSH key
+- **GitLab**: Preferences > SSH Keys
+
+등록 후 연결 테스트:
+```bash
+ssh -T git@github.com
+```
+
+---
+
+## 8. 서버 디렉토리 구조
+
+앱 사용 시 자동 생성되는 디렉토리/파일:
+
+```
+~/
+├── .inn_server_config.json    # 서버 설정 (앱이 자동 생성)
+├── .inn_plugins/              # 설치된 플러그인
+│   └── plugin-name/
+│       ├── plugin.json
+│       ├── main.py
+│       └── .disabled          # 비활성화 마커 (있으면 비활성)
+├── .local/bin/
+│   └── hugo                   # Hugo 바이너리 (앱 설치 마법사로 설치)
+├── .ssh/
+│   ├── id_ed25519             # SSH 키 (git push용)
+│   └── id_ed25519.pub
+├── inn_backups/               # blog-backup 플러그인 백업 위치
+└── [hugo-site]/               # Hugo 사이트 루트
+    ├── content/
+    ├── static/
+    └── themes/
+```
+
+---
+
 ## 완료
 
 이제 im-not-notion에서 아래 정보만 입력하면 됩니다:

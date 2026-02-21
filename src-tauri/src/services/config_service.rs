@@ -19,6 +19,7 @@ pub fn load_app_config() -> Result<AppConfig> {
         servers: client.servers.clone(),
         cms_config: CmsConfig::default(),
         shortcuts: HashMap::new(),
+        plugin_local_path: client.plugin_local_path.clone(),
     };
 
     // 2. active server의 SSH 설정으로 연결 시도
@@ -90,6 +91,16 @@ pub fn switch_server(servers: Vec<crate::types::config::ServerEntry>, server_id:
     config.save_client_config()?;
     *APP_CONFIG.lock().unwrap() = Some(config.clone());
     Ok(config)
+}
+
+/// 플러그인 로컬 경로만 저장 (ClientConfig만 업데이트, SSH 재연결 없음)
+pub fn save_plugin_local_path(path: String) -> Result<()> {
+    let mut guard = APP_CONFIG.lock().unwrap();
+    if let Some(ref mut config) = *guard {
+        config.plugin_local_path = path;
+        config.save_client_config()?;
+    }
+    Ok(())
 }
 
 pub fn get_app_config() -> Result<AppConfig> {

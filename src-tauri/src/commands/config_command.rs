@@ -1,6 +1,6 @@
 use tauri::command;
 use tauri::ipc::InvokeError;
-use crate::services::config_service::{load_app_config, save_app_config};
+use crate::services::config_service::{load_app_config, save_app_config, save_plugin_local_path as save_plugin_path};
 use crate::types::config::AppConfig;
 use crate::utils::IntoInvokeError;
 
@@ -14,6 +14,12 @@ pub fn load_config() -> Result<AppConfig, InvokeError> {
 #[command]
 pub fn save_config(config: AppConfig) -> Result<(), InvokeError> {
     save_app_config(config).into_invoke_err()
+}
+
+/// 플러그인 로컬 경로 저장 (ClientConfig만 업데이트)
+#[command]
+pub fn save_plugin_local_path(path: String) -> Result<(), InvokeError> {
+    save_plugin_path(path).into_invoke_err()
 }
 
 /// SSH 연결 상태 확인

@@ -38,6 +38,7 @@ export interface AppConfig {
 	servers?: ServerEntry[];
 	cms_config: CmsConfig;
 	shortcuts?: Record<string, string[]>;
+	plugin_local_path?: string;
 }
 
 export interface DownloadItem {

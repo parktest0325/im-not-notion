@@ -19,6 +19,8 @@ pub struct AppConfig {
     pub cms_config: CmsConfig,
     #[serde(default)]
     pub shortcuts: HashMap<String, Vec<String>>,
+    #[serde(default)]
+    pub plugin_local_path: String,
 }
 
 impl AppConfig {
@@ -31,7 +33,7 @@ impl AppConfig {
 
     /// AppConfig를 ClientConfig로 분리
     pub fn to_client_config(&self) -> ClientConfig {
-        ClientConfig::new(self.active_server.clone(), self.servers.clone())
+        ClientConfig::new(self.active_server.clone(), self.servers.clone(), self.plugin_local_path.clone())
     }
 
     /// AppConfig를 ServerConfig로 분리

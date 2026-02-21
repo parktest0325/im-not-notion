@@ -38,7 +38,4 @@ let toastId = 0;
 export function addToast(message: string, type: ToastItem["type"] = "error") {
   const id = ++toastId;
   toasts.update(t => [...t, { id, message, type }]);
-  setTimeout(() => {
-    toasts.update(t => t.filter(item => item.id !== id));
-  }, 3000);
 }

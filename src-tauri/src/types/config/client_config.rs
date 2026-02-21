@@ -15,6 +15,8 @@ pub struct ClientConfig {
     pub active_server: String,
     #[serde(default)]
     pub servers: Vec<ServerEntry>,
+    #[serde(default)]
+    pub plugin_local_path: String,
 
     // 하위호환: 기존 단일 ssh_config → 마이그레이션용 (저장 시 제외)
     #[serde(default, skip_serializing)]
@@ -22,10 +24,11 @@ pub struct ClientConfig {
 }
 
 impl ClientConfig {
-    pub fn new(active_server: String, servers: Vec<ServerEntry>) -> Self {
+    pub fn new(active_server: String, servers: Vec<ServerEntry>, plugin_local_path: String) -> Self {
         ClientConfig {
             active_server,
             servers,
+            plugin_local_path,
             ssh_config: SshConfig::default(),
         }
     }
@@ -86,6 +89,7 @@ impl ClientConfig {
                     ssh_config: s.ssh_config.prepare_for_save().unwrap_or_default(),
                 }
             }).collect(),
+            plugin_local_path: self.plugin_local_path.clone(),
             ssh_config: SshConfig::default(),
         };
 

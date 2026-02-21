@@ -5,7 +5,7 @@
   import PluginResultPopup from "./PluginResultPopup.svelte";
   import PluginDownloadPopup from "./PluginDownloadPopup.svelte";
   import { addToast, triggerPluginShortcut } from "../stores";
-  import type { PluginInfo, InputField, DownloadItem } from "../types/setting";
+  import type { PluginInfo, InputField, DownloadItem, AppConfig } from "../types/setting";
   import { registerAction, unregisterAction, pluginShortcutDefs, buildShortcutMap } from "../shortcut";
   import { onMount, onDestroy } from "svelte";
 
@@ -39,8 +39,16 @@
   // 현재 등록된 플러그인 shortcut action ids (cleanup용)
   let registeredActionIds: string[] = [];
 
-  // 마운트 시 바로 플러그인 로드 → 숏컷 등록 (패널 열기 전에도 동작)
-  onMount(() => { loadPlugins(); });
+  // 마운트 시 저장된 경로 복원 → 플러그인 로드 → 숏컷 등록
+  onMount(async () => {
+    try {
+      const config: AppConfig = await invoke("load_config");
+      if (config.plugin_local_path) {
+        localPath = config.plugin_local_path;
+      }
+    } catch (_) {}
+    loadPlugins();
+  });
 
   $: if (show) {
     loadPlugins();
@@ -100,6 +108,10 @@
     pluginShortcutDefs.set(defs);
     // Rebuild shortcut map (uses cached client overrides + new plugin defs)
     buildShortcutMap();
+  }
+
+  function saveLocalPath() {
+    invoke("save_plugin_local_path", { path: localPath }).catch(() => {});
   }
 
   async function loadPlugins() {
@@ -275,12 +287,12 @@
       style="background-color: var(--input-bg-color); border: 1px solid var(--border-color);"
       bind:value={localPath}
       placeholder="/path/to/local/plugins"
-      on:change={loadPlugins}
+      on:change={() => { saveLocalPath(); loadPlugins(); }}
     />
     <button
       class="px-3 py-2 rounded text-sm"
       style="background-color: var(--button-active-bg-color);"
-      on:click={loadPlugins}
+      on:click={() => { saveLocalPath(); loadPlugins(); }}
     >Scan</button>
   </div>
 

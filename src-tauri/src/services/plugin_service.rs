@@ -7,7 +7,7 @@ use crate::services::config_service::get_hugo_config;
 use crate::services::file_service::{mkdir_recursive, rmrf_file};
 use crate::types::plugin::*;
 
-const PLUGIN_DIR: &str = "~/.inn_plugins";
+const PLUGIN_DIR: &str = "$HOME/.inn_plugins";
 
 /// ~ 를 실제 홈 경로로 치환
 fn resolve_plugin_dir() -> Result<String> {
@@ -346,14 +346,30 @@ fn check_crontab_available() -> Result<()> {
 pub fn register_cron(plugin_name: &str, schedule: &str, entry: &str, label: &str) -> Result<()> {
     check_crontab_available()?;
     let mut channel = get_channel_session()?;
+
+    // entry 확장자에 따라 인터프리터 전체 경로 탐색
+    let run_cmd = if entry.ends_with(".py") {
+        let python_path = execute_ssh_command(
+            &mut channel, "which python3 2>/dev/null || which python 2>/dev/null"
+        )?.trim().to_string();
+        if python_path.is_empty() {
+            bail!("python3 not found on the server");
+        }
+        // get_channel_session은 매번 새 채널 필요
+        channel = get_channel_session()?;
+        format!("{} {}", python_path, entry)
+    } else {
+        format!("./{}", entry)
+    };
+
     let marker = format!("inn-plugin:{}:{}", plugin_name, label);
     let job = format!(
-        "{} cd {}/{} && ./{} '{}' # {}",
-        schedule, PLUGIN_DIR, plugin_name, entry, label, marker
+        "{} cd {}/{} && {} # {}",
+        schedule, PLUGIN_DIR, plugin_name, run_cmd, marker
     );
     let cmd = format!(
-        "(crontab -l 2>/dev/null | grep -v '{}'; echo '{}') | crontab -",
-        marker, job
+        "(crontab -l 2>/dev/null | grep -v '{marker}'; echo '{job}') | crontab -",
+        marker = marker, job = job
     );
     execute_ssh_command(&mut channel, &cmd)?;
     Ok(())
