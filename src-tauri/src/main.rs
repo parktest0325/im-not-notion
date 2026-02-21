@@ -56,19 +56,22 @@ fn main() -> Result<()> {
             APP_HANDLE.set(app.handle().clone()).ok();
 
             // macOS: Edit 메뉴가 있어야 Cmd+C/V/X/A가 WebView에 전달됨
-            let edit_menu = SubmenuBuilder::new(app, "Edit")
-                .undo()
-                .redo()
-                .separator()
-                .cut()
-                .copy()
-                .paste()
-                .select_all()
-                .build()?;
-            let menu = MenuBuilder::new(app)
-                .item(&edit_menu)
-                .build()?;
-            app.set_menu(menu)?;
+            #[cfg(target_os = "macos")]
+            {
+                let edit_menu = SubmenuBuilder::new(app, "Edit")
+                    .undo()
+                    .redo()
+                    .separator()
+                    .cut()
+                    .copy()
+                    .paste()
+                    .select_all()
+                    .build()?;
+                let menu = MenuBuilder::new(app)
+                    .item(&edit_menu)
+                    .build()?;
+                app.set_menu(menu)?;
+            }
 
             // 앱 시작 시 설정 로드 (SSH 연결 포함)
             if let Err(e) = load_config() {
