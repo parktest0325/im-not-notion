@@ -28,6 +28,7 @@
   let isSetupRunning = false;
   let isSwitching = false;
   let isConnected = true;
+  let deletingServerId: string | null = null;
 
   // Shortcuts state
   let shortcutEntries: Array<{ id: string; description: string; shortcuts: string[] }> = [];
@@ -215,14 +216,20 @@
     editingServer = null;
   }
 
-  function deleteServer(id: string) {
-    if (!config.servers) return;
-    config.servers = config.servers.filter(s => s.id !== id);
-    if (config.active_server === id) {
-      config.active_server = config.servers.length > 0 ? config.servers[0].id : "";
+  function confirmDeleteServer(id: string) {
+    deletingServerId = id;
+  }
+
+  function proceedDeleteServer(confirmed: boolean) {
+    if (confirmed && deletingServerId) {
+      if (!config.servers) return;
+      config.servers = config.servers.filter(s => s.id !== deletingServerId);
+      if (config.active_server === deletingServerId) {
+        config.active_server = config.servers.length > 0 ? config.servers[0].id : "";
+      }
+      invoke("save_config", { config }).catch(() => {});
     }
-    // 즉시 로컬 저장
-    invoke("save_config", { config }).catch(() => {});
+    deletingServerId = null;
   }
 
   // ── Shortcuts ──
@@ -346,7 +353,7 @@
                   <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
                 </svg>
               </button>
-              <button class="server-action-btn delete" on:click={() => deleteServer(server.id)} title="Delete">
+              <button class="server-action-btn delete" on:click={() => confirmDeleteServer(server.id)} title="Delete">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <polyline points="3 6 5 6 21 6"/>
                   <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
@@ -354,6 +361,15 @@
               </button>
             </div>
           </div>
+          {#if deletingServerId === server.id}
+            <div class="confirm-box">
+              <p class="text-sm">Delete this server?</p>
+              <div class="flex justify-end gap-2 mt-2">
+                <button class="px-3 py-1 rounded text-xs btn-danger" on:click={() => proceedDeleteServer(true)}>Delete</button>
+                <button class="px-3 py-1 rounded text-xs btn-cancel" on:click={() => proceedDeleteServer(false)}>Cancel</button>
+              </div>
+            </div>
+          {/if}
         </div>
       {/each}
 
@@ -465,6 +481,20 @@
   .server-card.server-disconnected {
     border-color: var(--error-color);
   }
+
+  .confirm-box {
+    margin-top: 0.5rem;
+    padding: 0.75rem;
+    border-radius: 0.375rem;
+    border: 1px solid var(--confirm-box-border);
+    background-color: var(--confirm-box-bg);
+    color: var(--confirm-box-text);
+  }
+
+  .btn-danger { background-color: var(--btn-danger-bg); color: var(--btn-danger-text); }
+  .btn-danger:hover { background-color: var(--btn-danger-hover-bg); }
+  .btn-cancel { background-color: var(--btn-cancel-bg); color: var(--btn-cancel-text); }
+  .btn-cancel:hover { background-color: var(--btn-cancel-hover-bg); }
 
   .server-action-btn.reconnect {
     color: var(--error-color);
