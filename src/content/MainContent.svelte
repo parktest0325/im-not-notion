@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { isConnected, relativeFilePath, isEditingContent, addToast } from "../stores";
+  import { isConnected, relativeFilePath, selectedCursor, isEditingContent, addToast } from "../stores";
   import { invoke } from "@tauri-apps/api/core";
   import { v4 as uuidv4 } from "uuid";
   import { tick, onMount, onDestroy } from "svelte";
-  import { writable } from "svelte/store";
+  import { writable, get } from "svelte/store";
   import SavePopup from "./SavePopup.svelte";
   import { registerAction, unregisterAction } from "../shortcut";
 
@@ -25,6 +25,13 @@
   let autoSaveEnabled = writable(true);
   let autoSaveInterval = 1000 * 5;
   let autoSaveTimer: number | null = null;
+
+  // Unsaved changes dialog
+  let currentFilePath: string = "";
+  let showUnsavedDialog: boolean = false;
+  let unsavedAction: "exit" | "switch" | null = null;
+  let unsavedSwitchPath: string | null = null;
+  let unsavedSwitchCursor: string | null = null;
 
   // CodeMirror
   let view: EditorView | null = null;
@@ -137,8 +144,7 @@
           { key: "Mod-s", run: () => { if (editable) showDialog = true; return true; } },
           // Escape → exit edit (검색 패널이 없을 때)
           { key: "Escape", run: (v) => {
-            // 검색 패널이 열려있으면 CodeMirror가 먼저 처리하므로 여기에 안 옴
-            if (editable) { editable = false; return true; }
+            if (editable) { tryExitEdit(); return true; }
             return false;
           }},
           ...searchKeymap,
@@ -209,13 +215,101 @@
     });
   }
 
-  // --- Reactive ---
+  // --- Unsaved changes ---
 
-  $: if ($relativeFilePath) {
-    getFileContent($relativeFilePath);
+  function tryExitEdit() {
+    if (isContentChanged) {
+      stopAutoSave();
+      unsavedAction = "exit";
+      showUnsavedDialog = true;
+    } else {
+      editable = false;
+    }
+  }
+
+  function handleFilePathChange(newPath: string) {
+    if (!newPath || newPath === currentFilePath) return;
+
+    if (editable && isContentChanged) {
+      stopAutoSave();
+      unsavedAction = "switch";
+      unsavedSwitchPath = newPath;
+      unsavedSwitchCursor = get(selectedCursor);
+      // 즉시 되돌려서 TopBar/사이드바가 점프하지 않도록
+      relativeFilePath.set(currentFilePath);
+      selectedCursor.set(currentFilePath);
+      showUnsavedDialog = true;
+    } else {
+      switchToFile(newPath);
+    }
+  }
+
+  function switchToFile(path: string, cursor?: string) {
+    currentFilePath = path;
+    relativeFilePath.set(path);
+    if (cursor) selectedCursor.set(cursor);
+    getFileContent(path);
     scrollRatio = 0;
     contentDiv?.scrollTo(0, 0);
     editable = false;
+  }
+
+  async function handleUnsavedSave() {
+    // 항상 원래 파일(currentFilePath)에 저장
+    await saveContent(true, currentFilePath);
+
+    // 저장 완전 실패 시 (SSH 끊김 등) 편집 모드 유지
+    if (isContentChanged) {
+      showUnsavedDialog = false;
+      unsavedAction = null;
+      unsavedSwitchPath = null;
+      unsavedSwitchCursor = null;
+      startAutoSave();
+      return;
+    }
+
+    showUnsavedDialog = false;
+    addToast("File saved.", "success");
+
+    if (unsavedAction === "exit") {
+      await getFileContent(currentFilePath);
+      editable = false;
+    } else if (unsavedAction === "switch" && unsavedSwitchPath) {
+      switchToFile(unsavedSwitchPath, unsavedSwitchCursor ?? undefined);
+    }
+    unsavedAction = null;
+    unsavedSwitchPath = null;
+    unsavedSwitchCursor = null;
+  }
+
+  async function handleUnsavedDiscard() {
+    showUnsavedDialog = false;
+    isContentChanged = false;
+
+    if (unsavedAction === "exit") {
+      await getFileContent(currentFilePath);
+      editable = false;
+    } else if (unsavedAction === "switch" && unsavedSwitchPath) {
+      switchToFile(unsavedSwitchPath, unsavedSwitchCursor ?? undefined);
+    }
+    unsavedAction = null;
+    unsavedSwitchPath = null;
+    unsavedSwitchCursor = null;
+  }
+
+  function handleUnsavedCancel() {
+    showUnsavedDialog = false;
+    // stores는 handleFilePathChange에서 이미 되돌림
+    unsavedAction = null;
+    unsavedSwitchPath = null;
+    unsavedSwitchCursor = null;
+    startAutoSave();
+  }
+
+  // --- Reactive ---
+
+  $: if ($relativeFilePath) {
+    handleFilePathChange($relativeFilePath);
   }
 
   $: if (editable) {
@@ -240,7 +334,7 @@
       if (editable) showDialog = true;
     });
     registerAction("exit-edit", () => {
-      if (editable) editable = false;
+      if (editable) tryExitEdit();
     });
   });
 
@@ -272,7 +366,7 @@
   function startAutoSave() {
     if ($autoSaveEnabled && !autoSaveTimer) {
       autoSaveTimer = setInterval(() => {
-        saveContent();
+        saveContent(false, currentFilePath);
       }, autoSaveInterval);
     }
   }
@@ -284,7 +378,7 @@
     }
   }
 
-  async function saveContent(manual: boolean = false): Promise<boolean> {
+  async function saveContent(manual: boolean = false, savePath?: string): Promise<boolean> {
     if (!isContentChanged) {
       return true;
     }
@@ -294,7 +388,7 @@
     }
     try {
       const syncOk = await invoke<boolean>("save_file_content", {
-        filePath: $relativeFilePath,
+        filePath: savePath ?? $relativeFilePath,
         fileData: fileContent,
         manual,
       });
@@ -331,7 +425,7 @@
 
           const uuidValue = uuidv4();
           const savedPath = await invoke("save_file_image", {
-            filePath: $relativeFilePath,
+            filePath: currentFilePath,
             fileName: uuidValue,
             fileData: Array.from(fileData),
           });
@@ -380,16 +474,27 @@
     editable = true;
   }}
   handleSave={async () => {
-    const syncOk = await saveContent(true);
+    const syncOk = await saveContent(true, currentFilePath);
     showDialog = false;
     if (syncOk) {
-      await getFileContent($relativeFilePath);
+      await getFileContent(currentFilePath);
       addToast("File saved.", "success");
       editable = false;
     } else {
       addToast("File saved, but image sync failed.", "warning");
     }
   }}
+/>
+
+<SavePopup show={showUnsavedDialog}
+  title="Unsaved Changes"
+  message="You have unsaved changes."
+  saveLabel="Save"
+  discardLabel="Discard"
+  cancelLabel="Cancel"
+  closeSave={handleUnsavedCancel}
+  handleSave={handleUnsavedSave}
+  handleDiscard={handleUnsavedDiscard}
 />
 
 <div bind:this={contentDiv} class="{editable ? 'overflow-hidden' : 'overflow-y-auto'} h-full w-full">
