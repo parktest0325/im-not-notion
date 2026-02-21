@@ -29,7 +29,7 @@ export function createDefaultSshConfig(): SshConfig {
 }
 
 function createDefaultHugoConfig(): HugoConfig {
-    return { url: "", hugo_cmd_path: "", base_path: "", content_path: "", image_path: "", hidden_path: "" };
+    return { url: "", hugo_cmd_path: "", base_path: "", content_paths: [], image_path: "", hidden_path: "" };
 }
 
 function createDefaultCmsConfig(): CmsConfig {

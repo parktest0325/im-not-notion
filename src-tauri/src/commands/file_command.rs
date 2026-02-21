@@ -3,7 +3,7 @@ use crate::utils::IntoInvokeError;
 use tauri::ipc::InvokeError;
 
 #[tauri::command]
-pub fn get_file_tree() -> Result<FileSystemNode, InvokeError> {
+pub fn get_file_tree() -> Result<Vec<FileSystemNode>, InvokeError> {
     file_service::build_file_tree().into_invoke_err()
 }
 

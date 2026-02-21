@@ -379,7 +379,7 @@
   }
 
   async function saveContent(manual: boolean = false, savePath?: string): Promise<boolean> {
-    if (!isContentChanged) {
+    if (!manual && !isContentChanged) {
       return true;
     }
     // 에디터에서 최신 내용 가져오기
@@ -410,7 +410,7 @@
 
   // --- Image paste ---
 
-  async function handlePaste(event: ClipboardEvent, cmView: EditorView): boolean {
+  function handlePaste(event: ClipboardEvent, cmView: EditorView): boolean {
     const items = event.clipboardData?.items;
 
     if (items) {
@@ -418,27 +418,29 @@
 
       if (item.type.indexOf("image") !== -1) {
         event.preventDefault();
+        // async 처리를 별도로 분리 — 동기적으로 true 반환해야 CM이 기본 동작 차단
+        (async () => {
+          try {
+            const fileData = await readFileAsArrayBuffer(item.getAsFile()!);
+            const currentPosition = cmView.state.selection.main.head;
 
-        try {
-          const fileData = await readFileAsArrayBuffer(item.getAsFile()!);
-          const currentPosition = cmView.state.selection.main.head;
+            const uuidValue = uuidv4();
+            const savedPath = await invoke("save_file_image", {
+              filePath: currentFilePath,
+              fileName: uuidValue,
+              fileData: Array.from(fileData),
+            });
 
-          const uuidValue = uuidv4();
-          const savedPath = await invoke("save_file_image", {
-            filePath: currentFilePath,
-            fileName: uuidValue,
-            fileData: Array.from(fileData),
-          });
-
-          const insertText = `\n![${uuidValue}](${savedPath})`;
-          cmView.dispatch({
-            changes: { from: currentPosition, insert: insertText },
-          });
-          isContentChanged = true;
-        } catch (e) {
-          console.error("Image paste failed:", e);
-          addToast("Failed to save image.");
-        }
+            const insertText = `\n![${uuidValue}](${savedPath})`;
+            cmView.dispatch({
+              changes: { from: currentPosition, insert: insertText },
+            });
+            isContentChanged = true;
+          } catch (e) {
+            console.error("Image paste failed:", e);
+            addToast("Failed to save image.");
+          }
+        })();
         return true;
       }
     }

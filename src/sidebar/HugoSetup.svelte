@@ -139,7 +139,7 @@
       updateStep(4, "running");
       config.cms_config.hugo_config.hugo_cmd_path = hugoPath!;
       config.cms_config.hugo_config.base_path = sitePath;
-      config.cms_config.hugo_config.content_path = "posts";
+      config.cms_config.hugo_config.content_paths = ["posts"];
       config.cms_config.hugo_config.image_path = "static";
       // URL 자동 세팅: https:// + SSH host
       const activeServer = config.servers.find(s => s.id === config.active_server);
@@ -174,7 +174,7 @@
 
       // 3. Validate loaded server config
       const hugo = config.cms_config.hugo_config;
-      if (!hugo.base_path || !hugo.content_path) {
+      if (!hugo.base_path || !hugo.content_paths || hugo.content_paths.length === 0) {
         errorMessage = "Server config not found. ~/.inn_server_config.json is missing or incomplete.";
         return;
       }

@@ -244,7 +244,7 @@ pub fn execute_plugin(plugin_name: &str, input_json: &str) -> Result<PluginResul
         .unwrap_or(serde_json::json!({}));
     input["context"] = serde_json::json!({
         "base_path": hugo_config.base_path,
-        "content_path": hugo_config.content_path,
+        "content_paths": hugo_config.content_paths,
         "image_path": hugo_config.image_path,
         "hidden_path": hugo_config.hidden_path,
     });
@@ -304,7 +304,7 @@ pub fn run_hooks(event: HookEvent, data: serde_json::Value) -> Result<Vec<Plugin
             "data": data,
             "context": {
                 "base_path": hugo_config.base_path,
-                "content_path": hugo_config.content_path,
+                "content_paths": hugo_config.content_paths,
                 "image_path": hugo_config.image_path,
                 "hidden_path": hugo_config.hidden_path,
             }

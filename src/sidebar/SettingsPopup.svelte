@@ -4,7 +4,7 @@
   import HugoSetup from "./HugoSetup.svelte";
   import { createDefaultAppConfig, createDefaultSshConfig, createDefaultServerEntry, type AppConfig, type ServerEntry } from "../types/setting";
   import Popup from "../component/Popup.svelte";
-  import { url, contentPath, hiddenPath, addToast, activeServerName } from "../stores";
+  import { url, contentPaths, hiddenPath, addToast, activeServerName } from "../stores";
   import { onMount } from "svelte";
   import { buildShortcutMap, getEffectiveShortcuts, eventToShortcutString, isRecordingShortcut, pluginShortcutDefs } from "../shortcut";
   import type { PluginInfo } from "../types/setting";
@@ -52,7 +52,7 @@
       config = { ...createDefaultAppConfig(), ...loadedConfig };
       if (!config.servers) config.servers = [];
       url.set(config.cms_config.hugo_config.url);
-      contentPath.set(config.cms_config.hugo_config.content_path);
+      contentPaths.set(config.cms_config.hugo_config.content_paths);
       hiddenPath.set(config.cms_config.hugo_config.hidden_path);
       const active = config.servers.find(s => s.id === config.active_server);
       activeServerName.set(active?.name ?? "");
@@ -97,7 +97,7 @@
         shortcuts: newConfig.shortcuts,
       };
       url.set(config.cms_config.hugo_config.url);
-      contentPath.set(config.cms_config.hugo_config.content_path);
+      contentPaths.set(config.cms_config.hugo_config.content_paths);
       hiddenPath.set(config.cms_config.hugo_config.hidden_path);
       const active = config.servers?.find(s => s.id === id);
       activeServerName.set(active?.name ?? "");
@@ -166,7 +166,7 @@
         config.cms_config = newConfig.cms_config;
         config.shortcuts = newConfig.shortcuts;
         url.set(config.cms_config.hugo_config.url);
-        contentPath.set(config.cms_config.hugo_config.content_path);
+        contentPaths.set(config.cms_config.hugo_config.content_paths);
         hiddenPath.set(config.cms_config.hugo_config.hidden_path);
         activeServerName.set(editingServer.name || editingServer.ssh_config.host);
         refreshShortcutEntries();
@@ -419,9 +419,25 @@
       {:else if editTab === "hugo"}
         <div class="space-y-3">
           <HugoSetup bind:config bind:isSetupRunning />
-          {#each Object.keys(config.cms_config.hugo_config) as key}
+          {#each Object.keys(config.cms_config.hugo_config).filter(k => k !== 'content_paths') as key}
             <DynamicField config={asFields(config.cms_config.hugo_config)} configKey={key} />
           {/each}
+          <div class="flex items-center space-x-2">
+            <label class="block min-w-[120px]" for="content-paths-input">content_paths</label>
+            <input
+              id="content-paths-input"
+              class="flex-1 p-2 border rounded"
+              value={config.cms_config.hugo_config.content_paths.join(', ')}
+              on:change={(e) => {
+                config.cms_config.hugo_config.content_paths = e.currentTarget.value
+                  .split(',')
+                  .map(s => s.trim())
+                  .filter(s => s.length > 0);
+                config = config;
+              }}
+              placeholder="posts, projects"
+            />
+          </div>
         </div>
 
       {:else if editTab === "shortcuts"}

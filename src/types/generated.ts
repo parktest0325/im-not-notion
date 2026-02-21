@@ -20,7 +20,7 @@ export interface HugoConfig {
 	url: string;
 	hugo_cmd_path: string;
 	base_path: string;
-	content_path: string;
+	content_paths: string[];
 	image_path: string;
 	hidden_path: string;
 }
