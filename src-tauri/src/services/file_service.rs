@@ -303,7 +303,7 @@ pub fn move_content(src: &str, dst: &str) -> Result<()> {
 
         // === Phase 3: Update image refs ===
         // legacy 이미지를 이동한 경우, md 참조도 legacy→new 로 업데이트 필요
-        if let Err(e) = sync_images_on_move(&sftp, &hugo_config, src, dst, false) {
+        if let Err(e) = sync_images_on_move(&sftp, &hugo_config, src, dst) {
             // 롤백: 이미지 + content/hidden rename 되돌리기
             if let Some((src_img, _)) = &found_src_img {
                 if sftp.stat(Path::new(&dst_img)).is_ok() {
@@ -494,15 +494,12 @@ fn update_image_refs_in_file(sftp: &Sftp, config: &HugoConfig, rel_path: &str, o
     Ok(())
 }
 
-/// 파일/폴더 이동 시 이미지 참조 업데이트
-/// scan_all=false: 이동된 파일/폴더 내부의 자기 참조만 업데이트
-/// scan_all=true: 전체 md 스캔하여 외부 참조도 업데이트
-fn sync_images_on_move(sftp: &Sftp, config: &HugoConfig, src: &str, dst: &str, scan_all: bool) -> Result<()> {
+/// 파일/폴더 이동 시 이미지 참조 업데이트 (이동된 파일/폴더 내부의 자기 참조만)
+fn sync_images_on_move(sftp: &Sftp, config: &HugoConfig, src: &str, dst: &str) -> Result<()> {
     let old_prefix = src.trim_start_matches('/');
     let new_prefix = dst.trim_start_matches('/');
     // Legacy prefix (섹션 없는 old 참조): "posts/my-post" → "my-post"
     let legacy_old = strip_section_prefix(config, src).map(|s| s.to_string());
-    let legacy_new = strip_section_prefix(config, dst).map(|s| s.to_string());
 
     let content_base = config.content_abs("");
     let hidden_base = config.hidden_abs("");
@@ -511,18 +508,14 @@ fn sync_images_on_move(sftp: &Sftp, config: &HugoConfig, src: &str, dst: &str, s
         // 새 형식 prefix 치환: posts/old-name → posts/new-name
         let _ = update_image_refs_in_file(sftp, config, rel_path, old_prefix, new_prefix);
         // Legacy 형식 치환: old-name → new-name (섹션 없는 참조)
-        if let (Some(lo), Some(_ln)) = (&legacy_old, &legacy_new) {
+        if let Some(lo) = &legacy_old {
             if lo != old_prefix {
                 let _ = update_image_refs_in_file(sftp, config, rel_path, lo, new_prefix);
             }
         }
     };
 
-    let md_files = if scan_all {
-        let mut files = find_md_files_recursive(sftp, Path::new(&content_base))?;
-        files.extend(find_md_files_recursive(sftp, Path::new(&hidden_base))?);
-        files
-    } else if dst.ends_with(".md") {
+    let md_files = if dst.ends_with(".md") {
         apply_refs(dst);
         return Ok(());
     } else {
