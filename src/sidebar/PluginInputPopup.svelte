@@ -29,10 +29,18 @@
     if (!plugin) return;
     isExecuting = true;
     try {
-      const inputJson = JSON.stringify({
-        trigger: "manual",
-        ...values,
-      });
+      // Read current values directly from DOM to avoid Svelte reactivity issues
+      const formData: Record<string, string | boolean> = { trigger: "manual" };
+      for (const field of inputFields) {
+        if (field.type === "boolean") {
+          const el = document.getElementById(field.name) as HTMLInputElement;
+          formData[field.name] = el?.checked ?? false;
+        } else {
+          const el = document.getElementById(field.name) as HTMLInputElement;
+          formData[field.name] = el?.value ?? values[field.name] ?? "";
+        }
+      }
+      const inputJson = JSON.stringify(formData);
       const result: PluginResult = await invoke("run_plugin", {
         name: plugin.name,
         input: inputJson,

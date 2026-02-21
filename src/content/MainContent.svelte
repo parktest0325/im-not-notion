@@ -444,6 +444,58 @@
         return true;
       }
     }
+
+    // 텍스트 붙여넣기: 외부 이미지 참조가 있으면 가로채서 sync 후 삽입
+    const pastedText = event.clipboardData?.getData("text/plain");
+    if (pastedText && hasExternalImageRefs(pastedText, currentFilePath)) {
+      event.preventDefault();
+      (async () => {
+        try {
+          const synced: string = await invoke("sync_pasted_refs", {
+            filePath: currentFilePath,
+            pastedText,
+          });
+          const pos = cmView.state.selection.main.head;
+          cmView.dispatch({
+            changes: { from: pos, insert: synced },
+          });
+          isContentChanged = true;
+          addToast("Image links synced.", "success");
+        } catch (e) {
+          // sync 실패 시 원본 텍스트 그대로 삽입
+          const pos = cmView.state.selection.main.head;
+          cmView.dispatch({
+            changes: { from: pos, insert: pastedText },
+          });
+          isContentChanged = true;
+        }
+      })();
+      return true;
+    }
+
+    return false;
+  }
+
+  /** 텍스트에 외부 이미지 참조(다른 파일 이미지 또는 URL)가 있는지 확인 */
+  function hasExternalImageRefs(text: string, filePath: string): boolean {
+    const myPrefix = filePath.replace(/^\//, "") + "/";
+    const patterns = [
+      /!\[[^\]]*\]\(([^)]+)\)/g,           // ![alt](path)
+      /<img\s[^>]*src\s*=\s*["']([^"']+)["']/g,  // <img src="path">
+    ];
+    for (const re of patterns) {
+      let m;
+      while ((m = re.exec(text)) !== null) {
+        const path = m[1].trim();
+        if (path.startsWith("http://") || path.startsWith("https://")) {
+          return true;
+        }
+        const clean = path.replace(/^\//, "");
+        if (!clean.startsWith(myPrefix)) {
+          return true;
+        }
+      }
+    }
     return false;
   }
 

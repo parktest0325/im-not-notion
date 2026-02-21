@@ -339,10 +339,11 @@ pub fn move_content(src: &str, dst: &str) -> Result<()> {
 
             for abs_md in md_files {
                 let abs_str = abs_md.to_string_lossy();
-                let rel = if abs_str.starts_with(&content_base) {
-                    abs_str.strip_prefix(&content_base).unwrap_or(&abs_str)
-                } else if abs_str.starts_with(&hidden_base) {
+                // hidden_base를 먼저 체크 (content_base보다 더 구체적인 prefix)
+                let rel = if abs_str.starts_with(&hidden_base) {
                     abs_str.strip_prefix(&hidden_base).unwrap_or(&abs_str)
+                } else if abs_str.starts_with(&content_base) {
+                    abs_str.strip_prefix(&content_base).unwrap_or(&abs_str)
                 } else {
                     continue;
                 };
@@ -447,6 +448,7 @@ fn find_md_files_recursive(sftp: &Sftp, dir: &Path) -> Result<Vec<PathBuf>> {
 
 /// md 파일 내 이미지 참조 경로만 치환 (old_prefix → new_prefix)
 /// ![...](...) 패턴 안에서만 치환하여 본문 텍스트나 일반 링크는 건드리지 않음
+/// 경로 시작 부분(prefix)만 매칭하여 부분 문자열 오매칭 방지
 fn update_image_refs_in_file(sftp: &Sftp, config: &HugoConfig, rel_path: &str, old_prefix: &str, new_prefix: &str) -> Result<()> {
     let content_path = config.content_abs(rel_path);
     let hidden_path = config.hidden_abs(rel_path);
@@ -455,20 +457,33 @@ fn update_image_refs_in_file(sftp: &Sftp, config: &HugoConfig, rel_path: &str, o
         .map(|c| (content_path, c))
         .or_else(|_| get_file(sftp, Path::new(&hidden_path)).map(|c| (hidden_path, c)))?;
 
-    // ![alt](path) 패턴을 찾아 path 부분에서만 old_prefix → new_prefix 치환
+    let old_with_slash = format!("{}/", old_prefix);
+
+    // 경로의 시작 부분에서만 old_prefix를 new_prefix로 치환
+    let replace_path_prefix = |path: &str| -> String {
+        let stripped = path.trim_start_matches('/');
+        if stripped.starts_with(&old_with_slash) || stripped == old_prefix {
+            let rest = &stripped[old_prefix.len()..];
+            format!("/{}{}", new_prefix, rest)
+        } else {
+            path.to_string()
+        }
+    };
+
+    // ![alt](path) 패턴
     let md_re = regex::Regex::new(r"(!\[[^\]]*\]\()([^)]+)(\))").unwrap();
     let updated = md_re.replace_all(&content, |caps: &regex::Captures| {
-        let prefix = &caps[1]; // ![alt](
-        let path = caps[2].replacen(old_prefix, new_prefix, 1);
-        let suffix = &caps[3]; // )
+        let prefix = &caps[1];
+        let path = replace_path_prefix(&caps[2]);
+        let suffix = &caps[3];
         format!("{}{}{}", prefix, path, suffix)
     }).to_string();
 
-    // <img src="path"> 패턴에서도 old_prefix → new_prefix 치환
+    // <img src="path"> 패턴
     let img_re = regex::Regex::new(r#"(<img\s[^>]*src\s*=\s*["'])([^"']+)(["'])"#).unwrap();
     let updated = img_re.replace_all(&updated, |caps: &regex::Captures| {
         let prefix = &caps[1];
-        let path = caps[2].replacen(old_prefix, new_prefix, 1);
+        let path = replace_path_prefix(&caps[2]);
         let suffix = &caps[3];
         format!("{}{}{}", prefix, path, suffix)
     }).to_string();
@@ -520,10 +535,11 @@ fn sync_images_on_move(sftp: &Sftp, config: &HugoConfig, src: &str, dst: &str, s
 
     for abs_md in md_files {
         let abs_str = abs_md.to_string_lossy();
-        let rel = if abs_str.starts_with(&content_base) {
-            abs_str.strip_prefix(&content_base).unwrap_or(&abs_str)
-        } else if abs_str.starts_with(&hidden_base) {
+        // hidden_base를 먼저 체크 (content_base보다 더 구체적인 prefix)
+        let rel = if abs_str.starts_with(&hidden_base) {
             abs_str.strip_prefix(&hidden_base).unwrap_or(&abs_str)
+        } else if abs_str.starts_with(&content_base) {
+            abs_str.strip_prefix(&content_base).unwrap_or(&abs_str)
         } else {
             continue;
         };
@@ -749,6 +765,76 @@ fn sync_images_on_save(sftp: &Sftp, config: &HugoConfig, file_path: &str, conten
     }
 
     Ok(())
+}
+
+/// 붙여넣기 텍스트의 외부 이미지 참조를 처리하여 수정된 텍스트 반환
+/// 이미지 파일 복사 + URL 다운로드만 수행, 파일 저장은 하지 않음
+pub fn sync_pasted_refs(file_path: &str, pasted_text: &str) -> Result<String> {
+    let (sftp, config) = sftp_and_config()?;
+
+    if !file_path.ends_with(".md") {
+        return Ok(pasted_text.to_string());
+    }
+
+    let rel = file_path.trim_start_matches('/');
+    let my_prefix = format!("{}/", rel);
+
+    let (local_refs, external_urls) = parse_all_image_refs(pasted_text);
+    let mut updated = pasted_text.to_string();
+
+    // 로컬 외부참조 → 내 디렉토리로 복사
+    for img_ref in &local_refs {
+        let ref_clean = img_ref.trim_start_matches('/');
+        if ref_clean.starts_with(&my_prefix) {
+            continue;
+        }
+
+        let filename = Path::new(ref_clean)
+            .file_name()
+            .and_then(|f| f.to_str())
+            .unwrap_or(ref_clean);
+        let new_ref = format!("/{}{}", my_prefix, filename);
+        let dst_abs = image_abs(&config, &new_ref);
+        let src_abs = image_abs(&config, ref_clean);
+
+        if sftp.stat(Path::new(&src_abs)).is_err() {
+            if sftp.stat(Path::new(&dst_abs)).is_err() {
+                continue;
+            }
+        } else if src_abs != dst_abs {
+            match copy_file_checked(&sftp, Path::new(&src_abs), Path::new(&dst_abs)) {
+                Ok(CopyResult::Renamed(new_name)) => {
+                    let renamed_ref = format!("/{}{}", my_prefix, new_name);
+                    updated = replace_image_ref(&updated, img_ref, &renamed_ref);
+                    continue;
+                }
+                Ok(_) => {}
+                Err(_) => continue,
+            }
+        }
+
+        updated = replace_image_ref(&updated, img_ref, &new_ref);
+    }
+
+    // 외부 URL → 다운로드 + 저장
+    for url in &external_urls {
+        let filename = generate_url_filename(url);
+        let new_ref = format!("/{}{}", my_prefix, filename);
+        let dst_abs = image_abs(&config, &new_ref);
+
+        if sftp.stat(Path::new(&dst_abs)).is_ok() {
+            updated = replace_image_ref(&updated, url, &new_ref);
+            continue;
+        }
+
+        if download_url_to_sftp(&sftp, url, Path::new(&dst_abs)).is_err() {
+            continue;
+        }
+
+        updated = replace_image_ref(&updated, url, &new_ref);
+    }
+
+    Ok(updated)
 }
 
 // ============================================================

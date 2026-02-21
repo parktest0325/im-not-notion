@@ -55,3 +55,8 @@ pub fn check_file_hidden(path: &str) -> Result<bool, InvokeError> {
 pub fn download_remote_file(remote_path: &str, local_path: &str) -> Result<(), InvokeError> {
     file_service::download_remote(remote_path, local_path).into_invoke_err()
 }
+
+#[tauri::command]
+pub fn sync_pasted_refs(file_path: &str, pasted_text: &str) -> Result<String, InvokeError> {
+    file_service::sync_pasted_refs(file_path, pasted_text).into_invoke_err()
+}
