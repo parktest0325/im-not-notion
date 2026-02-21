@@ -57,10 +57,13 @@
       activeServerName.set(active?.name ?? "");
       buildShortcutMap(config.shortcuts ?? {}, []);
       refreshShortcutEntries();
-      isConnected = await invoke<boolean>("check_connection");
+      // load_config 내부에서 이미 SSH 연결을 시도하므로,
+      // 설정이 성공적으로 로드되었으면 연결된 것으로 판단 (별도 check_connection 불필요)
+      isConnected = !!config.cms_config.hugo_config.base_path;
     } catch (error) {
       console.error("Failed to load config:", error);
       config = createDefaultAppConfig();
+      isConnected = false;
       addToast("Failed to load settings.");
     } finally {
       isLoading = false;

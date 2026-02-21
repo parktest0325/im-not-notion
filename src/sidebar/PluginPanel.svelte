@@ -115,11 +115,15 @@
       });
       registerPluginShortcuts();
 
-      // Cron 등록 상태 조회
-      try {
-        const crons: string[] = await invoke("list_registered_crons");
-        cronEnabled = new Set(crons);
-      } catch (_) {
+      // Cron 등록 상태 조회 (installed 플러그인이 있을 때만)
+      if (plugins.some(p => p.installed && p.enabled)) {
+        try {
+          const crons: string[] = await invoke("list_registered_crons");
+          cronEnabled = new Set(crons);
+        } catch (_) {
+          cronEnabled = new Set();
+        }
+      } else {
         cronEnabled = new Set();
       }
     } catch (error) {
