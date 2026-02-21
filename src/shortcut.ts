@@ -23,6 +23,23 @@ export const BUILTIN_DEFAULTS: Record<string, BuiltinDef> = {
   rename:      { shortcuts: ["F2", "Enter"],   description: "Rename file" },
 };
 
+// --- Reserved shortcuts (browser/system defaults — never intercepted) ---
+
+const RESERVED_SHORTCUTS = new Set([
+  "Ctrl+f", "Meta+f",           // find (CodeMirror handles)
+  "Ctrl+h", "Meta+h",           // replace (CodeMirror handles)
+  "Ctrl+c", "Meta+c",           // copy
+  "Ctrl+v", "Meta+v",           // paste
+  "Ctrl+x", "Meta+x",           // cut
+  "Ctrl+a", "Meta+a",           // select all
+  "Ctrl+z", "Meta+z",           // undo
+  "Ctrl+Shift+z", "Meta+Shift+z", // redo
+  "Ctrl+r", "Meta+r",           // reload (dev)
+  "Ctrl+Shift+r", "Meta+Shift+r", // hard reload (dev)
+  "Ctrl+Shift+i", "Meta+Alt+i", // dev tools
+  "f12",                         // dev tools
+]);
+
 // --- Internal state ---
 
 const actionHandlers = new Map<string, () => void>();
@@ -240,6 +257,10 @@ export function handleShortcutEvent(event: KeyboardEvent): void {
   const hasModifier = event.ctrlKey || event.metaKey || event.altKey;
 
   const evtStr = eventToString(event);
+
+  // Reserved shortcuts — always pass through to browser/system
+  if (RESERVED_SHORTCUTS.has(evtStr)) return;
+
   const map = get(resolvedMap);
   const actionId = map.get(evtStr);
 

@@ -90,5 +90,30 @@ pub enum PluginAction {
     #[serde(rename = "open_file")]
     OpenFile { path: String },
     #[serde(rename = "show_result")]
-    ShowResult { title: String, body: String },
+    ShowResult {
+        title: String,
+        #[serde(default)]
+        body: String,
+        #[serde(default)]
+        pages: Vec<ResultPage>,
+    },
+    #[serde(rename = "download_files")]
+    DownloadFiles {
+        items: Vec<DownloadItem>,
+    },
+}
+
+#[typeshare]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ResultPage {
+    pub title: String,
+    pub body: String,
+}
+
+#[typeshare]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct DownloadItem {
+    pub path: String,
+    pub filename: String,
+    pub size: String,
 }

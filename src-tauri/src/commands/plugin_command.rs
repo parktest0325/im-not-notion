@@ -34,13 +34,18 @@ pub fn run_plugin(name: &str, input: &str) -> Result<PluginResult, InvokeError> 
 }
 
 #[tauri::command]
-pub fn register_plugin_cron(name: &str, schedule: &str, entry: &str) -> Result<(), InvokeError> {
-    plugin_service::register_cron(name, schedule, entry).into_invoke_err()
+pub fn register_plugin_cron(name: &str, schedule: &str, entry: &str, label: &str) -> Result<(), InvokeError> {
+    plugin_service::register_cron(name, schedule, entry, label).into_invoke_err()
 }
 
 #[tauri::command]
-pub fn unregister_plugin_cron(name: &str) -> Result<(), InvokeError> {
-    plugin_service::unregister_cron(name).into_invoke_err()
+pub fn unregister_plugin_cron(name: &str, label: &str) -> Result<(), InvokeError> {
+    plugin_service::unregister_single_cron(name, label).into_invoke_err()
+}
+
+#[tauri::command]
+pub fn list_registered_crons() -> Result<Vec<String>, InvokeError> {
+    plugin_service::list_registered_crons().into_invoke_err()
 }
 
 #[tauri::command]

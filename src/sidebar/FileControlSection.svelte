@@ -1,15 +1,25 @@
 <script context="module" lang="ts">
     import { invoke } from "@tauri-apps/api/core";
+    import { writable } from "svelte/store";
+    import { isConnected, addToast } from "../stores";
+    import type { FileSystemNode } from "../types/setting";
 
     let directoryStructure = writable<FileSystemNode[]>([]);
     export async function refreshList() {
         try {
-            const data: FileSystemNode = await invoke("get_file_tree");
-            directoryStructure.set(data.children);
-            isConnected.set(true); // 파일 리스트를 정상적으로 가져온 경우
+            const data: FileSystemNode[] = await invoke("get_file_tree");
+            directoryStructure.set(data);
+            isConnected.set(true);
         } catch (error) {
             console.error("Failed to update file list:", error);
-            isConnected.set(false); // 파일 리스트를 가져오지 못한 경우
+            directoryStructure.set([]);
+            const connected: boolean = await invoke("check_connection");
+            isConnected.set(connected);
+            if (!connected) {
+                addToast("SSH connection lost.");
+            } else {
+                addToast("Failed to load file list.");
+            }
         }
     }
 </script>
@@ -17,36 +27,97 @@
 <script lang="ts">
     import FaSearch from "svelte-icons/fa/FaSearch.svelte";
     import IoMdRefresh from "svelte-icons/io/IoMdRefresh.svelte";
-    import { writable } from "svelte/store";
+    import FaFileMedical from "svelte-icons/fa/FaFileMedical.svelte";
+    import FaFolderPlus from "svelte-icons/fa/FaFolderPlus.svelte";
     import TreeNode from "./TreeNode.svelte";
-    import { setContext, onMount } from "svelte";
-    import { selectedCursor, relativeFilePath, isConnected, addToast } from "../stores";
-    import { GLOBAL_FUNCTIONS } from "../context";
-    import type { FileSystemNode } from "../types/setting";
+    import { onMount } from "svelte";
+    import { selectedCursor, relativeFilePath, draggingInfo, isEditingFileName } from "../stores";
 
     let searchTerm: string = "";
+    let expandedSections: Record<string, boolean> = {};
+    let dragOverSection: string | null = null;
 
     onMount(refreshList);
+
+    // 섹션이 로드되면 기본적으로 모두 펼침
+    $: {
+        for (const node of $directoryStructure) {
+            if (!(node.name in expandedSections)) {
+                expandedSections[node.name] = true;
+            }
+        }
+    }
+
+    function toggleSection(name: string) {
+        expandedSections[name] = !expandedSections[name];
+        expandedSections = expandedSections;
+    }
+
+    async function createInSection(event: MouseEvent, sectionName: string, createType: string) {
+        event.stopPropagation();
+        try {
+            const basePath = createType === "Directory"
+                ? `/${sectionName}/new_folder/_index.md`
+                : `/${sectionName}/new_file.md`;
+            const createdPath: string = await invoke("new_content_for_hugo", {
+                filePath: basePath,
+            });
+            selectedCursor.set(createdPath);
+            relativeFilePath.set(createdPath);
+            expandedSections[sectionName] = true;
+            expandedSections = expandedSections;
+            await refreshList();
+            addToast("Item created.", "success");
+        } catch (error) {
+            console.error("failed to create item:", error);
+            addToast("Failed to create item.");
+        }
+    }
+
+    function onSectionDragOver(event: DragEvent, sectionName: string) {
+        if ($isEditingFileName) return;
+        event.preventDefault();
+        event.stopPropagation();
+        event.dataTransfer!.dropEffect = 'move';
+        dragOverSection = sectionName;
+    }
+
+    function onSectionDragLeave(event: DragEvent) {
+        event.stopPropagation();
+        dragOverSection = null;
+    }
+
+    async function onSectionDrop(event: DragEvent, sectionName: string) {
+        if ($isEditingFileName) return;
+        event.preventDefault();
+        event.stopPropagation();
+        dragOverSection = null;
+
+        const info = $draggingInfo;
+        if (!info) return;
+
+        const src = info.path;
+        const name = src.split('/').pop();
+        const dst = `/${sectionName}/${name}`;
+
+        // 같은 위치면 무시
+        if (src === dst) return;
+
+        try {
+            await invoke('move_file_or_folder', { src, dst });
+            selectedCursor.set(dst);
+            relativeFilePath.set(dst);
+            await refreshList();
+            addToast("Item moved.", "success");
+        } catch (e) {
+            console.error('Failed to move file:', e);
+            addToast("Failed to move item.");
+        }
+    }
 
     const searchFiles = (_term: string) => {
         // TODO: 검색 로직 구현
     };
-
-    async function createFolder(event: MouseEvent) {
-        event.stopPropagation();
-        try {
-            const createdPath: string = await invoke("new_content_for_hugo", {
-                filePath: "/new_folder/_index.md",
-            });
-            selectedCursor.set(createdPath);
-            relativeFilePath.set(createdPath);
-            await refreshList();
-            addToast("Folder created.", "success");
-        } catch (error) {
-            console.error("failed to make directory:", error);
-            addToast("Failed to create folder.");
-        }
-    }
 </script>
 
 <div class="flex flex-col h-full">
@@ -72,25 +143,117 @@
         </button>
     </div>
 
-    <!-- 파일 리스트 -->
+    <!-- 섹션별 파일 리스트 -->
     <div class="flex-grow overflow-y-auto">
-        <ul class="list-none p-0">
-            {#each $directoryStructure as node}
-                <TreeNode {node} />
-            {/each}
-        </ul>
-        <button class="w-full mt-2 btn-create" on:click={createFolder}>+</button>
+        {#each $directoryStructure as section, i}
+            {#if i > 0}
+                <hr class="section-divider" />
+            {/if}
+            <div class="section">
+                <button class="section-header"
+                    class:drag-over-section={dragOverSection === section.name}
+                    on:click={() => toggleSection(section.name)}
+                    on:dragover={(e) => onSectionDragOver(e, section.name)}
+                    on:dragleave={onSectionDragLeave}
+                    on:drop={(e) => onSectionDrop(e, section.name)}
+                >
+                    <span class="section-arrow">{expandedSections[section.name] ? '\u25BC' : '\u25B6'}</span>
+                    <span class="section-name">{section.name}</span>
+                    <span class="section-actions">
+                        <button
+                            class="section-action-btn"
+                            on:click|stopPropagation={(e) => createInSection(e, section.name, "File")}
+                            title="New file"
+                        >
+                            <div class="w-3 h-3"><FaFileMedical /></div>
+                        </button>
+                        <button
+                            class="section-action-btn"
+                            on:click|stopPropagation={(e) => createInSection(e, section.name, "Directory")}
+                            title="New folder"
+                        >
+                            <div class="w-3 h-3"><FaFolderPlus /></div>
+                        </button>
+                    </span>
+                </button>
+                {#if expandedSections[section.name]}
+                    <ul class="list-none p-0">
+                        {#each section.children as node}
+                            <TreeNode path={`/${section.name}/`} {node} />
+                        {/each}
+                    </ul>
+                {/if}
+            </div>
+        {/each}
     </div>
 </div>
 
 <style>
-    .btn-create {
-        background-color: var(--btn-create-bg);
-        border-color: var(--btn-create-border);
+    .section-divider {
+        border: none;
+        border-top: 1px solid var(--border-color);
+        margin: 0.25rem 0;
     }
-    .btn-create:hover {
-        background-color: var(--btn-create-hover-bg);
-        border-color: var(--btn-create-hover-border);
-        color: #ffffff;
+
+    .section-header {
+        display: flex;
+        align-items: center;
+        width: 100%;
+        padding: 0.375rem 0.25rem;
+        border: none;
+        background: none;
+        cursor: pointer;
+        font-size: 0.8rem;
+        font-weight: 600;
+        opacity: 0.7;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        box-shadow: none;
+    }
+
+    .section-header:hover {
+        opacity: 1;
+    }
+
+    .section-arrow {
+        font-size: 0.6rem;
+        width: 1rem;
+        flex-shrink: 0;
+    }
+
+    .section-name {
+        flex-grow: 1;
+        text-align: left;
+    }
+
+    .section-actions {
+        display: flex;
+        gap: 0.25rem;
+        opacity: 0;
+        transition: opacity 0.15s;
+    }
+
+    .section-header:hover .section-actions {
+        opacity: 1;
+    }
+
+    .section-action-btn {
+        padding: 0.125rem;
+        border: none;
+        background: none;
+        cursor: pointer;
+        opacity: 0.6;
+        border-radius: 0.25rem;
+        box-shadow: none;
+    }
+
+    .section-action-btn:hover {
+        opacity: 1;
+        background-color: var(--button-hover-bg-color);
+    }
+
+    .drag-over-section {
+        background-color: var(--button-selected-bg-color);
+        opacity: 0.5;
     }
 </style>

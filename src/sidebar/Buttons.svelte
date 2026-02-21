@@ -8,6 +8,10 @@
   import FaTerminal from "svelte-icons/fa/FaTerminal.svelte";
   import TerminalPopup from "./TerminalPopup.svelte";
   import PluginPanel from "./PluginPanel.svelte";
+  import { getContext } from "svelte";
+  import { GLOBAL_FUNCTIONS } from "../context";
+
+  const { refreshList } = getContext<{ refreshList: () => void }>(GLOBAL_FUNCTIONS);
 
   let bSetting: boolean;
   let bReboot: boolean;
@@ -60,7 +64,7 @@
   </button>
 </div>
 
-<SettingsPopup show={bSetting} closeSettings={toggleSettings} />
+<SettingsPopup show={bSetting} closeSettings={toggleSettings} onServerSwitch={refreshList} />
 <RebootPopup show={bReboot} closeReboot={toggleReboot} />
 <TerminalPopup show={bTerminal} closeTerminal={toggleTerminal} />
 <PluginPanel show={bPlugin} closePlugin={togglePlugin} />

@@ -9,11 +9,18 @@ export interface SshConfig {
 	password: string;
 }
 
+/** 서버 항목: ID + 이름 + SSH 설정 */
+export interface ServerEntry {
+	id: string;
+	name: string;
+	ssh_config: SshConfig;
+}
+
 export interface HugoConfig {
 	url: string;
 	hugo_cmd_path: string;
 	base_path: string;
-	content_path: string;
+	content_paths: string[];
 	image_path: string;
 	hidden_path: string;
 }
@@ -27,9 +34,17 @@ export interface CmsConfig {
  * 실제 저장은 ClientConfig(로컬)와 ServerConfig(서버)로 분리됨
  */
 export interface AppConfig {
-	ssh_config: SshConfig;
+	active_server: string;
+	servers?: ServerEntry[];
 	cms_config: CmsConfig;
 	shortcuts?: Record<string, string[]>;
+	plugin_local_path?: string;
+}
+
+export interface DownloadItem {
+	path: string;
+	filename: string;
+	size: string;
 }
 
 export enum NodeType {
@@ -96,7 +111,11 @@ export type PluginAction =
 }}
 	| { type: "show_result", content: {
 	title: string;
-	body: string;
+	body?: string;
+	pages?: ResultPage[];
+}}
+	| { type: "download_files", content: {
+	items: DownloadItem[];
 }};
 
 /** 스크립트 stdout JSON 파싱 결과 */
@@ -111,6 +130,11 @@ export interface PrerequisiteResult {
 	curl: boolean;
 	tar: boolean;
 	git: boolean;
+}
+
+export interface ResultPage {
+	title: string;
+	body: string;
 }
 
 export enum HookEvent {

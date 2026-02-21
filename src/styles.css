@@ -65,6 +65,14 @@
   --confirm-box-text: #f9fafb;
   --confirm-box-border: var(--error-color);
 
+  /* ========== Search bar ========== */
+  --search-bar-bg: #f3f4f6;
+  --search-bar-border: #d1d5db;
+  --search-match-bg: rgba(253, 230, 138, 0.6);
+  --search-match-current-bg: #f97316;
+  --search-match-current-text: #ffffff;
+  --search-btn-active-bg: #dbeafe;
+
   /* ========== Toast ========== */
   --toast-text: #ffffff;
 
@@ -155,6 +163,14 @@
     --confirm-box-bg: #1f2937;
     --confirm-box-text: #f9fafb;
     --confirm-box-border: #ef4444;
+
+    /* ========== Search bar ========== */
+    --search-bar-bg: #374151;
+    --search-bar-border: #4b5563;
+    --search-match-bg: rgba(133, 77, 14, 0.5);
+    --search-match-current-bg: #f97316;
+    --search-match-current-text: #ffffff;
+    --search-btn-active-bg: #1e3a5f;
 
     /* ========== Toast ========== */
     --toast-text: #ffffff;

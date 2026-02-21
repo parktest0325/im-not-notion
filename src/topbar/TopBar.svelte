@@ -3,7 +3,7 @@
   export let toggleMenu: () => void;
   import MdArrowForward from "svelte-icons/md/MdArrowForward.svelte";
   import DiIe from 'svelte-icons/di/DiIe.svelte'
-  import { relativeFilePath, url, contentPath, hiddenPath, fullFilePath, addToast } from "../stores";
+  import { relativeFilePath, url, hiddenPath, fullFilePath, addToast } from "../stores";
   import { type GlobalFunctions, GLOBAL_FUNCTIONS } from "../context";
   import { invoke } from "@tauri-apps/api/core";
   import { open } from "@tauri-apps/plugin-shell";
@@ -56,7 +56,8 @@
     checkHidden();
     
     // relativeFilePath가 갱신되면 전체 파일 경로 갱신
-    const newPath = (isHidden ? `/${$hiddenPath}` : '') + `/${$contentPath}${$relativeFilePath}`;
+    // relativeFilePath에 섹션이 포함됨: e.g. "/posts/my-post/_index.md"
+    const newPath = (isHidden ? `/${$hiddenPath}` : '') + $relativeFilePath;
     fullFilePath.set(newPath);
   }
 

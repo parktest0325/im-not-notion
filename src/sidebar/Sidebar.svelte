@@ -5,7 +5,7 @@
   import Buttons from "./Buttons.svelte";
   import FileControlSection from "./FileControlSection.svelte";
   import LogoSVG from '../resource/LogoSVG.svelte';
-  import { isConnected } from "../stores";
+  import { isConnected, activeServerName } from "../stores";
   import { currentTheme, cycleTheme } from "../theme";
 </script>
 
@@ -31,12 +31,12 @@
     {#if $isConnected}
       <div class="flex items-center" style="color: var(--status-connected-color)">
         <div class="w-2 h-2 rounded-full mr-2" style="background-color: var(--status-connected-color)"></div>
-        Connected
+        Connected{$activeServerName ? ` · ${$activeServerName}` : ""}
       </div>
     {:else}
       <div class="flex items-center" style="color: var(--status-disconnected-color)">
         <div class="w-2 h-2 rounded-full mr-2" style="background-color: var(--status-disconnected-color)"></div>
-        Not Connected
+        Not Connected{$activeServerName ? ` · ${$activeServerName}` : ""}
       </div>
     {/if}
     <button

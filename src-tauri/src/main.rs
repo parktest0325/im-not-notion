@@ -9,7 +9,9 @@ mod services;
 use std::sync::OnceLock;
 use anyhow::Result;
 use tauri::Emitter;
+use tauri::menu::{MenuBuilder, SubmenuBuilder};
 use tauri_plugin_shell::init as shell_init;
+use tauri_plugin_dialog::init as dialog_init;
 
 static APP_HANDLE: OnceLock<tauri::AppHandle> = OnceLock::new();
 
@@ -25,9 +27,9 @@ use commands::{
     file_command::{
         get_file_content, get_file_tree, move_file_or_folder,
         new_content_for_hugo, remove_file, save_file_content, save_file_image,
-        toggle_hidden_file, check_file_hidden,
+        toggle_hidden_file, check_file_hidden, download_remote_file, sync_pasted_refs,
     },
-    config_command::{load_config, save_config},
+    config_command::{load_config, save_config, save_plugin_local_path, switch_server, check_connection},
     ssh_command::{kill_server, start_server, execute_ssh},
     setup_command::{
         check_prerequisites_cmd, check_hugo_installed_cmd,
@@ -41,6 +43,7 @@ use commands::{
         list_plugins, install_plugin, uninstall_plugin,
         enable_plugin, disable_plugin, run_plugin,
         register_plugin_cron, unregister_plugin_cron,
+        list_registered_crons,
         pull_plugin, open_plugin_in_editor,
     },
 };
@@ -48,8 +51,25 @@ use commands::{
 fn main() -> Result<()> {
     tauri::Builder::default()
         .plugin(shell_init())
+        .plugin(dialog_init())
         .setup(|app| {
             APP_HANDLE.set(app.handle().clone()).ok();
+
+            // macOS: Edit 메뉴가 있어야 Cmd+C/V/X/A가 WebView에 전달됨
+            let edit_menu = SubmenuBuilder::new(app, "Edit")
+                .undo()
+                .redo()
+                .separator()
+                .cut()
+                .copy()
+                .paste()
+                .select_all()
+                .build()?;
+            let menu = MenuBuilder::new(app)
+                .item(&edit_menu)
+                .build()?;
+            app.set_menu(menu)?;
+
             // 앱 시작 시 설정 로드 (SSH 연결 포함)
             if let Err(e) = load_config() {
                 eprintln!("Failed to load config: {:?}", e);
@@ -59,6 +79,9 @@ fn main() -> Result<()> {
         .invoke_handler(tauri::generate_handler![
             load_config,
             save_config,
+            save_plugin_local_path,
+            switch_server,
+            check_connection,
             get_file_tree,
             get_file_content,
             save_file_content,
@@ -71,6 +94,8 @@ fn main() -> Result<()> {
             execute_ssh,
             toggle_hidden_file,
             check_file_hidden,
+            download_remote_file,
+            sync_pasted_refs,
             check_prerequisites_cmd,
             check_hugo_installed_cmd,
             detect_server_platform_cmd,
@@ -93,6 +118,7 @@ fn main() -> Result<()> {
             run_plugin,
             register_plugin_cron,
             unregister_plugin_cron,
+            list_registered_crons,
             pull_plugin,
             open_plugin_in_editor,
         ])

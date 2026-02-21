@@ -3,8 +3,9 @@
   import Popup from "../component/Popup.svelte";
   import PluginInputPopup from "./PluginInputPopup.svelte";
   import PluginResultPopup from "./PluginResultPopup.svelte";
+  import PluginDownloadPopup from "./PluginDownloadPopup.svelte";
   import { addToast, triggerPluginShortcut } from "../stores";
-  import type { PluginInfo, InputField } from "../types/setting";
+  import type { PluginInfo, InputField, DownloadItem, AppConfig } from "../types/setting";
   import { registerAction, unregisterAction, pluginShortcutDefs, buildShortcutMap } from "../shortcut";
   import { onMount, onDestroy } from "svelte";
 
@@ -24,12 +25,30 @@
   let showResultPopup = false;
   let resultTitle = "";
   let resultBody = "";
+  let resultPages: any[] = [];
+
+  // 다운로드 팝업 상태
+  let showDownloadPopup = false;
+  let downloadItems: DownloadItem[] = [];
+
+  // Cron 등록 상태: "pluginName:label" → true
+  let cronEnabled: Set<string> = new Set();
+
+  function cronKey(name: string, label: string) { return `${name}:${label}`; }
 
   // 현재 등록된 플러그인 shortcut action ids (cleanup용)
   let registeredActionIds: string[] = [];
 
-  // 마운트 시 바로 플러그인 로드 → 숏컷 등록 (패널 열기 전에도 동작)
-  onMount(() => { loadPlugins(); });
+  // 마운트 시 저장된 경로 복원 → 플러그인 로드 → 숏컷 등록
+  onMount(async () => {
+    try {
+      const config: AppConfig = await invoke("load_config");
+      if (config.plugin_local_path) {
+        localPath = config.plugin_local_path;
+      }
+    } catch (_) {}
+    loadPlugins();
+  });
 
   $: if (show) {
     loadPlugins();
@@ -91,6 +110,10 @@
     buildShortcutMap();
   }
 
+  function saveLocalPath() {
+    invoke("save_plugin_local_path", { path: localPath }).catch(() => {});
+  }
+
   async function loadPlugins() {
     isLoading = true;
     try {
@@ -103,6 +126,18 @@
         return a.manifest.name.localeCompare(b.manifest.name);
       });
       registerPluginShortcuts();
+
+      // Cron 등록 상태 조회 (installed 플러그인이 있을 때만)
+      if (plugins.some(p => p.installed && p.enabled)) {
+        try {
+          const crons: string[] = await invoke("list_registered_crons");
+          cronEnabled = new Set(crons);
+        } catch (_) {
+          cronEnabled = new Set();
+        }
+      } else {
+        cronEnabled = new Set();
+      }
     } catch (error) {
       console.error("Failed to load plugins:", error);
       plugins = [];
@@ -164,15 +199,19 @@
   async function toggleCron(name: string, schedule: string, entry: string, label: string, enable: boolean) {
     try {
       if (enable) {
-        await invoke("register_plugin_cron", { name, schedule, entry });
+        await invoke("register_plugin_cron", { name, schedule, entry, label });
+        cronEnabled.add(cronKey(name, label));
+        cronEnabled = cronEnabled;
         addToast(`Cron "${label}" enabled.`, "success");
       } else {
-        await invoke("unregister_plugin_cron", { name });
+        await invoke("unregister_plugin_cron", { name, label });
+        cronEnabled.delete(cronKey(name, label));
+        cronEnabled = cronEnabled;
         addToast(`Cron "${label}" disabled.`, "info");
       }
     } catch (error) {
       console.error("Cron toggle failed:", error);
-      addToast("Cron toggle failed.");
+      addToast(`Cron failed: ${error}`);
     }
   }
 
@@ -200,10 +239,16 @@
     } catch (_) {}
   }
 
-  function handleShowResult(title: string, body: string) {
+  function handleShowResult(title: string, body: string, pages?: any[]) {
     resultTitle = title;
     resultBody = body;
+    resultPages = pages ?? [];
     showResultPopup = true;
+  }
+
+  function handleDownloadFiles(items: DownloadItem[]) {
+    downloadItems = items;
+    showDownloadPopup = true;
   }
 </script>
 
@@ -214,13 +259,21 @@
   onClose={() => { showInputPopup = false; }}
   onRefreshTree={handleRefreshTree}
   onShowResult={handleShowResult}
+  onDownloadFiles={handleDownloadFiles}
 />
 
 <PluginResultPopup
   show={showResultPopup}
   title={resultTitle}
   body={resultBody}
+  pages={resultPages}
   onClose={() => { showResultPopup = false; }}
+/>
+
+<PluginDownloadPopup
+  show={showDownloadPopup}
+  items={downloadItems}
+  onClose={() => { showDownloadPopup = false; }}
 />
 
 <Popup {show} {isLoading} closePopup={closePlugin}>
@@ -234,12 +287,12 @@
       style="background-color: var(--input-bg-color); border: 1px solid var(--border-color);"
       bind:value={localPath}
       placeholder="/path/to/local/plugins"
-      on:change={loadPlugins}
+      on:change={() => { saveLocalPath(); loadPlugins(); }}
     />
     <button
       class="px-3 py-2 rounded text-sm"
       style="background-color: var(--button-active-bg-color);"
-      on:click={loadPlugins}
+      on:click={() => { saveLocalPath(); loadPlugins(); }}
     >Scan</button>
   </div>
 
@@ -356,15 +409,18 @@
                 {:else if trigger.type === "cron"}
                   <div class="flex items-center justify-between text-xs">
                     <span class="opacity-60">{trigger.content.label} ({trigger.content.schedule})</span>
-                    <div class="flex gap-1">
-                      <button class="px-2 py-0.5 rounded"
-                        style="background-color: var(--button-active-bg-color);"
-                        on:click={() => toggleCron(p.manifest.name, trigger.content.schedule, p.manifest.entry, trigger.content.label, true)}
-                      >On</button>
-                      <button class="px-2 py-0.5 rounded opacity-60"
-                        on:click={() => toggleCron(p.manifest.name, trigger.content.schedule, p.manifest.entry, trigger.content.label, false)}
-                      >Off</button>
-                    </div>
+                    <button
+                      class="toggle-btn"
+                      class:toggle-on={cronEnabled.has(cronKey(p.manifest.name, trigger.content.label))}
+                      title={cronEnabled.has(cronKey(p.manifest.name, trigger.content.label)) ? "Disable cron" : "Enable cron"}
+                      on:click={() => toggleCron(
+                        p.manifest.name,
+                        trigger.content.schedule,
+                        p.manifest.entry,
+                        trigger.content.label,
+                        !cronEnabled.has(cronKey(p.manifest.name, trigger.content.label))
+                      )}
+                    ><span class="toggle-dot"></span></button>
                   </div>
                 {:else if trigger.type === "hook"}
                   <div class="text-xs opacity-50">Hook: {trigger.content.event}</div>

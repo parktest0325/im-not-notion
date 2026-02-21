@@ -9,9 +9,10 @@
   import { GLOBAL_FUNCTIONS } from "./context";
   import Toast from "./component/Toast.svelte";
   import PluginResultPopup from "./sidebar/PluginResultPopup.svelte";
+  import PluginDownloadPopup from "./sidebar/PluginDownloadPopup.svelte";
   import { handleShortcutEvent, buildShortcutMap, registerAction } from "./shortcut";
   import { addToast, selectedCursor, isEditingFileName, isEditingContent, renamingPath } from "./stores";
-  import type { PluginAction } from "./types/setting";
+  import type { PluginAction, DownloadItem } from "./types/setting";
   import "./theme"; // Initialize theme on app startup
 
   let isMenuOpen: boolean = true;
@@ -37,6 +38,9 @@
   let showHookResult = false;
   let hookResultTitle = "";
   let hookResultBody = "";
+  let hookResultPages: any[] = [];
+  let showHookDownload = false;
+  let hookDownloadItems: DownloadItem[] = [];
   let unlisten: (() => void) | null = null;
 
   onMount(async () => {
@@ -51,8 +55,12 @@
         refreshList();
       } else if (action.type === "show_result" && action.content) {
         hookResultTitle = action.content.title;
-        hookResultBody = action.content.body;
+        hookResultBody = action.content.body ?? "";
+        hookResultPages = action.content.pages ?? [];
         showHookResult = true;
+      } else if (action.type === "download_files" && action.content) {
+        hookDownloadItems = action.content.items;
+        showHookDownload = true;
       }
     });
   });
@@ -78,5 +86,12 @@
   show={showHookResult}
   title={hookResultTitle}
   body={hookResultBody}
+  pages={hookResultPages}
   onClose={() => { showHookResult = false; }}
+/>
+
+<PluginDownloadPopup
+  show={showHookDownload}
+  items={hookDownloadItems}
+  onClose={() => { showHookDownload = false; }}
 />
