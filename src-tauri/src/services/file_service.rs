@@ -746,6 +746,16 @@ pub fn save_file(sftp: &Sftp, path: &Path, content: String) -> Result<()> {
 }
 
 
+/// 서버의 원격 파일을 로컬로 다운로드
+pub fn download_remote(remote_path: &str, local_path: &str) -> Result<()> {
+    let sftp = get_sftp_session()?;
+    let mut remote_file = sftp.open(Path::new(remote_path))?;
+    let mut data = Vec::new();
+    remote_file.read_to_end(&mut data)?;
+    std::fs::write(local_path, &data)?;
+    Ok(())
+}
+
 pub fn save_image(sftp: &Sftp, path: &Path, image: Vec<u8>) -> Result<()> {
     if let Some(parent) = path.parent() {
         mkdir_recursive(sftp, parent)?;

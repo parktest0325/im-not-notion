@@ -40,6 +40,12 @@ export interface AppConfig {
 	shortcuts?: Record<string, string[]>;
 }
 
+export interface DownloadItem {
+	path: string;
+	filename: string;
+	size: string;
+}
+
 export enum NodeType {
 	File = "File",
 	Directory = "Directory",
@@ -104,7 +110,11 @@ export type PluginAction =
 }}
 	| { type: "show_result", content: {
 	title: string;
-	body: string;
+	body?: string;
+	pages?: ResultPage[];
+}}
+	| { type: "download_files", content: {
+	items: DownloadItem[];
 }};
 
 /** 스크립트 stdout JSON 파싱 결과 */
@@ -119,6 +129,11 @@ export interface PrerequisiteResult {
 	curl: boolean;
 	tar: boolean;
 	git: boolean;
+}
+
+export interface ResultPage {
+	title: string;
+	body: string;
 }
 
 export enum HookEvent {

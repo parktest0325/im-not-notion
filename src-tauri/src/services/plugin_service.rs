@@ -1,7 +1,7 @@
 use std::path::Path;
 use std::io::prelude::*;
 use std::collections::HashMap;
-use anyhow::{Result, Context};
+use anyhow::{Result, Context, bail};
 use crate::services::ssh_service::{get_channel_session, get_sftp_session, execute_ssh_command, get_server_home_path};
 use crate::services::config_service::get_hugo_config;
 use crate::services::file_service::{mkdir_recursive, rmrf_file};
@@ -333,12 +333,23 @@ pub fn run_hooks(event: HookEvent, data: serde_json::Value) -> Result<Vec<Plugin
 // Cron
 // ============================================================
 
-pub fn register_cron(plugin_name: &str, schedule: &str, entry: &str) -> Result<()> {
+/// crontab 사용 가능 여부 확인
+fn check_crontab_available() -> Result<()> {
     let mut channel = get_channel_session()?;
-    let marker = format!("inn-plugin:{}", plugin_name);
+    let output = execute_ssh_command(&mut channel, "which crontab 2>/dev/null && echo OK")?;
+    if !output.contains("OK") {
+        bail!("crontab is not installed on the server");
+    }
+    Ok(())
+}
+
+pub fn register_cron(plugin_name: &str, schedule: &str, entry: &str, label: &str) -> Result<()> {
+    check_crontab_available()?;
+    let mut channel = get_channel_session()?;
+    let marker = format!("inn-plugin:{}:{}", plugin_name, label);
     let job = format!(
-        "{} cd {}/{} && ./{} # {}",
-        schedule, PLUGIN_DIR, plugin_name, entry, marker
+        "{} cd {}/{} && ./{} '{}' # {}",
+        schedule, PLUGIN_DIR, plugin_name, entry, label, marker
     );
     let cmd = format!(
         "(crontab -l 2>/dev/null | grep -v '{}'; echo '{}') | crontab -",
@@ -348,6 +359,37 @@ pub fn register_cron(plugin_name: &str, schedule: &str, entry: &str) -> Result<(
     Ok(())
 }
 
+/// 특정 라벨의 cron 제거 (개별 Off)
+pub fn unregister_single_cron(plugin_name: &str, label: &str) -> Result<()> {
+    check_crontab_available()?;
+    let mut channel = get_channel_session()?;
+    let marker = format!("inn-plugin:{}:{}", plugin_name, label);
+    let cmd = format!(
+        "crontab -l 2>/dev/null | grep -v '{}' | crontab -",
+        marker
+    );
+    execute_ssh_command(&mut channel, &cmd)?;
+    Ok(())
+}
+
+/// 등록된 cron 목록 조회 → "pluginName:label" 형태 반환
+pub fn list_registered_crons() -> Result<Vec<String>> {
+    let mut channel = get_channel_session()?;
+    let output = execute_ssh_command(&mut channel, "crontab -l 2>/dev/null")?;
+    let mut result = Vec::new();
+    for line in output.lines() {
+        // 마커 형식: # inn-plugin:{name}:{label}
+        if let Some(pos) = line.find("inn-plugin:") {
+            let marker = line[pos + "inn-plugin:".len()..].trim();
+            if !marker.is_empty() {
+                result.push(marker.to_string());
+            }
+        }
+    }
+    Ok(result)
+}
+
+/// 플러그인의 모든 cron 제거 (disable/uninstall 용)
 pub fn unregister_cron(plugin_name: &str) -> Result<()> {
     let mut channel = get_channel_session()?;
     let marker = format!("inn-plugin:{}", plugin_name);

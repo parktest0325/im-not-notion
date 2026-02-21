@@ -16,6 +16,7 @@ export type {
     InputField,
     PluginResult,
     PluginAction,
+    DownloadItem,
 } from "./generated";
 
 export { NodeType, HookEvent } from "./generated";

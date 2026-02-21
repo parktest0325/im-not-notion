@@ -10,6 +10,7 @@ use std::sync::OnceLock;
 use anyhow::Result;
 use tauri::Emitter;
 use tauri_plugin_shell::init as shell_init;
+use tauri_plugin_dialog::init as dialog_init;
 
 static APP_HANDLE: OnceLock<tauri::AppHandle> = OnceLock::new();
 
@@ -25,7 +26,7 @@ use commands::{
     file_command::{
         get_file_content, get_file_tree, move_file_or_folder,
         new_content_for_hugo, remove_file, save_file_content, save_file_image,
-        toggle_hidden_file, check_file_hidden,
+        toggle_hidden_file, check_file_hidden, download_remote_file,
     },
     config_command::{load_config, save_config, switch_server, check_connection},
     ssh_command::{kill_server, start_server, execute_ssh},
@@ -41,6 +42,7 @@ use commands::{
         list_plugins, install_plugin, uninstall_plugin,
         enable_plugin, disable_plugin, run_plugin,
         register_plugin_cron, unregister_plugin_cron,
+        list_registered_crons,
         pull_plugin, open_plugin_in_editor,
     },
 };
@@ -48,6 +50,7 @@ use commands::{
 fn main() -> Result<()> {
     tauri::Builder::default()
         .plugin(shell_init())
+        .plugin(dialog_init())
         .setup(|app| {
             APP_HANDLE.set(app.handle().clone()).ok();
             // 앱 시작 시 설정 로드 (SSH 연결 포함)
@@ -73,6 +76,7 @@ fn main() -> Result<()> {
             execute_ssh,
             toggle_hidden_file,
             check_file_hidden,
+            download_remote_file,
             check_prerequisites_cmd,
             check_hugo_installed_cmd,
             detect_server_platform_cmd,
@@ -95,6 +99,7 @@ fn main() -> Result<()> {
             run_plugin,
             register_plugin_cron,
             unregister_plugin_cron,
+            list_registered_crons,
             pull_plugin,
             open_plugin_in_editor,
         ])

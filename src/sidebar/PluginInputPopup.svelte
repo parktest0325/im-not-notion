@@ -1,6 +1,5 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import Popup from "../component/Popup.svelte";
   import { addToast } from "../stores";
   import type { PluginManifest, InputField, PluginResult } from "../types/setting";
 
@@ -9,7 +8,8 @@
   export let inputFields: InputField[] = [];
   export let onClose: () => void;
   export let onRefreshTree: () => void;
-  export let onShowResult: (title: string, body: string) => void = () => {};
+  export let onShowResult: (title: string, body: string, pages?: any[]) => void = () => {};
+  export let onDownloadFiles: (items: any[]) => void = () => {};
 
   let values: Record<string, string | boolean> = {};
   let isExecuting = false;
@@ -44,7 +44,6 @@
         addToast(result.error ?? "Plugin failed.");
       }
 
-      // actions 처리
       if (result.actions) {
         for (const action of result.actions) {
           if (action.type === "refresh_tree") {
@@ -55,7 +54,9 @@
               action.content.toast_type === "success" ? "success" : "error"
             );
           } else if (action.type === "show_result" && action.content) {
-            onShowResult(action.content.title, action.content.body);
+            onShowResult(action.content.title, action.content.body ?? "", action.content.pages);
+          } else if (action.type === "download_files" && action.content) {
+            onDownloadFiles(action.content.items);
           }
         }
       }
@@ -70,45 +71,72 @@
   }
 </script>
 
-<Popup {show} closePopup={onClose}>
-  {#if plugin}
-    <h3 class="text-lg font-bold">{plugin.name}</h3>
-    <p class="text-sm opacity-70">{plugin.description}</p>
+{#if show}
+  <!-- svelte-ignore a11y-click-events-have-key-events -->
+  <!-- svelte-ignore a11y-no-static-element-interactions -->
+  <div class="fixed inset-0 flex justify-center items-center p-4 input-overlay" on:click|self={onClose}>
+    <div class="input-popup-content">
+      {#if plugin}
+        <h3 class="text-lg font-bold">{plugin.name}</h3>
+        <p class="text-sm opacity-70">{plugin.description}</p>
 
-    <div class="space-y-3">
-      {#each inputFields as field}
-        <div>
-          {#if field.type === "boolean"}
-            <label class="flex items-center gap-2 text-sm cursor-pointer" for={field.name}>
-              <input
-                id={field.name}
-                type="checkbox"
-                bind:checked={values[field.name]}
-              />
-              {field.label}
-            </label>
-          {:else}
-            <label class="block text-sm mb-1" for={field.name}>{field.label}</label>
-            <input
-              id={field.name}
-              type="text"
-              class="w-full p-2 rounded border"
-              style="background-color: var(--input-bg-color); border-color: var(--border-color);"
-              bind:value={values[field.name]}
-              placeholder={field.default ?? ""}
-            />
-          {/if}
+        <div class="space-y-3">
+          {#each inputFields as field}
+            <div>
+              {#if field.type === "boolean"}
+                <label class="flex items-center gap-2 text-sm cursor-pointer" for={field.name}>
+                  <input
+                    id={field.name}
+                    type="checkbox"
+                    checked={values[field.name]}
+                    on:change={(e) => { values[field.name] = e.currentTarget.checked; values = values; }}
+                  />
+                  {field.label}
+                </label>
+              {:else}
+                <label class="block text-sm mb-1" for={field.name}>{field.label}</label>
+                <input
+                  id={field.name}
+                  type="text"
+                  class="w-full p-2 rounded border"
+                  style="background-color: var(--input-bg-color); border-color: var(--border-color);"
+                  value={values[field.name]}
+                  on:input={(e) => { values[field.name] = e.currentTarget.value; values = values; }}
+                  placeholder={field.default ?? ""}
+                />
+              {/if}
+            </div>
+          {/each}
         </div>
-      {/each}
-    </div>
 
-    <button
-      class="w-full p-2 rounded mt-2"
-      style="background-color: var(--button-active-bg-color);"
-      on:click={executePlugin}
-      disabled={isExecuting}
-    >
-      {isExecuting ? "Executing..." : "Execute"}
-    </button>
-  {/if}
-</Popup>
+        <button
+          class="w-full p-2 rounded mt-2"
+          style="background-color: var(--button-active-bg-color);"
+          on:click={executePlugin}
+          disabled={isExecuting}
+        >
+          {isExecuting ? "Executing..." : "Execute"}
+        </button>
+      {/if}
+    </div>
+  </div>
+{/if}
+
+<style>
+  .input-overlay {
+    background-color: var(--overlay-bg-color);
+    z-index: 1100;
+  }
+  .input-popup-content {
+    background-color: var(--popup-bg-color);
+    color: var(--popup-text-color);
+    padding: 1.5rem;
+    border-radius: 0.5rem;
+    box-shadow: var(--shadow-popup);
+    width: 100%;
+    max-width: 32rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+</style>
