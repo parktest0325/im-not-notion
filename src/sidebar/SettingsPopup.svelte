@@ -27,6 +27,7 @@
   let editTab: "ssh" | "hugo" | "shortcuts" = "ssh";
   let isSetupRunning = false;
   let isSwitching = false;
+  let isConnected = true;
 
   // Shortcuts state
   let shortcutEntries: Array<{ id: string; description: string; shortcuts: string[] }> = [];
@@ -56,6 +57,7 @@
       activeServerName.set(active?.name ?? "");
       buildShortcutMap(config.shortcuts ?? {}, []);
       refreshShortcutEntries();
+      isConnected = await invoke<boolean>("check_connection");
     } catch (error) {
       console.error("Failed to load config:", error);
       config = createDefaultAppConfig();
@@ -69,6 +71,14 @@
 
   async function selectServer(id: string) {
     if (config.active_server === id) return;
+    await connectServer(id);
+  }
+
+  async function reconnectServer() {
+    await connectServer(config.active_server);
+  }
+
+  async function connectServer(id: string) {
     isSwitching = true;
     try {
       const newConfig: AppConfig = await invoke("switch_server", {
@@ -87,12 +97,14 @@
       hiddenPath.set(config.cms_config.hugo_config.hidden_path);
       const active = config.servers?.find(s => s.id === id);
       activeServerName.set(active?.name ?? "");
+      isConnected = true;
       refreshShortcutEntries();
-      addToast("Server switched.", "success");
+      addToast("Server connected.", "success");
       onServerSwitch();
     } catch (error) {
-      console.error("Failed to switch server:", error);
-      addToast("Failed to switch server.");
+      console.error("Failed to connect server:", error);
+      isConnected = false;
+      addToast(`Failed to connect: ${error}`);
     } finally {
       isSwitching = false;
     }
@@ -299,17 +311,18 @@
     <!-- ═══ Server List View ═══ -->
     <div class="space-y-3 max-h-96 overflow-y-auto">
       {#each config.servers ?? [] as server (server.id)}
-        <div class="server-card" class:server-active={server.id === config.active_server}>
+        <div class="server-card" class:server-active={server.id === config.active_server && isConnected} class:server-disconnected={server.id === config.active_server && !isConnected}>
           <div class="server-card-header">
             <button
               class="server-radio"
-              class:selected={server.id === config.active_server}
+              class:selected={server.id === config.active_server && isConnected}
+              class:disconnected={server.id === config.active_server && !isConnected}
               on:click={() => selectServer(server.id)}
               disabled={isSwitching}
               title="Set as active server"
             >
               {#if server.id === config.active_server}
-                <div class="radio-dot"></div>
+                <div class="radio-dot" class:dot-disconnected={!isConnected}></div>
               {/if}
             </button>
             <div class="server-info">
@@ -317,6 +330,13 @@
               <span class="server-host">{server.ssh_config.host}:{server.ssh_config.port || "22"} · {server.ssh_config.username}</span>
             </div>
             <div class="server-actions">
+              {#if server.id === config.active_server && !isConnected}
+                <button class="server-action-btn reconnect" on:click={reconnectServer} disabled={isSwitching} title="Reconnect">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                  </svg>
+                </button>
+              {/if}
               <button class="server-action-btn" on:click={() => openEditServer(server)} title="Edit">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
@@ -439,6 +459,20 @@
     border-color: var(--status-connected-color);
   }
 
+  .server-card.server-disconnected {
+    border-color: var(--error-color);
+  }
+
+  .server-action-btn.reconnect {
+    color: var(--error-color);
+    opacity: 0.8;
+  }
+
+  .server-action-btn.reconnect:hover {
+    opacity: 1;
+    color: var(--error-color);
+  }
+
   .server-card-header {
     display: flex;
     align-items: center;
@@ -464,11 +498,19 @@
     border-color: var(--status-connected-color);
   }
 
+  .server-radio.disconnected {
+    border-color: var(--error-color);
+  }
+
   .radio-dot {
     width: 8px;
     height: 8px;
     border-radius: 50%;
     background-color: var(--status-connected-color);
+  }
+
+  .radio-dot.dot-disconnected {
+    background-color: var(--error-color);
   }
 
   .server-info {

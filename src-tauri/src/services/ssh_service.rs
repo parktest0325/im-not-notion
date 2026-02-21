@@ -4,22 +4,36 @@ use anyhow::{Result, Context};
 use crate::types::config::SshConfig;
 use once_cell::sync::Lazy;
 
-const TCP_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+const TCP_CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
+const ALIVE_CHECK_TIMEOUT_MS: u32 = 2000;
 
 static SSH_CLIENT: Lazy<Mutex<Option<Session>>> = Lazy::new(|| Mutex::new(None));
+
+/// 기존 세션이 살아있는지 빠르게 확인 (타임아웃 일시 적용)
+fn is_session_alive(session: &Session) -> bool {
+    if !session.authenticated() {
+        return false;
+    }
+    session.set_timeout(ALIVE_CHECK_TIMEOUT_MS);
+    let alive = session.channel_session().is_ok();
+    session.set_timeout(0); // 원복: 무제한
+    alive
+}
 
 /// SshConfig를 직접 받아 SSH 연결
 fn connect_inner(ssh_config: &SshConfig, force: bool) -> Result<()> {
     if !force {
-        let client = SSH_CLIENT.lock().unwrap();
+        let mut client = SSH_CLIENT.lock().unwrap();
         if let Some(ref session) = *client {
-            if session.authenticated() {
-                // Try opening a channel to verify connection is alive
-                if session.channel_session().is_ok() {
-                    return Ok(());
-                }
+            if is_session_alive(session) {
+                return Ok(());
             }
         }
+        // 죽은 세션 정리 — 이후 get_channel_session 등에서 블로킹 방지
+        *client = None;
+    } else {
+        // force: 기존 세션 즉시 정리
+        *SSH_CLIENT.lock().unwrap() = None;
     }
 
     let mut session = Session::new().context("Failed to create SSH session")?;
@@ -59,7 +73,7 @@ pub fn reconnect_ssh_with_config(ssh_config: &SshConfig) -> Result<()> {
 pub fn is_ssh_connected() -> bool {
     let client = SSH_CLIENT.lock().unwrap();
     if let Some(ref session) = *client {
-        session.authenticated() && session.channel_session().is_ok()
+        is_session_alive(session)
     } else {
         false
     }
