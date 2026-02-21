@@ -3,6 +3,7 @@ import { svelte } from "@sveltejs/vite-plugin-svelte";
 
 // https://vitejs.dev/config/
 export default defineConfig(async () => ({
+  base: '',
   plugins: [svelte()],
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
