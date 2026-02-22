@@ -10,6 +10,7 @@
 |----------|-------------|
 | [GETTING_STARTED.md](./guide/GETTING_STARTED.md) | 빌드, 설치, 실행 방법 |
 | [SERVER_SETUP.md](./guide/SERVER_SETUP.md) | 서버 초기 세팅 (SSH, 유저, Docker, 패키지) |
+| [PLUGINS.md](./guide/PLUGINS.md) | 플러그인 사용 가이드 (autopush, autosquash, backup, image-link) |
 
 ### Internal — 내부 동작 가이드
 
