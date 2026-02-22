@@ -459,12 +459,13 @@ fn update_image_refs_in_file(sftp: &Sftp, config: &HugoConfig, rel_path: &str, o
 
     let old_with_slash = format!("{}/", old_prefix);
 
-    // 경로의 시작 부분에서만 old_prefix를 new_prefix로 치환
+    // 경로의 시작 부분에서만 old_prefix를 new_prefix로 치환 (fragment 보존)
     let replace_path_prefix = |path: &str| -> String {
-        let stripped = path.trim_start_matches('/');
+        let (file_path, fragment) = split_image_fragment(path);
+        let stripped = file_path.trim_start_matches('/');
         if stripped.starts_with(&old_with_slash) || stripped == old_prefix {
             let rest = &stripped[old_prefix.len()..];
-            format!("/{}{}", new_prefix, rest)
+            format!("/{}{}{}", new_prefix, rest, fragment)
         } else {
             path.to_string()
         }
@@ -590,6 +591,17 @@ fn copy_file_checked(sftp: &Sftp, src: &Path, dst: &Path) -> Result<CopyResult> 
 }
 
 /// md 내 모든 이미지 참조 추출 (로컬 + 외부 URL)
+/// 이미지 경로에서 fragment(#...) 부분을 분리하여 (경로, fragment) 반환
+/// 예: "image.png#center-w60" → ("image.png", "#center-w60")
+///     "https://example.com/img.png#center" → ("https://example.com/img.png", "#center")
+///     "image.png" → ("image.png", "")
+fn split_image_fragment(path: &str) -> (&str, &str) {
+    match path.find('#') {
+        Some(idx) => (&path[..idx], &path[idx..]),
+        None => (path, ""),
+    }
+}
+
 fn parse_all_image_refs(content: &str) -> (Vec<String>, Vec<String>) {
     let mut local_refs = Vec::new();
     let mut external_urls = Vec::new();
@@ -685,7 +697,9 @@ fn sync_images_on_save(sftp: &Sftp, config: &HugoConfig, file_path: &str, conten
 
     // 1. 로컬 외부참조 → 내 디렉토리로 복사
     for img_ref in &local_refs {
-        let ref_clean = img_ref.trim_start_matches('/');
+        // fragment(#center-w60 등) 분리: 파일 경로에서 제외하고, 치환 시 보존
+        let (ref_path, fragment) = split_image_fragment(img_ref);
+        let ref_clean = ref_path.trim_start_matches('/');
         if ref_clean.starts_with(&my_prefix) {
             continue; // 이미 내 디렉토리
         }
@@ -694,8 +708,8 @@ fn sync_images_on_save(sftp: &Sftp, config: &HugoConfig, file_path: &str, conten
             .file_name()
             .and_then(|f| f.to_str())
             .unwrap_or(ref_clean);
-        let new_ref = format!("/{}{}", my_prefix, filename);
-        let dst_abs = image_abs(config, &new_ref);
+        let new_ref = format!("/{}{}{}", my_prefix, filename, fragment);
+        let dst_abs = image_abs(config, &format!("/{}{}", my_prefix, filename));
         let src_abs = image_abs(config, ref_clean);
 
         if sftp.stat(Path::new(&src_abs)).is_err() {
@@ -708,8 +722,8 @@ fn sync_images_on_save(sftp: &Sftp, config: &HugoConfig, file_path: &str, conten
             // 원본 존재 → 해시 비교 복사
             match copy_file_checked(sftp, Path::new(&src_abs), Path::new(&dst_abs)) {
                 Ok(CopyResult::Renamed(new_name)) => {
-                    // 이름 충돌 → 새 이름으로 링크 업데이트
-                    let renamed_ref = format!("/{}{}", my_prefix, new_name);
+                    // 이름 충돌 → 새 이름으로 링크 업데이트 (fragment 보존)
+                    let renamed_ref = format!("/{}{}{}", my_prefix, new_name, fragment);
                     updated_content = replace_image_ref(&updated_content, img_ref, &renamed_ref);
                     modified = true;
                     continue;
@@ -724,11 +738,12 @@ fn sync_images_on_save(sftp: &Sftp, config: &HugoConfig, file_path: &str, conten
         modified = true;
     }
 
-    // 2. 외부 URL → 다운로드 + 저장
+    // 2. 외부 URL → 다운로드 + 저장 (fragment 보존)
     for url in &external_urls {
-        let filename = generate_url_filename(url);
-        let new_ref = format!("/{}{}", my_prefix, filename);
-        let dst_abs = image_abs(config, &new_ref);
+        let (clean_url, fragment) = split_image_fragment(url);
+        let filename = generate_url_filename(clean_url);
+        let new_ref = format!("/{}{}{}", my_prefix, filename, fragment);
+        let dst_abs = image_abs(config, &format!("/{}{}", my_prefix, filename));
 
         // 이미 다운로드 되어있으면 스킵
         if sftp.stat(Path::new(&dst_abs)).is_ok() {
@@ -737,7 +752,7 @@ fn sync_images_on_save(sftp: &Sftp, config: &HugoConfig, file_path: &str, conten
             continue;
         }
 
-        if let Err(_) = download_url_to_sftp(sftp, url, Path::new(&dst_abs)) {
+        if let Err(_) = download_url_to_sftp(sftp, clean_url, Path::new(&dst_abs)) {
             continue; // 다운로드 실패 → 해당 URL 스킵
         }
 
@@ -775,9 +790,10 @@ pub fn sync_pasted_refs(file_path: &str, pasted_text: &str) -> Result<String> {
     let (local_refs, external_urls) = parse_all_image_refs(pasted_text);
     let mut updated = pasted_text.to_string();
 
-    // 로컬 외부참조 → 내 디렉토리로 복사
+    // 로컬 외부참조 → 내 디렉토리로 복사 (fragment 보존)
     for img_ref in &local_refs {
-        let ref_clean = img_ref.trim_start_matches('/');
+        let (ref_path, fragment) = split_image_fragment(img_ref);
+        let ref_clean = ref_path.trim_start_matches('/');
         if ref_clean.starts_with(&my_prefix) {
             continue;
         }
@@ -786,8 +802,8 @@ pub fn sync_pasted_refs(file_path: &str, pasted_text: &str) -> Result<String> {
             .file_name()
             .and_then(|f| f.to_str())
             .unwrap_or(ref_clean);
-        let new_ref = format!("/{}{}", my_prefix, filename);
-        let dst_abs = image_abs(&config, &new_ref);
+        let new_ref = format!("/{}{}{}", my_prefix, filename, fragment);
+        let dst_abs = image_abs(&config, &format!("/{}{}", my_prefix, filename));
         let src_abs = image_abs(&config, ref_clean);
 
         if sftp.stat(Path::new(&src_abs)).is_err() {
@@ -797,7 +813,7 @@ pub fn sync_pasted_refs(file_path: &str, pasted_text: &str) -> Result<String> {
         } else if src_abs != dst_abs {
             match copy_file_checked(&sftp, Path::new(&src_abs), Path::new(&dst_abs)) {
                 Ok(CopyResult::Renamed(new_name)) => {
-                    let renamed_ref = format!("/{}{}", my_prefix, new_name);
+                    let renamed_ref = format!("/{}{}{}", my_prefix, new_name, fragment);
                     updated = replace_image_ref(&updated, img_ref, &renamed_ref);
                     continue;
                 }
@@ -809,18 +825,19 @@ pub fn sync_pasted_refs(file_path: &str, pasted_text: &str) -> Result<String> {
         updated = replace_image_ref(&updated, img_ref, &new_ref);
     }
 
-    // 외부 URL → 다운로드 + 저장
+    // 외부 URL → 다운로드 + 저장 (fragment 보존)
     for url in &external_urls {
-        let filename = generate_url_filename(url);
-        let new_ref = format!("/{}{}", my_prefix, filename);
-        let dst_abs = image_abs(&config, &new_ref);
+        let (clean_url, fragment) = split_image_fragment(url);
+        let filename = generate_url_filename(clean_url);
+        let new_ref = format!("/{}{}{}", my_prefix, filename, fragment);
+        let dst_abs = image_abs(&config, &format!("/{}{}", my_prefix, filename));
 
         if sftp.stat(Path::new(&dst_abs)).is_ok() {
             updated = replace_image_ref(&updated, url, &new_ref);
             continue;
         }
 
-        if download_url_to_sftp(&sftp, url, Path::new(&dst_abs)).is_err() {
+        if download_url_to_sftp(&sftp, clean_url, Path::new(&dst_abs)).is_err() {
             continue;
         }
 
