@@ -248,10 +248,47 @@ hidden 파일을 이동할 때 content 경로에 동일한 이름이 있어도 �
 
 ---
 
-### [F7] Hugo 커스텀 테마 제작
-- **상태**: 대기
+### [F7] Hugo 커스텀 테마 제작 (im-not-notion-theme)
+- **상태**: 완료
 
-개인 블로그용 Hugo 테마 제작.
+`inn-plugins/deploy-theme/im-not-notion-theme/` 에 Hugo 테마 구현.
+
+#### Blog 섹션 — HugoBook 스타일
+- 왼쪽 사이드바 폴더 트리 (재귀, `_index.md` weight 정렬)
+- 접기/펼치기 토글 (기본 접힘, 현재 경로 자동 펼침)
+- **깊이별 색상 가이드 라인**: `mod depth 4` 로 accent/cyan/magenta/green 순환 (무한 depth 대응)
+- 깊이별 폰트 크기 감소, hover 시 가이드 라인 강조
+- 오른쪽 TOC (Table of Contents)
+- 코드 하이라이팅 (Chroma, dracula 테마)
+- 이전/다음 글 네비게이션
+- 모바일 반응형 (사이드바 토글)
+
+#### Projects 섹션 — 사이버펑크 카드
+- 네온 글로우 보더 + hover 글리치 효과 (다크모드)
+- 스캔라인 오버레이, 크로매틱 어버레이션
+- 모달 팝업 (카드 클릭 → 상세 정보 + 기술 스택 + 링크)
+- 태그 필터링 (JS data attribute)
+- 상태 인디케이터 (active/completed/archived)
+- Front matter: `technologies`, `status`, `links` (blog/showcase/demo/github)
+
+#### 홈페이지
+- Hero 섹션 (글리치 타이틀, 타이핑 커서)
+- About 섹션 (아바타, 바이오, 소셜 링크)
+- Featured Projects (카드 그리드 + 모달)
+- Site Stats (빌드타임 통계 + GoatCounter 방문자 수)
+- Recent Posts 리스트
+
+#### 통합 기능
+- **다크/라이트 모드**: `[data-theme]` CSS 변수 + localStorage
+- **GoatCounter**: 푸터 페이지뷰 + 홈페이지 총 방문자
+- **Giscus 댓글**: 블로그 글 + 방명록 페이지 (사이트 테마 자동 동기화)
+- **방명록**: `/guestbook/` 별도 페이지 (nav 메뉴)
+- **반응형**: 768px/1100px breakpoints
+
+#### exampleSite
+- 26개 블로그 글 (depth 4, game-dev/security/os-dev)
+- 3개 프로젝트 (game-engine/ctf-toolkit/micro-os)
+- `hugo.toml` 전체 설정 옵션 문서화 (주석 + placeholder)
 
 ---
 
@@ -266,6 +303,45 @@ AI를 활용한 웹 크롤링 플러그인.
 - **상태**: 대기
 
 AI를 활용한 문서 작성 보조 플러그인.
+
+---
+
+### [F12] deploy-theme 플러그인
+- **상태**: 완료
+
+`inn-plugins/deploy-theme/` — 테마 + 데모 콘텐츠를 Hugo 사이트에 배포.
+
+- 테마 배포: `shutil.rmtree` 후 clean overwrite
+- 콘텐츠 배포: rename 방식 (`_old` → copy new → delete old)
+- `hugo.toml` 패치: theme 설정 + Blog/Projects/Guestbook 메뉴 자동 추가
+- `content_paths` 서버 config 자동 업데이트
+- 트리거: manual (`deploy_content` boolean 입력)
+
+---
+
+### [F13] 플러그인 싱크 tar 최적화
+- **상태**: 완료
+
+플러그인 install/pull을 파일별 SFTP → tar 기반 벌크 전송으로 변경.
+257개 파일 개별 전송 → 1개 tar.gz 파일로 전환.
+
+- `install_plugin()`: 로컬 tar.gz 생성 → SFTP 업로드 → 서버에서 추출
+- `pull_plugin()`: 서버에서 tar.gz 생성 → SFTP 다운로드 → 로컬 추출
+- 추가 크레이트: `flate2`, `tar`, `walkdir`
+- 기존 `upload_dir_recursive`, `download_dir_recursive` 제거
+
+---
+
+### [F14] 섹션 아코디언 UI
+- **상태**: 완료
+
+`FileControlSection.svelte` 사이드바 섹션 표시 개선.
+
+- 섹션 헤더 항상 표시 (flex-shrink: 0)
+- 한 번에 하나의 섹션만 열림
+- 열린 섹션이 남은 공간 100% 사용 + 내부 스크롤
+- 첫 번째 섹션 자동 열림 (최초 1회만)
+- 클릭으로 접기/펼치기 토글
 
 ---
 
@@ -314,5 +390,13 @@ AI를 활용한 문서 작성 보조 플러그인.
 | 2026-02-22 | - | 완료 | 텍스트 붙여넣기 시 이미지 동기화 (sync_pasted_refs, preventDefault 방식) |
 | 2026-02-22 | - | 완료 | verify/fix-image-link 플러그인 재작성 (v1.0.0, 5개 카테고리, collapsible 출력) |
 | 2026-02-22 | - | 완료 | 플러그인 호환성 수정 (blog-backup, git-autosquash, git-autopush config 경로) |
-| 2026-02-22 | F5 | 진행중 | 문서 구조 개편 (docs/tmp/ → docs/, README 인덱스, IMAGE_SYNC 보강) |
+| 2026-02-22 | F5 | 완료 | 문서 구조 개편 (docs/tmp/ → docs/, README 인덱스, IMAGE_SYNC 보강) |
 | 2026-02-22 | F6-F9 | 등록 | TODO 업데이트 (autosquash 테스트, hugo 테마, AI 플러그인 2종) |
+| 2026-02-22 | F7 | 완료 | Hugo 커스텀 테마 (blog sidebar + cyberpunk projects + homepage + dark/light) |
+| 2026-02-22 | F7 | 완료 | 테마 추가기능: GoatCounter, Giscus 댓글, 방명록, About 섹션, 반응형 |
+| 2026-02-22 | F7 | 완료 | exampleSite: 26개 블로그 글 (depth 4) + 3개 프로젝트 + hugo.toml 문서화 |
+| 2026-02-22 | F12 | 완료 | deploy-theme 플러그인 (테마+콘텐츠 배포, hugo.toml 패치, Guestbook 메뉴) |
+| 2026-02-22 | F13 | 완료 | 플러그인 싱크 tar 최적화 (flate2+tar+walkdir, 파일별 SFTP→벌크 전송) |
+| 2026-02-22 | F14 | 완료 | 섹션 아코디언 UI (항상 표시 헤더, 하나만 열림, 내부 스크롤) |
+| 2026-02-22 | - | 완료 | 플러그인 업로드 시 기존 폴더 클리어 후 업로드 |
+| 2026-02-22 | - | 버전 | 1.0.1 → 1.1.0 (Cargo.toml, tauri.conf.json, docs/README.md) |

@@ -1,6 +1,6 @@
 # im-not-notion Documentation
 
-> version: 1.0.1 | last updated: 2026-02-22
+> version: 1.1.0 | last updated: 2026-02-22
 
 ## Index
 
