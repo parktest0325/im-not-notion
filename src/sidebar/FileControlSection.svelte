@@ -34,23 +34,26 @@
     import { selectedCursor, relativeFilePath, draggingInfo, isEditingFileName } from "../stores";
 
     let searchTerm: string = "";
-    let expandedSections: Record<string, boolean> = {};
+    let activeSection: string | null = null;
+    let initialized = false;
     let dragOverSection: string | null = null;
 
     onMount(refreshList);
 
-    // 섹션이 로드되면 기본적으로 모두 펼침
+    // 최초 로드 시에만 첫 번째 섹션 활성화
     $: {
-        for (const node of $directoryStructure) {
-            if (!(node.name in expandedSections)) {
-                expandedSections[node.name] = true;
-            }
+        if ($directoryStructure.length > 0 && !initialized) {
+            activeSection = $directoryStructure[0].name;
+            initialized = true;
         }
     }
 
     function toggleSection(name: string) {
-        expandedSections[name] = !expandedSections[name];
-        expandedSections = expandedSections;
+        if (activeSection === name) {
+            activeSection = null;
+        } else {
+            activeSection = name;
+        }
     }
 
     async function createInSection(event: MouseEvent, sectionName: string, createType: string) {
@@ -64,8 +67,7 @@
             });
             selectedCursor.set(createdPath);
             relativeFilePath.set(createdPath);
-            expandedSections[sectionName] = true;
-            expandedSections = expandedSections;
+            activeSection = sectionName;
             await refreshList();
             addToast("Item created.", "success");
         } catch (error) {
@@ -143,56 +145,56 @@
         </button>
     </div>
 
-    <!-- 섹션별 파일 리스트 -->
-    <div class="flex-grow overflow-y-auto">
-        {#each $directoryStructure as section, i}
-            {#if i > 0}
-                <hr class="section-divider" />
-            {/if}
-            <div class="section">
-                <button class="section-header"
-                    class:drag-over-section={dragOverSection === section.name}
-                    on:click={() => toggleSection(section.name)}
-                    on:dragover={(e) => onSectionDragOver(e, section.name)}
-                    on:dragleave={onSectionDragLeave}
-                    on:drop={(e) => onSectionDrop(e, section.name)}
-                >
-                    <span class="section-arrow">{expandedSections[section.name] ? '\u25BC' : '\u25B6'}</span>
-                    <span class="section-name">{section.name}</span>
-                    <span class="section-actions">
-                        <button
-                            class="section-action-btn"
-                            on:click|stopPropagation={(e) => createInSection(e, section.name, "File")}
-                            title="New file"
-                        >
-                            <div class="w-3 h-3"><FaFileMedical /></div>
-                        </button>
-                        <button
-                            class="section-action-btn"
-                            on:click|stopPropagation={(e) => createInSection(e, section.name, "Directory")}
-                            title="New folder"
-                        >
-                            <div class="w-3 h-3"><FaFolderPlus /></div>
-                        </button>
-                    </span>
-                </button>
-                {#if expandedSections[section.name]}
+    <!-- 섹션 아코디언: 헤더는 항상 보이고, 열린 섹션만 나머지 공간 차지 -->
+    <div class="section-accordion">
+        {#each $directoryStructure as section}
+            <button class="section-header"
+                class:active={activeSection === section.name}
+                class:drag-over-section={dragOverSection === section.name}
+                on:click={() => toggleSection(section.name)}
+                on:dragover={(e) => onSectionDragOver(e, section.name)}
+                on:dragleave={onSectionDragLeave}
+                on:drop={(e) => onSectionDrop(e, section.name)}
+            >
+                <span class="section-arrow">{activeSection === section.name ? '\u25BC' : '\u25B6'}</span>
+                <span class="section-name">{section.name}</span>
+                <span class="section-actions">
+                    <button
+                        class="section-action-btn"
+                        on:click|stopPropagation={(e) => createInSection(e, section.name, "File")}
+                        title="New file"
+                    >
+                        <div class="w-3 h-3"><FaFileMedical /></div>
+                    </button>
+                    <button
+                        class="section-action-btn"
+                        on:click|stopPropagation={(e) => createInSection(e, section.name, "Directory")}
+                        title="New folder"
+                    >
+                        <div class="w-3 h-3"><FaFolderPlus /></div>
+                    </button>
+                </span>
+            </button>
+            {#if activeSection === section.name}
+                <div class="section-content">
                     <ul class="list-none p-0">
                         {#each section.children as node}
                             <TreeNode path={`/${section.name}/`} {node} />
                         {/each}
                     </ul>
-                {/if}
-            </div>
+                </div>
+            {/if}
         {/each}
     </div>
 </div>
 
 <style>
-    .section-divider {
-        border: none;
-        border-top: 1px solid var(--border-color);
-        margin: 0.25rem 0;
+    .section-accordion {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        overflow: hidden;
     }
 
     .section-header {
@@ -201,6 +203,7 @@
         width: 100%;
         padding: 0.375rem 0.25rem;
         border: none;
+        border-top: 1px solid var(--border-color);
         background: none;
         cursor: pointer;
         font-size: 0.8rem;
@@ -209,10 +212,20 @@
         text-transform: uppercase;
         letter-spacing: 0.03em;
         box-shadow: none;
+        flex-shrink: 0;
+    }
+
+    .section-header:first-child {
+        border-top: none;
     }
 
     .section-header:hover {
         opacity: 1;
+    }
+
+    .section-header.active {
+        opacity: 1;
+        background-color: var(--button-hover-bg-color);
     }
 
     .section-arrow {
@@ -250,6 +263,12 @@
     .section-action-btn:hover {
         opacity: 1;
         background-color: var(--button-hover-bg-color);
+    }
+
+    .section-content {
+        flex: 1;
+        overflow-y: auto;
+        min-height: 0;
     }
 
     .drag-over-section {

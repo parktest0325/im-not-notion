@@ -169,7 +169,7 @@ pub fn list_all_plugins(local_path: &str) -> Result<Vec<PluginInfo>> {
 
 /// 로컬 플러그인 하나를 서버에 설치
 pub fn install_plugin(local_path: &str, plugin_name: &str) -> Result<()> {
-    let sftp = get_sftp_session()?;
+    let mut sftp = get_sftp_session()?;
     let remote_base = resolve_plugin_dir()?;
     mkdir_recursive(&sftp, Path::new(&remote_base))?;
 
@@ -178,7 +178,9 @@ pub fn install_plugin(local_path: &str, plugin_name: &str) -> Result<()> {
         anyhow::bail!("Plugin not found locally: {}", plugin_name);
     }
 
+    // 기존 원격 플러그인 폴더를 완전히 삭제 후 다시 업로드
     let remote_dir = format!("{}/{}", remote_base, plugin_name);
+    let _ = rmrf_file(&mut sftp, Path::new(&remote_dir));
     upload_dir_recursive(&sftp, &local_dir, &remote_dir)?;
 
     // 실행 권한 부여
