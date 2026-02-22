@@ -167,29 +167,43 @@ pub fn list_all_plugins(local_path: &str) -> Result<Vec<PluginInfo>> {
 // Install / Uninstall
 // ============================================================
 
-/// 로컬 플러그인 하나를 서버에 설치
+/// 로컬 플러그인 하나를 서버에 설치 (tar 압축 → 단일 업로드 → 서버 해제)
 pub fn install_plugin(local_path: &str, plugin_name: &str) -> Result<()> {
-    let mut sftp = get_sftp_session()?;
+    let sftp = get_sftp_session()?;
     let remote_base = resolve_plugin_dir()?;
-    mkdir_recursive(&sftp, Path::new(&remote_base))?;
 
     let local_dir = Path::new(local_path).join(plugin_name);
     if !local_dir.is_dir() {
         anyhow::bail!("Plugin not found locally: {}", plugin_name);
     }
 
-    // 기존 원격 플러그인 폴더를 완전히 삭제 후 다시 업로드
-    let remote_dir = format!("{}/{}", remote_base, plugin_name);
-    let _ = rmrf_file(&mut sftp, Path::new(&remote_dir));
-    upload_dir_recursive(&sftp, &local_dir, &remote_dir)?;
+    // 1. 로컬에서 tar.gz 생성
+    let tar_data = create_tar_gz(&local_dir)?;
 
-    // 실행 권한 부여
+    // 2. 서버에 tar.gz 업로드
+    let remote_tar = format!("{}/{}.tar.gz", remote_base, plugin_name);
+    mkdir_recursive(&sftp, Path::new(&remote_base))?;
+    let mut remote_file = sftp.create(Path::new(&remote_tar))?;
+    remote_file.write_all(&tar_data)?;
+
+    // 3. 서버에서 기존 폴더 삭제 → 압축 해제 → tar.gz 삭제
+    let remote_dir = format!("{}/{}", remote_base, plugin_name);
+    let mut channel = get_channel_session()?;
+    execute_ssh_command(
+        &mut channel,
+        &format!(
+            "rm -rf '{}' && mkdir -p '{}' && tar -xzf '{}' -C '{}' && rm -f '{}'",
+            remote_dir, remote_dir, remote_tar, remote_dir, remote_tar
+        ),
+    )?;
+
+    // 4. 실행 권한 부여
     let json_path = local_dir.join("plugin.json");
     if let Ok(data) = std::fs::read_to_string(&json_path) {
         if let Ok(manifest) = serde_json::from_str::<PluginManifest>(&data) {
-            let mut channel = get_channel_session()?;
+            let mut ch = get_channel_session()?;
             let _ = execute_ssh_command(
-                &mut channel,
+                &mut ch,
                 &format!("chmod +x {}/{}", remote_dir, manifest.entry),
             );
         }
@@ -423,12 +437,36 @@ pub fn unregister_cron(plugin_name: &str) -> Result<()> {
 // Pull (서버 → 로컬)
 // ============================================================
 
-/// 서버에서 플러그인 전체를 로컬로 다운로드
+/// 서버에서 플러그인 전체를 로컬로 다운로드 (서버에서 tar → 단일 다운로드 → 로컬 해제)
 pub fn pull_plugin(local_path: &str, plugin_name: &str) -> Result<()> {
     let sftp = get_sftp_session()?;
-    let remote_dir = format!("{}/{}", resolve_plugin_dir()?, plugin_name);
+    let remote_base = resolve_plugin_dir()?;
+    let remote_dir = format!("{}/{}", remote_base, plugin_name);
+    let remote_tar = format!("{}/{}.tar.gz", remote_base, plugin_name);
+
+    // 1. 서버에서 tar.gz 생성
+    let mut channel = get_channel_session()?;
+    execute_ssh_command(
+        &mut channel,
+        &format!("tar -czf '{}' -C '{}' .", remote_tar, remote_dir),
+    )?;
+
+    // 2. tar.gz 다운로드
+    let mut remote_file = sftp.open(Path::new(&remote_tar))
+        .context(format!("Failed to open remote tar: {}", remote_tar))?;
+    let mut tar_data = Vec::new();
+    remote_file.read_to_end(&mut tar_data)?;
+
+    // 3. 서버 tar.gz 삭제
+    let _ = sftp.unlink(Path::new(&remote_tar));
+
+    // 4. 로컬 폴더 삭제 → tar.gz 해제
     let local_dir = Path::new(local_path).join(plugin_name);
-    download_dir_recursive(&sftp, &remote_dir, &local_dir)?;
+    if local_dir.is_dir() {
+        std::fs::remove_dir_all(&local_dir)?;
+    }
+    extract_tar_gz(&tar_data, &local_dir)?;
+
     Ok(())
 }
 
@@ -436,49 +474,36 @@ pub fn pull_plugin(local_path: &str, plugin_name: &str) -> Result<()> {
 // SFTP 업로드/다운로드 헬퍼
 // ============================================================
 
-fn download_dir_recursive(sftp: &ssh2::Sftp, remote_dir: &str, local_dir: &Path) -> Result<()> {
-    std::fs::create_dir_all(local_dir)?;
+/// 로컬 디렉토리를 tar.gz 바이트로 압축
+fn create_tar_gz(dir: &Path) -> Result<Vec<u8>> {
+    let buf = Vec::new();
+    let enc = flate2::write::GzEncoder::new(buf, flate2::Compression::fast());
+    let mut tar = tar::Builder::new(enc);
 
-    let entries = sftp.readdir(Path::new(remote_dir))
-        .context(format!("Failed to list remote dir: {}", remote_dir))?;
-
-    for (remote_path, stat) in entries {
-        let name = remote_path.file_name()
-            .unwrap_or_default().to_string_lossy().to_string();
-        if name.starts_with('.') { continue; }
-
-        let local_path = local_dir.join(&name);
-        let remote_str = format!("{}/{}", remote_dir, name);
-
-        if stat.is_dir() {
-            download_dir_recursive(sftp, &remote_str, &local_path)?;
-        } else {
-            let mut remote_file = sftp.open(Path::new(&remote_path))?;
-            let mut data = Vec::new();
-            remote_file.read_to_end(&mut data)?;
-            std::fs::write(&local_path, &data)?;
-        }
-    }
-    Ok(())
-}
-
-fn upload_dir_recursive(sftp: &ssh2::Sftp, local_dir: &Path, remote_dir: &str) -> Result<()> {
-    mkdir_recursive(sftp, Path::new(remote_dir))?;
-
-    for entry in std::fs::read_dir(local_dir)? {
+    // 디렉토리 내부 파일만 추가 (.으로 시작하는 것 제외)
+    for entry in walkdir::WalkDir::new(dir).into_iter().filter_entry(|e| {
+        !e.file_name().to_string_lossy().starts_with('.')
+    }) {
         let entry = entry?;
-        let name = entry.file_name().to_string_lossy().to_string();
-        if name.starts_with('.') { continue; }
-
-        let remote_path = format!("{}/{}", remote_dir, name);
-
-        if entry.file_type()?.is_dir() {
-            upload_dir_recursive(sftp, &entry.path(), &remote_path)?;
-        } else {
-            let data = std::fs::read(entry.path())?;
-            let mut remote_file = sftp.create(Path::new(&remote_path))?;
-            remote_file.write_all(&data)?;
+        let rel_path = entry.path().strip_prefix(dir)?;
+        if rel_path.as_os_str().is_empty() { continue; }
+        if entry.file_type().is_file() {
+            tar.append_path_with_name(entry.path(), rel_path)?;
+        } else if entry.file_type().is_dir() {
+            tar.append_dir(rel_path, entry.path())?;
         }
     }
+
+    let enc = tar.into_inner()?;
+    Ok(enc.finish()?)
+}
+
+/// tar.gz 바이트를 로컬 디렉토리에 해제
+fn extract_tar_gz(data: &[u8], dst: &Path) -> Result<()> {
+    std::fs::create_dir_all(dst)?;
+    let dec = flate2::read::GzDecoder::new(data);
+    let mut archive = tar::Archive::new(dec);
+    archive.unpack(dst)?;
     Ok(())
 }
+
