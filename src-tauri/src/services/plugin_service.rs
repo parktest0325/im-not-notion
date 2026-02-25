@@ -213,8 +213,8 @@ pub fn install_plugin(local_path: &str, plugin_name: &str) -> Result<()> {
     execute_ssh_command(
         &mut channel,
         &format!(
-            "rm -rf '{}' && mkdir -p '{}' && tar -xzf '{}' -C '{}' && rm -f '{}'",
-            remote_dir, remote_dir, remote_tar, remote_dir, remote_tar
+            "rm -rf '{}' && mkdir -p '{}' && tar -xzf '{}' -C '{}' && rm -f '{}' && find '{}' -type f \\( -name '*.py' -o -name '*.sh' -o -name '*.json' \\) -exec sed -i 's/\\r$//' {{}} +",
+            remote_dir, remote_dir, remote_tar, remote_dir, remote_tar, remote_dir
         ),
     )?;
 
