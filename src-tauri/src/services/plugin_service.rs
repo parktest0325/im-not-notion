@@ -1,6 +1,7 @@
 use std::path::Path;
 use std::io::prelude::*;
 use std::collections::HashMap;
+use sha2::{Sha256, Digest};
 use anyhow::{Result, Context, bail};
 use crate::services::ssh_service::{get_channel_session, get_sftp_session, execute_ssh_command, get_server_home_path};
 use crate::services::config_service::get_hugo_config;
@@ -30,7 +31,7 @@ fn discover_server_plugins() -> Result<Vec<(PluginManifest, bool, String)>> {
             name=$(basename \"$dir\"); \
             disabled=\"false\"; \
             [ -f \"$dir/.disabled\" ] && disabled=\"true\"; \
-            hash=$(cd \"$dir\" && find . -type f ! -path '*/.*' -exec sha256sum {{}} + 2>/dev/null | sort | sha256sum | awk '{{print $1}}'); \
+            hash=$(cd \"$dir\" && find . -type f ! -path '*/.*' | while IFS= read -r f; do printf '%s  %s\\n' \"$(tr -d '\\r' < \"$f\" | sha256sum | head -c 64)\" \"$f\"; done | sort | sha256sum | awk '{{print $1}}'); \
             echo \"---ENTRY---\"; \
             echo \"$disabled\"; \
             echo \"$hash\"; \
@@ -86,23 +87,43 @@ fn discover_local_plugins(local_path: &str) -> Result<Vec<PluginManifest>> {
     Ok(plugins)
 }
 
-/// 로컬 플러그인 디렉토리의 해시 계산
+/// 로컬 플러그인 디렉토리의 해시 계산 (pure Rust, \r 정규화)
+/// 서버 해시와 동일한 로직: 각 파일의 sha256(\r 제거) + 상대경로 → 정렬 → 전체 sha256
 fn compute_local_hash(plugin_dir: &Path) -> String {
-    let hash_cmd = if cfg!(target_os = "macos") {
-        "shasum -a 256"
-    } else {
-        "sha256sum"
-    };
-    let script = format!(
-        "cd '{}' && find . -type f ! -path '*/.*' -exec {} {{}} + 2>/dev/null | sort | {} | awk '{{print $1}}'",
-        plugin_dir.display(), hash_cmd, hash_cmd
-    );
-    std::process::Command::new("sh")
-        .arg("-c")
-        .arg(&script)
-        .output()
-        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
-        .unwrap_or_default()
+    let mut entries: Vec<(String, String)> = Vec::new(); // (hash, relative_path)
+
+    fn walk(dir: &Path, base: &Path, out: &mut Vec<(String, String)>) {
+        let Ok(rd) = std::fs::read_dir(dir) else { return };
+        for entry in rd.flatten() {
+            let path = entry.path();
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name.starts_with('.') { continue; } // skip hidden
+            if path.is_dir() {
+                walk(&path, base, out);
+            } else if path.is_file() {
+                let Ok(raw) = std::fs::read(&path) else { continue };
+                // Strip \r to normalize CRLF→LF (matches server tr -d '\r')
+                let normalized: Vec<u8> = raw.into_iter().filter(|&b| b != b'\r').collect();
+                let hash = format!("{:x}", Sha256::digest(&normalized));
+                // Relative path with forward slashes (matches server `find .`)
+                let rel = path.strip_prefix(base)
+                    .map(|p| format!("./{}", p.to_string_lossy().replace('\\', "/")))
+                    .unwrap_or_default();
+                out.push((hash, rel));
+            }
+        }
+    }
+
+    walk(plugin_dir, plugin_dir, &mut entries);
+    if entries.is_empty() { return String::new(); }
+
+    // Format like sha256sum output: "hash  filename\n", sort, then hash the whole thing
+    let mut lines: Vec<String> = entries.into_iter()
+        .map(|(h, p)| format!("{}  {}", h, p))
+        .collect();
+    lines.sort();
+    let combined = lines.join("\n") + "\n";
+    format!("{:x}", Sha256::digest(combined.as_bytes()))
 }
 
 /// 로컬 + 서버 플러그인 병합 리스트
