@@ -9,6 +9,7 @@ mod services;
 use std::sync::OnceLock;
 use anyhow::Result;
 use tauri::Emitter;
+#[cfg(target_os = "macos")]
 use tauri::menu::{MenuBuilder, SubmenuBuilder};
 use tauri_plugin_shell::init as shell_init;
 use tauri_plugin_dialog::init as dialog_init;
