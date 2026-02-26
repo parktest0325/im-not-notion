@@ -121,10 +121,6 @@
     {/each}
   </div>
 
-  <button
-    class="w-full p-2 rounded mt-2 opacity-60"
-    on:click={onClose}
-  >Close</button>
 </Popup>
 
 <style>

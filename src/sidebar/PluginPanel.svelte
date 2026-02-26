@@ -427,7 +427,6 @@
     </div>
   {/if}
 
-  <button class="w-full p-2 rounded mt-2 opacity-60" on:click={closePlugin}>Close</button>
 </Popup>
 
 <PluginInputPopup

@@ -319,6 +319,7 @@
 <Popup {show} {isLoading} closePopup={() => { if (!isSetupRunning) closeSettings(); }}>
   {#if view === "list"}
     <!-- ═══ Server List View ═══ -->
+    <h3 class="text-lg font-bold">Servers</h3>
     <div class="space-y-3 max-h-96 overflow-y-auto">
       {#each config.servers ?? [] as server (server.id)}
         <div class="server-card" class:server-active={server.id === config.active_server && isConnected} class:server-disconnected={server.id === config.active_server && !isConnected}>

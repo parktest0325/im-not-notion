@@ -14,6 +14,29 @@
   let terminal: Terminal | null = null;
   let fitAddon: FitAddon | null = null;
   let started = false;
+  let fontSize = 14;
+
+  function changeFontSize(delta: number) {
+    fontSize = Math.max(8, Math.min(32, fontSize + delta));
+    if (terminal) {
+      terminal.options.fontSize = fontSize;
+      fitAddon?.fit();
+    }
+  }
+
+  function handleTerminalKey(e: KeyboardEvent) {
+    if (!show || !started) return;
+    if (e.ctrlKey && (e.key === '=' || e.key === '+')) {
+      e.preventDefault();
+      changeFontSize(1);
+    } else if (e.ctrlKey && e.key === '-') {
+      e.preventDefault();
+      changeFontSize(-1);
+    } else if (e.ctrlKey && e.key === '0') {
+      e.preventDefault();
+      changeFontSize(14 - fontSize);
+    }
+  }
 
   async function startTerminal() {
     if (started) return;
@@ -113,10 +136,10 @@
   });
 </script>
 
-<svelte:window on:resize={handleResize} />
+<svelte:window on:resize={handleResize} on:keydown={handleTerminalKey} />
 
 <div class="terminal-popup">
-  <Popup {show} closePopup={closeTerminal}>
+  <Popup {show} closePopup={closeTerminal} showCloseBtn={false}>
     <div bind:this={termContainer} class="terminal-container"></div>
   </Popup>
 </div>
@@ -125,6 +148,7 @@
   .terminal-container {
     width: 100%;
     height: 60vh;
+    padding-left: 0.5rem;
   }
 
   :global(.terminal-popup .popup-content) {

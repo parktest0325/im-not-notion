@@ -3,6 +3,7 @@
   export let show: boolean;
   export let isLoading: boolean = false;
   export let closePopup: () => void;
+  export let showCloseBtn: boolean = true;
 </script>
 
 {#if show}
@@ -11,11 +12,13 @@
       <p>Loading...</p>
     {:else}
       <div class="popup-content">
-        <button class="popup-close" title="Close" on:click={closePopup}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
-        </button>
+        {#if showCloseBtn}
+          <button class="popup-close" title="Close" on:click={closePopup}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        {/if}
         <slot />
       </div>
     {/if}
@@ -44,22 +47,22 @@
 
   .popup-close {
     position: absolute;
-    top: 0.75rem;
-    right: 0.75rem;
+    top: 0.5rem;
+    right: 0.5rem;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 24px;
-    height: 24px;
+    width: 22px;
+    height: 22px;
     border-radius: 0.25rem;
     border: none;
     background: none;
     cursor: pointer;
-    opacity: 0.4;
+    opacity: 0.3;
     z-index: 1;
   }
   .popup-close:hover {
-    opacity: 1;
+    opacity: 0.8;
     background-color: var(--button-active-bg-color);
   }
 </style>
