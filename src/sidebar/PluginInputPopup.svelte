@@ -105,7 +105,7 @@
                 <label class="block text-sm mb-1" for={field.name}>{field.label}</label>
                 <input
                   id={field.name}
-                  type="text"
+                  type={field.type === "password" ? "password" : "text"}
                   class="w-full p-2 rounded border"
                   style="background-color: var(--input-bg-color); border-color: var(--border-color);"
                   value={values[field.name]}

@@ -15,6 +15,11 @@
   let plugins: PluginInfo[] = [];
   let isLoading = true;
   let localPath = "";
+  let searchQuery = "";
+
+  $: filteredPlugins = searchQuery.trim()
+    ? plugins.filter(p => p.manifest.name.toLowerCase().includes(searchQuery.trim().toLowerCase()))
+    : plugins;
 
   // Manual 플러그인 입력 팝업 상태
   let showInputPopup = false;
@@ -252,30 +257,6 @@
   }
 </script>
 
-<PluginInputPopup
-  show={showInputPopup}
-  plugin={selectedPlugin?.manifest ?? null}
-  inputFields={selectedInputFields}
-  onClose={() => { showInputPopup = false; }}
-  onRefreshTree={handleRefreshTree}
-  onShowResult={handleShowResult}
-  onDownloadFiles={handleDownloadFiles}
-/>
-
-<PluginResultPopup
-  show={showResultPopup}
-  title={resultTitle}
-  body={resultBody}
-  pages={resultPages}
-  onClose={() => { showResultPopup = false; }}
-/>
-
-<PluginDownloadPopup
-  show={showDownloadPopup}
-  items={downloadItems}
-  onClose={() => { showDownloadPopup = false; }}
-/>
-
 <Popup {show} {isLoading} closePopup={closePlugin}>
   <h3 class="text-lg font-bold">Plugins</h3>
 
@@ -296,12 +277,25 @@
     >Scan</button>
   </div>
 
+  <!-- 플러그인 검색 -->
+  {#if plugins.length > 0}
+    <input
+      type="text"
+      class="w-full p-2 rounded text-sm"
+      style="background-color: var(--input-bg-color); border: 1px solid var(--border-color);"
+      bind:value={searchQuery}
+      placeholder="Search plugins..."
+    />
+  {/if}
+
   <!-- 플러그인 리스트 -->
   {#if plugins.length === 0}
     <p class="text-sm opacity-50">No plugins found.</p>
+  {:else if filteredPlugins.length === 0}
+    <p class="text-sm opacity-50">No matching plugins.</p>
   {:else}
     <div class="space-y-3 max-h-80 overflow-y-auto">
-      {#each plugins as p}
+      {#each filteredPlugins as p}
         <div class="plugin-card" class:plugin-active={p.installed && p.enabled}>
           <!-- 헤더: 이름 + 상태 뱃지 -->
           <div class="flex justify-between items-center">
@@ -435,6 +429,30 @@
 
   <button class="w-full p-2 rounded mt-2 opacity-60" on:click={closePlugin}>Close</button>
 </Popup>
+
+<PluginInputPopup
+  show={showInputPopup}
+  plugin={selectedPlugin?.manifest ?? null}
+  inputFields={selectedInputFields}
+  onClose={() => { showInputPopup = false; }}
+  onRefreshTree={handleRefreshTree}
+  onShowResult={handleShowResult}
+  onDownloadFiles={handleDownloadFiles}
+/>
+
+<PluginResultPopup
+  show={showResultPopup}
+  title={resultTitle}
+  body={resultBody}
+  pages={resultPages}
+  onClose={() => { showResultPopup = false; }}
+/>
+
+<PluginDownloadPopup
+  show={showDownloadPopup}
+  items={downloadItems}
+  onClose={() => { showDownloadPopup = false; }}
+/>
 
 <style>
   .plugin-card {

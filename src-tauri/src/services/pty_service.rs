@@ -84,54 +84,57 @@ fn io_loop(
 ) {
     let mut read_buf = [0u8; 16384];
     let mut utf8_leftover = Vec::with_capacity(4);
+    let mut pending_write: Vec<u8> = Vec::new();
 
     loop {
-        // 1) 메시지 처리 (non-blocking)
-        match rx.try_recv() {
-            Ok(PtyMsg::Write(data)) => {
-                // non-blocking write with retry
-                let mut written = 0;
-                let mut retries = 0;
-                while written < data.len() {
-                    match channel.write(&data[written..]) {
-                        Ok(n) => {
-                            written += n;
-                            retries = 0;
-                        }
-                        Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                            retries += 1;
-                            if retries > 100 {
-                                break; // give up after 100ms
-                            }
-                            thread::sleep(IO_LOOP_SLEEP);
-                        }
-                        Err(_) => return, // fatal error, exit loop
-                    }
+        let mut had_activity = false;
+
+        // 1) 메시지 drain — 큐의 모든 메시지를 한 번에 소비
+        let mut should_stop = false;
+        loop {
+            match rx.try_recv() {
+                Ok(PtyMsg::Write(data)) => {
+                    pending_write.extend_from_slice(&data);
+                    had_activity = true;
                 }
-                // flush (best effort)
-                let _ = channel.flush();
-            }
-            Ok(PtyMsg::Resize { cols, rows }) => {
-                // resize — retry once on EAGAIN
-                if let Err(e) = channel.request_pty_size(cols, rows, None, None) {
-                    if e.code() == ssh2::ErrorCode::Session(-37) {
-                        thread::sleep(Duration::from_millis(5));
-                        let _ = channel.request_pty_size(cols, rows, None, None);
+                Ok(PtyMsg::Resize { cols, rows }) => {
+                    if let Err(e) = channel.request_pty_size(cols, rows, None, None) {
+                        if e.code() == ssh2::ErrorCode::Session(-37) {
+                            thread::sleep(Duration::from_millis(5));
+                            let _ = channel.request_pty_size(cols, rows, None, None);
+                        }
                     }
+                    had_activity = true;
                 }
+                Ok(PtyMsg::Stop) => { should_stop = true; break; }
+                Err(mpsc::TryRecvError::Disconnected) => { should_stop = true; break; }
+                Err(mpsc::TryRecvError::Empty) => break,
             }
-            Ok(PtyMsg::Stop) => break,
-            Err(mpsc::TryRecvError::Disconnected) => break,
-            Err(mpsc::TryRecvError::Empty) => {} // no message, continue
+        }
+        if should_stop { break; }
+
+        // 2) 쓰기 — pending 데이터를 non-blocking으로 한 번만 시도
+        if !pending_write.is_empty() {
+            match channel.write(&pending_write) {
+                Ok(n) => {
+                    pending_write.drain(..n);
+                    let _ = channel.flush();
+                    had_activity = true;
+                }
+                Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                    // 다음 루프에서 재시도 — 블록하지 않음
+                }
+                Err(_) => break, // fatal error
+            }
         }
 
-        // 2) 읽기 (non-blocking)
-        if channel.eof() {
-            break;
-        }
+        // 3) 읽기 (non-blocking)
+        if channel.eof() { break; }
 
         match channel.read(&mut read_buf) {
             Ok(n) if n > 0 => {
+                had_activity = true;
+
                 // UTF-8 경계 처리
                 let mut combined;
                 let data: &[u8] = if utf8_leftover.is_empty() {
@@ -156,16 +159,19 @@ fn io_loop(
                     utf8_leftover.extend_from_slice(&data[trail_start..]);
                 }
             }
-            Ok(_) => {
-                // WouldBlock — 데이터 없음, 짧게 대기
-                thread::sleep(IO_LOOP_SLEEP);
-            }
-            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                thread::sleep(IO_LOOP_SLEEP);
-            }
+            Ok(_) => {} // 0바이트 — 데이터 없음
+            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {} // 대기 중
             Err(_) => break, // fatal error
         }
+
+        // 4) idle일 때만 sleep — 활동이 있으면 즉시 다음 루프
+        if !had_activity && pending_write.is_empty() {
+            thread::sleep(IO_LOOP_SLEEP);
+        }
     }
+
+    // 셸 종료 시그널을 프론트엔드에 전송
+    let _ = on_output("\x00__PTY_CLOSED__".to_string());
 
     // 정리
     session.set_blocking(true);

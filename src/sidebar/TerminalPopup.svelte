@@ -42,6 +42,12 @@
     // Tauri Channel: 서버 출력 수신
     const onEvent = new Channel<string>();
     onEvent.onmessage = (data: string) => {
+      if (data === "\x00__PTY_CLOSED__") {
+        // 셸 종료 (exit) → 터미널 팝업 닫기
+        stopTerminal();
+        closeTerminal();
+        return;
+      }
       terminal?.write(data);
     };
 
@@ -54,11 +60,21 @@
       return;
     }
 
-    // 사용자 입력 → 서버로 전송
+    // 사용자 입력 → 2ms 배칭 후 서버로 전송
+    let inputBuffer = "";
+    let inputTimer: number | null = null;
     terminal.onData((data: string) => {
-      invoke("write_pty_cmd", { data }).catch((e: unknown) => {
-        console.error("write_pty_cmd error:", e);
-      });
+      inputBuffer += data;
+      if (!inputTimer) {
+        inputTimer = window.setTimeout(() => {
+          const buf = inputBuffer;
+          inputBuffer = "";
+          inputTimer = null;
+          invoke("write_pty_cmd", { data: buf }).catch((e: unknown) => {
+            console.error("write_pty_cmd error:", e);
+          });
+        }, 2);
+      }
     });
 
     // 터미널 리사이즈 → 서버 PTY 리사이즈
