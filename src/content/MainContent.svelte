@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { isConnected, relativeFilePath, selectedCursor, isEditingContent, addToast } from "../stores";
+  import { isConnected, relativeFilePath, selectedCursor, isEditingContent, addToast, gotoLine } from "../stores";
   import { invoke } from "@tauri-apps/api/core";
   import { v4 as uuidv4 } from "uuid";
   import { tick, onMount, onDestroy } from "svelte";
@@ -25,6 +25,10 @@
   let autoSaveEnabled = writable(true);
   let autoSaveInterval = 1000 * 5;
   let autoSaveTimer: number | null = null;
+
+  // Search highlight
+  let highlightLine: number = 0;
+  let highlightEl: HTMLDivElement | null = null;
 
   // Unsaved changes dialog
   let currentFilePath: string = "";
@@ -248,6 +252,7 @@
     currentFilePath = path;
     relativeFilePath.set(path);
     if (cursor) selectedCursor.set(cursor);
+    highlightLine = 0;
     getFileContent(path);
     scrollRatio = 0;
     contentDiv?.scrollTo(0, 0);
@@ -312,6 +317,13 @@
     handleFilePathChange($relativeFilePath);
   }
 
+  // 같은 파일 내에서 검색 결과 라인 클릭 시 (relativeFilePath 변경 없이 gotoLine만 변경)
+  $: if ($gotoLine > 0 && currentFilePath) {
+    highlightLine = $gotoLine;
+    gotoLine.set(0);
+    scrollToHighlight();
+  }
+
   $: if (editable) {
     enterEditMode();
   } else {
@@ -325,6 +337,14 @@
         changes: { from: 0, to: view.state.doc.length, insert: fileContent },
       });
     }
+  }
+
+  function scrollToHighlight() {
+    tick().then(() => {
+      if (highlightEl) {
+        highlightEl.scrollIntoView({ block: "center", behavior: "smooth" });
+      }
+    });
   }
 
   // --- Shortcuts ---
@@ -349,10 +369,19 @@
       isContentChanged = false;
       isConnected.set(true);
       syncEditorContent();
+
+      // 검색 결과에서 라인 점프 요청이 있으면 강조
+      const pendingLine = get(gotoLine);
+      if (pendingLine > 0) {
+        highlightLine = pendingLine;
+        gotoLine.set(0);
+        scrollToHighlight();
+      }
     } catch (error) {
       console.error("Failed to get file content", error);
       fileContent = "";
       syncEditorContent();
+      gotoLine.set(0);
       const connected: boolean = await invoke("check_connection");
       isConnected.set(connected);
       if (!connected) {
@@ -564,11 +593,27 @@
         if ($relativeFilePath != "") {
           const max = contentDiv.scrollHeight - contentDiv.clientHeight;
           scrollRatio = max > 0 ? contentDiv.scrollTop / max : 0;
+          highlightLine = 0;
           editable = true;
         }
       }}
     >
-      {fileContent + '\n'}
+      {#each fileContent.split('\n') as line, i}
+        {#if highlightLine === i + 1}
+          <div class="highlight-line" bind:this={highlightEl}>{line || ' '}</div>
+        {:else}
+          <div>{line || ' '}</div>
+        {/if}
+      {/each}
     </div>
   {/if}
 </div>
+
+<style>
+  .highlight-line {
+    background-color: var(--search-match-bg, rgba(255, 213, 79, 0.25));
+    border-radius: 2px;
+    margin: 0 -0.25rem;
+    padding: 0 0.25rem;
+  }
+</style>

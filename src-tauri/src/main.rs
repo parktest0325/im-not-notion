@@ -31,7 +31,7 @@ use commands::{
         toggle_hidden_file, check_file_hidden, download_remote_file, sync_pasted_refs,
     },
     config_command::{load_config, save_config, save_plugin_local_path, switch_server, check_connection},
-    ssh_command::{kill_server, start_server, execute_ssh},
+    ssh_command::{kill_server, start_server, execute_ssh, search_content_cmd},
     setup_command::{
         check_prerequisites_cmd, check_hugo_installed_cmd,
         detect_server_platform_cmd, get_latest_hugo_version_cmd,
@@ -96,6 +96,7 @@ fn main() -> Result<()> {
             kill_server,
             start_server,
             execute_ssh,
+            search_content_cmd,
             toggle_hidden_file,
             check_file_hidden,
             download_remote_file,

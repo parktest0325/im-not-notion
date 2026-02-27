@@ -1,7 +1,9 @@
 use ssh2::{Session, Channel, Sftp};
 use std::{net::{TcpStream, ToSocketAddrs}, sync::Mutex, io::Read, time::Duration};
 use anyhow::{Result, Context};
+use serde::Serialize;
 use crate::types::config::SshConfig;
+use crate::services::config_service::get_hugo_config;
 use once_cell::sync::Lazy;
 
 const TCP_CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
@@ -116,4 +118,67 @@ pub fn execute_ssh_command(channel: &mut Channel, command: &str) -> Result<Strin
     }
 
     Ok(stdout)
+}
+
+// ── Content Search ──
+
+#[derive(Debug, Clone, Serialize)]
+pub struct SearchMatch {
+    pub file_path: String,
+    pub line_num: u32,
+    pub line_text: String,
+}
+
+/// Shell-escape a string for use inside single quotes.
+fn shell_escape(s: &str) -> String {
+    // Wrap in single quotes; escape any embedded single quotes.
+    format!("'{}'", s.replace('\'', "'\\''"))
+}
+
+/// Search Hugo content (both public + hidden) via SSH grep.
+pub fn search_content(query: &str) -> Result<Vec<SearchMatch>> {
+    if query.trim().is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let hugo = get_hugo_config()?;
+    let mut channel = get_channel_session()?;
+
+    let escaped = shell_escape(query);
+    let content_dir = format!("{}/content", hugo.base_path);
+    let cmd = format!(
+        "grep -rn --include='*.md' -F -- {} {} 2>/dev/null || true",
+        escaped, content_dir
+    );
+
+    let output = execute_ssh_command(&mut channel, &cmd)?;
+    let prefix = format!("{}/content", hugo.base_path);
+    let results = parse_grep_output(&output, &prefix);
+    Ok(results)
+}
+
+/// Parse grep -rn output lines into SearchMatch vec.
+/// Each line: `/abs/path/content/blog/post/_index.md:12:matched text`
+fn parse_grep_output(output: &str, prefix: &str) -> Vec<SearchMatch> {
+    let mut results = Vec::new();
+    for line in output.lines() {
+        // Split at first two colons: path:linenum:text
+        let Some((path, rest)) = line.split_once(':') else { continue };
+        let Some((num_str, text)) = rest.split_once(':') else { continue };
+        let Ok(line_num) = num_str.parse::<u32>() else { continue };
+
+        // Strip base prefix to get relative path like "/blog/post/_index.md"
+        let rel = if let Some(stripped) = path.strip_prefix(prefix) {
+            stripped.to_string()
+        } else {
+            path.to_string()
+        };
+
+        results.push(SearchMatch {
+            file_path: rel,
+            line_num,
+            line_text: text.trim().to_string(),
+        });
+    }
+    results
 }

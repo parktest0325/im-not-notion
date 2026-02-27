@@ -1,5 +1,5 @@
 use tauri::ipc::InvokeError;
-use crate::services::{config_service::get_hugo_config, ssh_service::{get_channel_session, execute_ssh_command}};
+use crate::services::{config_service::get_hugo_config, ssh_service::{self, get_channel_session, execute_ssh_command, SearchMatch}};
 use crate::utils::IntoInvokeError;
 
 #[tauri::command]
@@ -31,4 +31,9 @@ pub fn execute_ssh(cmd: &str) -> Result<String, InvokeError> {
     let mut channel = get_channel_session().into_invoke_err()?;
     let res = execute_ssh_command(&mut channel, cmd).into_invoke_err()?;
     Ok(res)
+}
+
+#[tauri::command]
+pub fn search_content_cmd(query: String) -> Result<Vec<SearchMatch>, InvokeError> {
+    ssh_service::search_content(&query).into_invoke_err()
 }

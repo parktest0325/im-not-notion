@@ -18,6 +18,8 @@ export const isEditingFileName = writable(false);
 export const isEditingContent = writable(false);
 // Set to a file path to trigger rename mode on the matching TreeNode.
 export const renamingPath = writable<string>("");
+// Set to a line number to jump to after loading a file (0 = ignore).
+export const gotoLine = writable<number>(0);
 // Set to trigger a plugin via shortcut: { pluginName, triggerLabel, inputFields }
 export const triggerPluginShortcut = writable<{
   pluginName: string;
