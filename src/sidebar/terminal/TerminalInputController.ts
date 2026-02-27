@@ -82,7 +82,13 @@ export class TerminalInputController {
   }
 
   private getAltScreenFallbackInput(e: KeyboardEvent): string | null {
-    if (e.ctrlKey || e.metaKey || e.altKey) return null;
+    // Ctrl+letter → control character (Ctrl+C=0x03, Ctrl+R=0x12 등)
+    if (e.ctrlKey && !e.metaKey && !e.altKey && e.key.length === 1) {
+      const code = e.key.toUpperCase().charCodeAt(0) - 64;
+      if (code >= 0 && code < 32) return String.fromCharCode(code);
+      return null;
+    }
+    if (e.metaKey || e.altKey) return null;
 
     if (e.key === "Enter") return "\r";
     if (e.key === "Backspace") return "\x7f";

@@ -133,19 +133,56 @@ dev 모드에서는 같은 동작이 정상이었다.
 
 ---
 
-## 9. 남은 리스크 / 후속 작업
+## 9. 후속 수정
 
-1. fallback 키 매핑은 현재 일반/내비게이션 중심이다.  
-   - 필요 시 기능키(F1~F12), 조합키 범위를 단계적으로 확장.
-2. alt-screen 판별은 escape 시퀀스 기반이다.  
-   - 일부 터미널 앱에서 다른 전환 시퀀스를 쓰는 경우 확장 필요.
-3. 회귀 방지 자동화가 아직 부족하다.  
-   - 추천: `vim` 진입 직후 입력 E2E 시나리오 추가.
+### 9-1. Ctrl 조합키 fallback 추가
+
+alt-screen fallback(`getAltScreenFallbackInput`)이 `Ctrl+letter` 조합을 처리하지 않아,
+vim에서 `Ctrl+C`(인터럽트), `Ctrl+R`(redo), `Ctrl+W`(윈도우), `Ctrl+[`(ESC 대용) 등이 동작하지 않는 문제를 수정.
+
+```typescript
+// Ctrl+letter → control character (Ctrl+C=0x03, Ctrl+R=0x12 등)
+if (e.ctrlKey && !e.metaKey && !e.altKey && e.key.length === 1) {
+  const code = e.key.toUpperCase().charCodeAt(0) - 64;
+  if (code >= 0 && code < 32) return String.fromCharCode(code);
+  return null;
+}
+```
+
+### 9-2. 터미널 닫기 버튼 추가
+
+`TerminalPopup`의 Popup 컴포넌트에서 `showCloseBtn`을 활성화하고, 닫기 버튼 클릭 시 정상 종료 로직 적용:
+
+1. `\x04` (Ctrl+D, EOF) 전송 → 셸이 정상 종료되면 `__PTY_CLOSED__` 시그널로 자동 정리
+2. 1초 내 종료되지 않으면 (vim 등 EOF를 무시하는 프로그램) 강제 종료 (`stop_pty_cmd`)
+
+```typescript
+function handleCloseBtn() {
+  if (started) {
+    invoke("write_pty_cmd", { data: "\x04" }).catch(() => {});
+    setTimeout(() => {
+      if (started) { stopTerminal(); closeTerminal(); }
+    }, 1000);
+  } else {
+    closeTerminal();
+  }
+}
+```
 
 ---
 
-## 10. 결론
+## 10. 남은 리스크 / 향후 작업
 
-이번 이슈는 릴리즈 환경의 입력 타이밍 불안정과 경로 경합이 겹친 문제였다.  
+1. **화살표 키 모드**: vim이 `ESC[?1h` (application cursor mode)를 활성화하면 화살표 시퀀스가 `\x1bOA` 형식이어야 하지만, 현재 fallback은 `\x1b[A` (normal mode)를 전송. `hjkl` 사용 시 무관하나 화살표 키 의존 시 문제 가능. app cursor mode 추적 추가 권장.
+2. **alt-screen 판별**: escape 시퀀스 기반이라, 일부 터미널 앱에서 다른 전환 시퀀스를 쓰는 경우 확장 필요.
+3. **fallback 키 범위**: 기능키(F1~F12) 등 아직 미지원. 필요 시 단계적 확장.
+4. **회귀 방지**: `vim` 진입 직후 입력 E2E 시나리오 자동화 추천.
+
+---
+
+## 11. 결론
+
+이번 이슈는 릴리즈 환경의 입력 타이밍 불안정과 경로 경합이 겹친 문제였다.
 해결은 단순 튜닝이 아니라 입력 파이프라인을 명확히 분리/직렬화하는 구조 개편으로 달성했다.
+이후 Ctrl 조합키 지원과 터미널 닫기 버튼(정상 종료 + 폴백 강제 종료)을 추가하여 사용성을 보완했다.
 

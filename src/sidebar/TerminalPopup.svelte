@@ -74,7 +74,7 @@
     onEvent.onmessage = (data: string) => {
       if (data === "\x00__PTY_CLOSED__") {
         stopTerminal();
-        closeTerminal();
+        if (show) closeTerminal();
         return;
       }
       inputController?.handleOutput(data);
@@ -111,6 +111,21 @@
     started = false;
   }
 
+  /** 닫기 버튼: Ctrl+D(EOF) 전송 → 정상 종료 시도 → 폴백으로 강제 종료 */
+  function handleCloseBtn() {
+    if (started) {
+      invoke("write_pty_cmd", { data: "\x04" }).catch(() => {});
+      // 셸이 EOF로 종료하면 __PTY_CLOSED__ 시그널이 와서 자동 정리됨.
+      // 1초 안에 종료 안 되면 (vim 등) 강제 종료.
+      setTimeout(() => {
+        if (started) stopTerminal();
+        if (show) closeTerminal();
+      }, 1000);
+    } else {
+      closeTerminal();
+    }
+  }
+
   $: if (show) {
     startTerminal();
   } else if (!show && started) {
@@ -129,7 +144,8 @@
 <svelte:window on:resize={handleResize} on:keydown={handleTerminalKey} />
 
 <div class="terminal-popup">
-  <Popup {show} closePopup={closeTerminal} showCloseBtn={false}>
+  <Popup {show} closePopup={handleCloseBtn} showCloseBtn={true}>
+    <h3 class="text-lg font-bold">Terminal</h3>
     <div bind:this={termContainer} class="terminal-container"></div>
   </Popup>
 </div>
