@@ -10,8 +10,6 @@ export class TerminalInputController {
   private inputFlushQueued = false;
   private inputWriteInFlight = false;
   private isAltScreen = false;
-  private isComposing = false;
-  private compositionJustEnded = false;
   private disposed = false;
 
   constructor(
@@ -22,24 +20,11 @@ export class TerminalInputController {
   attach(): void {
     this.terminal.attachCustomKeyEventHandler((e: KeyboardEvent) => this.handleCustomKey(e));
     this.terminal.onData((data: string) => this.handleOnData(data));
-
-    // Track IME composition state (Korean, Japanese, Chinese input)
-    const textarea = this.terminal.textarea;
-    if (textarea) {
-      textarea.addEventListener("compositionstart", () => {
-        this.isComposing = true;
-      });
-      textarea.addEventListener("compositionend", () => {
-        this.isComposing = false;
-        this.compositionJustEnded = true;
-      });
-    }
   }
 
   dispose(): void {
     this.disposed = true;
     this.inputBuffer = "";
-    // Reset custom handler to default pass-through behavior.
     this.terminal.attachCustomKeyEventHandler(() => true);
   }
 
@@ -50,32 +35,18 @@ export class TerminalInputController {
 
   private handleOnData(data: string): void {
     if (this.disposed) return;
-    // Suppress intermediate composition data
-    if (this.isComposing) return;
-
-    // After composition ends, always send the composed text (even in alt-screen)
-    if (this.compositionJustEnded) {
-      this.compositionJustEnded = false;
-      this.enqueue(data);
-      return;
-    }
-
-    // In alt-screen mode, regular keys are handled by handleCustomKey
     if (this.isAltScreen) return;
     this.enqueue(data);
   }
 
   private handleCustomKey(e: KeyboardEvent): boolean {
     if (this.disposed) return true;
-    // During IME composition, let the browser/xterm handle everything
-    if (e.isComposing || this.isComposing) return true;
     if (!this.isAltScreen || e.type !== "keydown") return true;
 
     const fallback = this.getAltScreenFallbackInput(e);
     if (fallback === null) return true;
 
     this.enqueue(fallback);
-    // Block xterm default processing to avoid duplicate sends.
     return false;
   }
 
@@ -108,7 +79,6 @@ export class TerminalInputController {
   }
 
   private getAltScreenFallbackInput(e: KeyboardEvent): string | null {
-    // Ctrl+letter → control character (Ctrl+C=0x03, Ctrl+R=0x12 등)
     if (e.ctrlKey && !e.metaKey && !e.altKey && e.key.length === 1) {
       const code = e.key.toUpperCase().charCodeAt(0) - 64;
       if (code >= 0 && code < 32) return String.fromCharCode(code);
