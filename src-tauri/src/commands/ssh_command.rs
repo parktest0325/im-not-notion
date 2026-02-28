@@ -21,7 +21,7 @@ pub fn start_server() -> Result<(), InvokeError> {
     execute_ssh_command(
         &mut channel,
         // this command is waiting for more user input... so i added "2>&1 < /dev/null" for not hanging
-        &format!("cd {} ; nohup {} server --liveReloadPort=443 --bind=0.0.0.0 > ./nohup.out 2>&1 < /dev/null &", hugo_config.base_path, hugo_config.hugo_cmd_path)
+        &format!("cd {} ; nohup {} server --liveReloadPort=443 --bind=0.0.0.0 --baseURL {} --appendPort=false > ./nohup.out 2>&1 < /dev/null &", hugo_config.base_path, hugo_config.hugo_cmd_path, hugo_config.url)
     ).into_invoke_err()?;
     Ok(())
 }
