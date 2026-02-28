@@ -16,13 +16,20 @@ pub fn kill_server() -> Result<(), InvokeError> {
 
 #[tauri::command]
 pub fn start_server() -> Result<(), InvokeError> {
-    let mut channel = get_channel_session().into_invoke_err()?;
     let hugo_config = get_hugo_config().into_invoke_err()?;
-    execute_ssh_command(
-        &mut channel,
-        // Clean public/ before starting, then launch hugo in background
-        &format!("cd {} && rm -rf public && nohup {} server --liveReloadPort=443 --bind=0.0.0.0 --baseURL {} --appendPort=false > ./nohup.out 2>&1 < /dev/null &", hugo_config.base_path, hugo_config.hugo_cmd_path, hugo_config.url)
-    ).into_invoke_err()?;
+
+    // Clean public/ first (wait for completion)
+    let mut ch1 = get_channel_session().into_invoke_err()?;
+    let _ = execute_ssh_command(
+        &mut ch1,
+        &format!("cd {} && rm -rf public", hugo_config.base_path)
+    );
+
+    // Fire-and-forget: exec nohup without reading output to avoid channel hang
+    let mut ch2 = get_channel_session().into_invoke_err()?;
+    ch2.exec(
+        &format!("cd {} && nohup {} server --liveReloadPort=443 --bind=0.0.0.0 --baseURL {} --appendPort=false > ./nohup.out 2>&1 < /dev/null &", hugo_config.base_path, hugo_config.hugo_cmd_path, hugo_config.url)
+    ).map_err(|e| InvokeError::from(e.to_string()))?;
     Ok(())
 }
 
