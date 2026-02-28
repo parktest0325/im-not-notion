@@ -1,19 +1,38 @@
 <script lang="ts">
   import Popup from "../component/Popup.svelte";
+  import PluginResultPopup from "./PluginResultPopup.svelte";
   import { invoke } from "@tauri-apps/api/core";
   import { addToast } from "../stores";
   export let show: boolean;
   export let closeReboot: () => void;
 
+  let showError = false;
+  let errorBody = "";
+
+  function sleep(ms: number) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
   async function handleReboot() {
     try {
       await invoke("kill_server");
       await invoke("start_server");
-      addToast("Server rebooted.", "success");
+      addToast("Server starting...", "success");
+      closeReboot();
+
+      // Wait for hugo to start, then verify
+      await sleep(3000);
+      try {
+        await invoke("check_server");
+        addToast("Server is running.", "success");
+      } catch (nohupContent) {
+        errorBody = String(nohupContent);
+        showError = true;
+        addToast("Server failed to start.");
+      }
     } catch (error) {
       console.error("Failed to reboot the server:", error);
       addToast("Failed to reboot server.");
-    } finally {
       closeReboot();
     }
   }
@@ -31,6 +50,14 @@
       on:click={closeReboot}>No</button>
   </div>
 </Popup>
+
+<PluginResultPopup
+  show={showError}
+  title="Server Boot Failed"
+  body={errorBody}
+  pages={[]}
+  onClose={() => { showError = false; }}
+/>
 
 <style>
   .btn-danger { background-color: var(--btn-danger-bg); color: var(--btn-danger-text); }

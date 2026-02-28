@@ -20,10 +20,33 @@ pub fn start_server() -> Result<(), InvokeError> {
     let hugo_config = get_hugo_config().into_invoke_err()?;
     execute_ssh_command(
         &mut channel,
-        // this command is waiting for more user input... so i added "2>&1 < /dev/null" for not hanging
-        &format!("cd {} ; nohup {} server --liveReloadPort=443 --bind=0.0.0.0 --baseURL {} --appendPort=false > ./nohup.out 2>&1 < /dev/null &", hugo_config.base_path, hugo_config.hugo_cmd_path, hugo_config.url)
+        // Clean public/ before starting, then launch hugo in background
+        &format!("cd {} && rm -rf public && nohup {} server --liveReloadPort=443 --bind=0.0.0.0 --baseURL {} --appendPort=false > ./nohup.out 2>&1 < /dev/null &", hugo_config.base_path, hugo_config.hugo_cmd_path, hugo_config.url)
     ).into_invoke_err()?;
     Ok(())
+}
+
+#[tauri::command]
+pub fn check_server() -> Result<String, InvokeError> {
+    let mut channel = get_channel_session().into_invoke_err()?;
+    let hugo_config = get_hugo_config().into_invoke_err()?;
+    // Check if hugo server process is running
+    let result = execute_ssh_command(
+        &mut channel,
+        &format!("pgrep -f '{} server'", hugo_config.hugo_cmd_path)
+    );
+    match result {
+        Ok(output) if !output.trim().is_empty() => Ok(output),
+        _ => {
+            // Process not running — read nohup.out for error details
+            let mut channel2 = get_channel_session().into_invoke_err()?;
+            let nohup = execute_ssh_command(
+                &mut channel2,
+                &format!("tail -100 {}/nohup.out 2>/dev/null || echo 'nohup.out not found'", hugo_config.base_path)
+            ).unwrap_or_else(|_| "Failed to read nohup.out".to_string());
+            Err(InvokeError::from(nohup))
+        }
+    }
 }
 
 #[tauri::command]
