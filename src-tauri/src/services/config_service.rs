@@ -128,8 +128,9 @@ pub fn set_hidden_path(new_hidden_path: &str) -> Result<String> {
             .take(10)
             .map(char::from)
             .collect::<String>()
+            .to_lowercase()
     } else {
-        new_hidden_path.to_string()
+        new_hidden_path.to_lowercase()
     };
 
     // 1) 현재 Hugo 설정을 가져온다. 없으면 빈 값으로 처리

@@ -127,6 +127,7 @@ pub struct SearchMatch {
     pub file_path: String,
     pub line_num: u32,
     pub line_text: String,
+    pub is_hidden: bool,
 }
 
 /// Shell-escape a string for use inside single quotes.
@@ -153,13 +154,14 @@ pub fn search_content(query: &str) -> Result<Vec<SearchMatch>> {
 
     let output = execute_ssh_command(&mut channel, &cmd)?;
     let prefix = format!("{}/content", hugo.base_path);
-    let results = parse_grep_output(&output, &prefix);
+    let hidden_prefix = format!("/{}", hugo.hidden_path);
+    let results = parse_grep_output(&output, &prefix, &hidden_prefix);
     Ok(results)
 }
 
 /// Parse grep -rn output lines into SearchMatch vec.
 /// Each line: `/abs/path/content/blog/post/_index.md:12:matched text`
-fn parse_grep_output(output: &str, prefix: &str) -> Vec<SearchMatch> {
+fn parse_grep_output(output: &str, prefix: &str, hidden_prefix: &str) -> Vec<SearchMatch> {
     let mut results = Vec::new();
     for line in output.lines() {
         // Split at first two colons: path:linenum:text
@@ -168,16 +170,25 @@ fn parse_grep_output(output: &str, prefix: &str) -> Vec<SearchMatch> {
         let Ok(line_num) = num_str.parse::<u32>() else { continue };
 
         // Strip base prefix to get relative path like "/blog/post/_index.md"
+        // or "/{hidden_path}/blog/post/_index.md" for hidden files
         let rel = if let Some(stripped) = path.strip_prefix(prefix) {
             stripped.to_string()
         } else {
             path.to_string()
         };
 
+        // Detect hidden files and strip hidden_path prefix
+        let (file_path, is_hidden) = if let Some(stripped) = rel.strip_prefix(hidden_prefix) {
+            (stripped.to_string(), true)
+        } else {
+            (rel, false)
+        };
+
         results.push(SearchMatch {
-            file_path: rel,
+            file_path,
             line_num,
             line_text: text.trim().to_string(),
+            is_hidden,
         });
     }
     results

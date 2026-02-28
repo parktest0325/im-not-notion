@@ -37,10 +37,12 @@
         file_path: string;
         line_num: number;
         line_text: string;
+        is_hidden: boolean;
     }
 
     interface GroupedResult {
         file_path: string;
+        is_hidden: boolean;
         matches: { line_num: number; line_text: string }[];
     }
 
@@ -134,16 +136,16 @@
     }
 
     function groupByFile(matches: SearchMatch[]): GroupedResult[] {
-        const map = new Map<string, { line_num: number; line_text: string }[]>();
+        const map = new Map<string, { is_hidden: boolean; items: { line_num: number; line_text: string }[] }>();
         for (const m of matches) {
-            let arr = map.get(m.file_path);
-            if (!arr) {
-                arr = [];
-                map.set(m.file_path, arr);
+            let entry = map.get(m.file_path);
+            if (!entry) {
+                entry = { is_hidden: m.is_hidden, items: [] };
+                map.set(m.file_path, entry);
             }
-            arr.push({ line_num: m.line_num, line_text: m.line_text });
+            entry.items.push({ line_num: m.line_num, line_text: m.line_text });
         }
-        return Array.from(map.entries()).map(([file_path, matches]) => ({ file_path, matches }));
+        return Array.from(map.entries()).map(([file_path, { is_hidden, items }]) => ({ file_path, is_hidden, matches: items }));
     }
 
     async function doSearch() {
@@ -242,7 +244,7 @@
         <div class="search-results">
             {#each searchResults as group}
                 <div class="result-group">
-                    <div class="result-file" title={group.file_path}>
+                    <div class="result-file {group.is_hidden ? 'text-hidden' : ''}" title={group.file_path}>
                         {displayName(group.file_path)}
                         <span class="result-file-path">{group.file_path}</span>
                     </div>
