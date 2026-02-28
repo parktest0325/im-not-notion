@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use anyhow::{Result, bail};
 use serde::{Deserialize, Serialize};
@@ -8,7 +9,7 @@ use rand::Rng;
 
 use typeshare::typeshare;
 
-use crate::services::ssh_service::{get_sftp_session, get_channel_session, execute_ssh_command};
+use crate::services::ssh_service::{get_sftp_session, get_channel_session, execute_ssh_command, SftpHandle};
 use crate::services::config_service::get_hugo_config;
 use crate::services::plugin_service;
 use crate::types::config::cms_config::HugoConfig;
@@ -21,7 +22,7 @@ use crate::types::plugin::HookEvent;
 const FILE_TREE_MAX_DEPTH: usize = 5;
 
 /// SFTP 세션 + Hugo 설정을 한 번에 가져옴
-fn sftp_and_config() -> Result<(Sftp, HugoConfig)> {
+fn sftp_and_config() -> Result<(SftpHandle, HugoConfig)> {
     let sftp = get_sftp_session()?;
     let config = get_hugo_config()?;
     Ok((sftp, config))
@@ -103,25 +104,185 @@ fn path_exists(sftp: &Sftp, hugo_config: &HugoConfig, rel_path: &str) -> bool {
         || sftp.stat(Path::new(&hugo_config.hidden_abs(rel_path))).is_ok()
 }
 
-/// 파일 트리 구성: 섹션별 트리 반환 (content + hidden 병합)
+/// SSH find 출력을 파싱하여 FileSystemNode 트리를 구성.
+/// prefix: find 출력에서 strip할 절대경로 접두사 (예: "/home/user/blog/content/posts")
+fn parse_find_output(output: &str, prefix: &str, root_name: &str, is_hidden: bool) -> FileSystemNode {
+    let mut root = FileSystemNode {
+        name: root_name.to_string(),
+        type_: NodeType::Directory,
+        is_hidden,
+        children: IndexMap::new(),
+    };
+
+    for line in output.lines() {
+        let line = line.trim();
+        if line.is_empty() { continue; }
+
+        // Strip prefix → 상대경로 (예: "/subdir/file.md")
+        let rel = match line.strip_prefix(prefix) {
+            Some(r) if !r.is_empty() => r,
+            _ => continue, // prefix 자체 또는 매칭 안 되는 줄 스킵
+        };
+
+        let parts: Vec<&str> = rel.split('/').filter(|s| !s.is_empty()).collect();
+        if parts.is_empty() { continue; }
+
+        // 경로 컴포넌트를 따라가며 트리에 삽입
+        let mut current = &mut root;
+        for (i, part) in parts.iter().enumerate() {
+            let is_last = i == parts.len() - 1;
+            let name = part.to_string();
+
+            if is_last {
+                // 마지막 컴포넌트: 확장자가 있으면 File, 없으면 Directory
+                let has_ext = name.contains('.');
+                current.children.entry(name.clone()).or_insert_with(|| FileSystemNode {
+                    name: name.clone(),
+                    type_: if has_ext { NodeType::File } else { NodeType::Directory },
+                    is_hidden,
+                    children: IndexMap::new(),
+                });
+            } else {
+                // 중간 컴포넌트: Directory
+                let entry = current.children.entry(name.clone()).or_insert_with(|| FileSystemNode {
+                    name: name.clone(),
+                    type_: NodeType::Directory,
+                    is_hidden,
+                    children: IndexMap::new(),
+                });
+                current = entry;
+            }
+        }
+    }
+
+    root
+}
+
+/// SSH find + grep을 하나의 명령으로 실행하여 파일 목록 + weight를 동시 수집.
+/// 반환: (find 출력, weight map)
+fn fetch_files_and_weights(base_path: &str, paths: &[String]) -> (String, HashMap<String, i32>) {
+    let mut channel = match get_channel_session() {
+        Ok(ch) => ch,
+        Err(_) => return (String::new(), HashMap::new()),
+    };
+
+    // find 대상 경로 조합
+    let find_targets: Vec<String> = paths.iter()
+        .map(|p| format!("{}/content/{}", base_path, p))
+        .collect();
+    let find_paths = find_targets.join(" ");
+
+    let cmd = format!(
+        "echo '---FILES---'; find {} -maxdepth {} -print 2>/dev/null; echo '---WEIGHTS---'; grep -rn -E '^weight\\s*[=:]\\s*' {}/content --include='*.md' 2>/dev/null; true",
+        find_paths, FILE_TREE_MAX_DEPTH, base_path
+    );
+
+    let output = match execute_ssh_command(&mut channel, &cmd) {
+        Ok(o) => o,
+        Err(_) => return (String::new(), HashMap::new()),
+    };
+
+    // ---FILES--- 와 ---WEIGHTS--- 구분자로 분리
+    let files_section;
+    let weights_section;
+
+    if let Some(files_start) = output.find("---FILES---") {
+        let after_files = &output[files_start + "---FILES---".len()..];
+        if let Some(weights_start) = after_files.find("---WEIGHTS---") {
+            files_section = after_files[..weights_start].to_string();
+            weights_section = after_files[weights_start + "---WEIGHTS---".len()..].to_string();
+        } else {
+            files_section = after_files.to_string();
+            weights_section = String::new();
+        }
+    } else {
+        files_section = String::new();
+        weights_section = String::new();
+    }
+
+    // weight 파싱
+    let prefix = format!("{}/content", base_path);
+    let weights = parse_weight_output(&weights_section, &prefix);
+
+    (files_section, weights)
+}
+
+/// grep 출력에서 weight 값 파싱
+fn parse_weight_output(output: &str, prefix: &str) -> HashMap<String, i32> {
+    let mut map = HashMap::new();
+    for line in output.lines() {
+        let Some((path, rest)) = line.split_once(':') else { continue };
+        let Some((_line_num, text)) = rest.split_once(':') else { continue };
+
+        let rel = match path.strip_prefix(prefix) {
+            Some(r) => r.to_string(),
+            None => continue,
+        };
+
+        let trimmed = text.trim();
+        let after_key = trimmed.strip_prefix("weight").unwrap_or(trimmed).trim();
+        let after_sep = after_key.trim_start_matches(|c: char| c == '=' || c == ':').trim();
+        if let Ok(w) = after_sep.parse::<i32>() {
+            map.entry(rel).or_insert(w);
+        }
+    }
+    map
+}
+
+/// 트리의 children을 weight 기준으로 재귀 정렬.
+/// current_path: 이 노드까지의 상대 경로 (예: "/blog/post")
+fn sort_tree(node: &mut FileSystemNode, current_path: &str, weights: &HashMap<String, i32>) {
+    for (name, child) in node.children.iter_mut() {
+        if child.type_ == NodeType::Directory {
+            let child_path = format!("{}/{}", current_path, name);
+            sort_tree(child, &child_path, weights);
+        }
+    }
+
+    node.children.sort_by(|a_name, _a_node, b_name, _b_node| {
+        let w_a = weight_for(current_path, a_name, _a_node, weights);
+        let w_b = weight_for(current_path, b_name, _b_node, weights);
+        w_a.cmp(&w_b).then_with(|| a_name.cmp(b_name))
+    });
+}
+
+/// 노드의 정렬 weight를 조회.
+fn weight_for(parent: &str, name: &str, node: &FileSystemNode, weights: &HashMap<String, i32>) -> i32 {
+    let key = match node.type_ {
+        NodeType::Directory => format!("{}/{}/_index.md", parent, name),
+        NodeType::File => format!("{}/{}", parent, name),
+    };
+    *weights.get(&key).unwrap_or(&i32::MAX)
+}
+
+/// 파일 트리 구성: SSH find 1회 + grep 1회로 섹션별 트리 반환 (weight 정렬 + hidden 병합)
 pub fn build_file_tree() -> Result<Vec<FileSystemNode>> {
-    let (sftp, hugo_config) = sftp_and_config()?;
+    let hugo_config = get_hugo_config()?;
+
+    // 모든 섹션 + hidden 섹션의 파일 목록 + weight를 SSH 1회로 수집
+    let mut all_paths: Vec<String> = hugo_config.content_paths.clone();
+    for section in &hugo_config.content_paths {
+        all_paths.push(format!("{}/{}", hugo_config.hidden_path, section));
+    }
+    let (find_output, weights) = fetch_files_and_weights(&hugo_config.base_path, &all_paths);
+
+    let content_prefix = format!("{}/content", hugo_config.base_path);
     let mut sections = Vec::new();
 
     for section in &hugo_config.content_paths {
-        let section_path = format!("{}/content/{}", hugo_config.base_path, section);
-        let mut tree = match get_file_list(&sftp, Path::new(&section_path), FILE_TREE_MAX_DEPTH, false) {
-            Ok(t) => t,
-            Err(_) => continue, // 섹션 디렉토리가 없으면 스킵
-        };
-        tree.name = section.clone(); // 루트 노드 이름 = 섹션명
+        // 섹션 트리 파싱
+        let section_abs = format!("{}/{}", content_prefix, section);
+        let mut tree = parse_find_output(&find_output, &section_abs, section, false);
 
-        // hidden 병합
-        let hidden_path = format!("{}/content/{}/{}", hugo_config.base_path, hugo_config.hidden_path, section);
-        if sftp.stat(Path::new(&hidden_path)).is_ok() {
-            if let Ok(hidden) = get_file_list(&sftp, Path::new(&hidden_path), FILE_TREE_MAX_DEPTH, true) {
-                merge_tree(&mut tree, hidden);
-            }
+        // weight 기준 정렬
+        let section_prefix = format!("/{}", section);
+        sort_tree(&mut tree, &section_prefix, &weights);
+
+        // hidden 트리 파싱 + 병합
+        let hidden_abs = format!("{}/{}/{}", content_prefix, hugo_config.hidden_path, section);
+        let hidden_tree = parse_find_output(&find_output, &hidden_abs, section, true);
+        if !hidden_tree.children.is_empty() {
+            merge_tree(&mut tree, hidden_tree);
         }
 
         sections.push(tree);
@@ -875,7 +1036,7 @@ pub struct FileSystemNode {
 }
 
 #[typeshare]
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum NodeType {
     File,
     Directory,
@@ -916,50 +1077,6 @@ pub fn merge_tree(
             }
         }
     }
-}
-
-
-// 전달받은 경로에서 하위 파일(폴더) 리스트 depth만큼 검색해서 가져오기
-pub fn get_file_list(sftp: &Sftp, path: &Path, depth: usize, hidden: bool) -> Result<FileSystemNode> {
-    let name = path.file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("")
-        .to_string();
-
-    if depth == 0 {
-        return Ok(FileSystemNode {
-            name,
-            type_: NodeType::Directory,
-            is_hidden: hidden,
-            children: IndexMap::new(),
-        });
-    }
-
-    let mut children = IndexMap::new();
-    for (child_path, stat) in sftp.readdir(path)? {
-        let node = if stat.is_dir() {
-            get_file_list(sftp, &child_path, depth - 1, hidden)?
-        } else {
-            let child_name = child_path.file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("")
-                .to_string();
-            FileSystemNode {
-                name: child_name,
-                type_: NodeType::File,
-                is_hidden: hidden,
-                children: IndexMap::new(),
-            }
-        };
-        children.insert(node.name.clone(), node);
-    }
-
-    Ok(FileSystemNode {
-        name,
-        type_: NodeType::Directory,
-        is_hidden: hidden,
-        children,
-    })
 }
 
 

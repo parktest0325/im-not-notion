@@ -1,5 +1,5 @@
 use ssh2::{Session, Channel, Sftp};
-use std::{net::{TcpStream, ToSocketAddrs}, sync::Mutex, io::Read, time::Duration};
+use std::{net::{TcpStream, ToSocketAddrs}, sync::Mutex, io::Read, time::Duration, path::Path, ops::{Deref, DerefMut}};
 use anyhow::{Result, Context};
 use serde::Serialize;
 use crate::types::config::SshConfig;
@@ -10,6 +10,27 @@ const TCP_CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
 const ALIVE_CHECK_TIMEOUT_MS: u32 = 2000;
 
 static SSH_CLIENT: Lazy<Mutex<Option<Session>>> = Lazy::new(|| Mutex::new(None));
+static SFTP_CACHE: Lazy<Mutex<Option<Sftp>>> = Lazy::new(|| Mutex::new(None));
+
+/// RAII wrapper: drop 시 SFTP 세션을 캐시에 반환
+pub struct SftpHandle(Option<Sftp>);
+
+impl Drop for SftpHandle {
+    fn drop(&mut self) {
+        if let Some(sftp) = self.0.take() {
+            *SFTP_CACHE.lock().unwrap() = Some(sftp);
+        }
+    }
+}
+
+impl Deref for SftpHandle {
+    type Target = Sftp;
+    fn deref(&self) -> &Sftp { self.0.as_ref().unwrap() }
+}
+
+impl DerefMut for SftpHandle {
+    fn deref_mut(&mut self) -> &mut Sftp { self.0.as_mut().unwrap() }
+}
 
 /// 기존 세션이 살아있는지 빠르게 확인 (타임아웃 일시 적용)
 fn is_session_alive(session: &Session) -> bool {
@@ -33,9 +54,11 @@ fn connect_inner(ssh_config: &SshConfig, force: bool) -> Result<()> {
         }
         // 죽은 세션 정리 — 이후 get_channel_session 등에서 블로킹 방지
         *client = None;
+        *SFTP_CACHE.lock().unwrap() = None;
     } else {
         // force: 기존 세션 즉시 정리
         *SSH_CLIENT.lock().unwrap() = None;
+        *SFTP_CACHE.lock().unwrap() = None;
     }
 
     let mut session = Session::new().context("Failed to create SSH session")?;
@@ -89,12 +112,21 @@ pub fn get_channel_session() -> Result<Channel> {
     Ok(channel)
 }
 
-pub fn get_sftp_session() -> Result<Sftp> {
+pub fn get_sftp_session() -> Result<SftpHandle> {
+    // 캐시에서 꺼내기
+    let cached = SFTP_CACHE.lock().unwrap().take();
+    if let Some(sftp) = cached {
+        // 살아있는지 간단 확인
+        if sftp.stat(Path::new(".")).is_ok() {
+            return Ok(SftpHandle(Some(sftp)));
+        }
+    }
+    // 새로 생성
     let sftp = SSH_CLIENT.lock().unwrap()
         .as_ref()
         .context("SSH session not initialized")?
         .sftp().context("Failed to open SFTP session")?;
-    Ok(sftp)
+    Ok(SftpHandle(Some(sftp)))
 }
 
 /// SSH 서버의 홈 디렉토리 경로를 가져옴
