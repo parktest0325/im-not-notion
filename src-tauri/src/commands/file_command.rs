@@ -52,8 +52,8 @@ pub fn check_file_hidden(path: &str) -> Result<bool, InvokeError> {
 }
 
 #[tauri::command]
-pub fn download_remote_file(remote_path: &str, local_path: &str) -> Result<(), InvokeError> {
-    file_service::download_remote(remote_path, local_path).into_invoke_err()
+pub fn download_remote_files(items: Vec<(String, String)>) -> Vec<Result<(), String>> {
+    file_service::download_remote_batch(items)
 }
 
 #[tauri::command]

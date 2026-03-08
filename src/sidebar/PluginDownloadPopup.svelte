@@ -8,36 +8,30 @@
   export let items: DownloadItem[] = [];
   export let onClose: () => void;
 
-  let checked: Record<string, boolean> = {};
+  let checkedArr: boolean[] = [];
   let isDownloading = false;
   let progress = { current: 0, total: 0 };
 
   $: if (show && items.length > 0) {
-    checked = {};
-    for (const item of items) {
-      checked[item.path] = false;
-    }
-    // Auto-check first item
-    if (items.length > 0) {
-      checked[items[0].path] = true;
-    }
-    checked = checked;
+    checkedArr = items.map((_, i) => i === 0);
     isDownloading = false;
     progress = { current: 0, total: 0 };
   }
 
-  $: selectedCount = Object.values(checked).filter(Boolean).length;
+  $: selectedCount = checkedArr.filter(Boolean).length;
+
+  function toggle(index: number) {
+    checkedArr[index] = !checkedArr[index];
+    checkedArr = [...checkedArr];
+  }
 
   function toggleAll() {
     const allChecked = selectedCount === items.length;
-    for (const item of items) {
-      checked[item.path] = !allChecked;
-    }
-    checked = checked;
+    checkedArr = items.map(() => !allChecked);
   }
 
   async function downloadSelected() {
-    const selected = items.filter(item => checked[item.path]);
+    const selected = items.filter((_, i) => checkedArr[i]);
     if (selected.length === 0) {
       addToast("No files selected.");
       return;
@@ -49,28 +43,34 @@
     isDownloading = true;
     progress = { current: 0, total: selected.length };
 
-    let succeeded = 0;
-    for (const item of selected) {
-      try {
-        const localPath = `${dir}/${item.filename}`;
-        await invoke("download_remote_file", {
-          remotePath: item.path,
-          localPath,
-        });
-        succeeded++;
-      } catch (error) {
-        console.error(`Download failed: ${item.filename}`, error);
-        addToast(`Failed: ${item.filename}`);
+    try {
+      const batch: [string, string][] = selected.map(item => [
+        item.path,
+        `${dir}/${item.filename}`,
+      ]);
+      const results: ({ Ok: null } | { Err: string })[] = await invoke("download_remote_files", { items: batch });
+
+      let succeeded = 0;
+      for (let i = 0; i < results.length; i++) {
+        if ("Err" in results[i]) {
+          console.error(`Download failed: ${selected[i].filename}`, results[i]);
+          addToast(`Failed: ${selected[i].filename}`);
+        } else {
+          succeeded++;
+        }
+        progress.current = i + 1;
+        progress = progress;
       }
-      progress.current++;
-      progress = progress;
+
+      if (succeeded > 0) {
+        addToast(`Downloaded ${succeeded} file(s).`, "success");
+      }
+    } catch (error) {
+      console.error("Batch download failed:", error);
+      addToast("Download failed.");
     }
 
     isDownloading = false;
-
-    if (succeeded > 0) {
-      addToast(`Downloaded ${succeeded} file(s).`, "success");
-    }
     onClose();
   }
 </script>
@@ -88,20 +88,21 @@
       </div>
 
       <div class="dl-list">
-        {#each items as item}
-          <label class="dl-item" for="dl-{item.path}">
+        {#each items as item, i}
+          <!-- svelte-ignore a11y-click-events-have-key-events -->
+          <!-- svelte-ignore a11y-no-static-element-interactions -->
+          <div class="dl-item" on:click={() => toggle(i)}>
             <input
-              id="dl-{item.path}"
               type="checkbox"
-              checked={checked[item.path]}
-              on:change={(e) => { checked[item.path] = e.currentTarget.checked; checked = checked; }}
+              checked={checkedArr[i]}
+              on:click|stopPropagation={() => toggle(i)}
             />
             <svg class="dl-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/>
             </svg>
             <span class="dl-name">{item.filename}</span>
             <span class="dl-size">{item.size}</span>
-          </label>
+          </div>
         {/each}
       </div>
 

@@ -1141,14 +1141,28 @@ pub fn save_file(sftp: &Sftp, path: &Path, content: String) -> Result<()> {
 }
 
 
-/// 서버의 원격 파일을 로컬로 다운로드
-pub fn download_remote(remote_path: &str, local_path: &str) -> Result<()> {
-    let sftp = get_sftp_session()?;
-    let mut remote_file = sftp.open(Path::new(remote_path))?;
-    let mut data = Vec::new();
-    remote_file.read_to_end(&mut data)?;
-    std::fs::write(local_path, &data)?;
-    Ok(())
+/// 여러 원격 파일을 한 SFTP 세션으로 일괄 다운로드.
+/// 각 파일의 성공/실패를 개별 반환.
+pub fn download_remote_batch(items: Vec<(String, String)>) -> Vec<Result<(), String>> {
+    let sftp = match get_sftp_session() {
+        Ok(s) => s,
+        Err(e) => return items.iter().map(|_| Err(e.to_string())).collect(),
+    };
+    items
+        .into_iter()
+        .map(|(remote, local)| {
+            let mut remote_file = sftp
+                .open(Path::new(&remote))
+                .map_err(|e| format!("{}: {}", remote, e))?;
+            let mut data = Vec::new();
+            remote_file
+                .read_to_end(&mut data)
+                .map_err(|e| format!("{}: {}", remote, e))?;
+            std::fs::write(&local, &data)
+                .map_err(|e| format!("{}: {}", local, e))?;
+            Ok(())
+        })
+        .collect()
 }
 
 pub fn save_image(sftp: &Sftp, path: &Path, image: Vec<u8>) -> Result<()> {

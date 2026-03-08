@@ -28,7 +28,7 @@ use commands::{
     file_command::{
         get_file_content, get_file_tree, move_file_or_folder,
         new_content_for_hugo, remove_file, save_file_content, save_file_image,
-        toggle_hidden_file, check_file_hidden, download_remote_file, sync_pasted_refs,
+        toggle_hidden_file, check_file_hidden, download_remote_files, sync_pasted_refs,
     },
     config_command::{load_config, save_config, save_plugin_local_path, switch_server, check_connection},
     ssh_command::{kill_server, start_server, check_server, execute_ssh, search_content_cmd},
@@ -100,7 +100,7 @@ fn main() -> Result<()> {
             search_content_cmd,
             toggle_hidden_file,
             check_file_hidden,
-            download_remote_file,
+            download_remote_files,
             sync_pasted_refs,
             check_prerequisites_cmd,
             check_hugo_installed_cmd,

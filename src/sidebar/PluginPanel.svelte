@@ -5,7 +5,7 @@
   import PluginResultPopup from "./PluginResultPopup.svelte";
   import PluginDownloadPopup from "./PluginDownloadPopup.svelte";
   import { addToast, triggerPluginShortcut } from "../stores";
-  import type { PluginInfo, InputField, DownloadItem, AppConfig } from "../types/setting";
+  import type { PluginInfo, InputField, DownloadItem, AppConfig, PluginResult } from "../types/setting";
   import { registerAction, unregisterAction, pluginShortcutDefs, buildShortcutMap } from "../shortcut";
   import { onMount, onDestroy } from "svelte";
 
@@ -195,7 +195,38 @@
     }
   }
 
-  function openManualInput(plugin: PluginInfo, inputFields: InputField[]) {
+  async function openManualInput(plugin: PluginInfo, inputFields: InputField[]) {
+    // input이 없으면 바로 실행
+    if (inputFields.length === 0) {
+      try {
+        const inputJson = JSON.stringify({ trigger: "manual" });
+        const result: PluginResult = await invoke("run_plugin", {
+          name: plugin.manifest.name,
+          input: inputJson,
+        });
+        if (result.success) {
+          addToast(result.message ?? "Plugin executed.", "success");
+        } else {
+          addToast(result.error ?? "Plugin failed.");
+        }
+        if (result.actions) {
+          for (const action of result.actions) {
+            if (action.type === "refresh_tree") handleRefreshTree();
+            else if (action.type === "toast" && action.content) {
+              addToast(action.content.message, action.content.toast_type === "success" ? "success" : "error");
+            } else if (action.type === "show_result" && action.content) {
+              handleShowResult(action.content.title, action.content.body ?? "", action.content.pages);
+            } else if (action.type === "download_files" && action.content) {
+              handleDownloadFiles(action.content.items);
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Plugin execution failed:", error);
+        addToast("Plugin execution failed.");
+      }
+      return;
+    }
     selectedPlugin = plugin;
     selectedInputFields = inputFields;
     showInputPopup = true;
