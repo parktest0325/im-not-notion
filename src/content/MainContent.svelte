@@ -20,6 +20,8 @@
   let contentDiv: HTMLDivElement;
   let editorContainer: HTMLDivElement;
   let scrollRatio: number = 0;
+  let targetLine: number = 0;
+  let targetYFraction: number = 0;
 
   let isContentChanged: boolean = false;
   let autoSaveEnabled = writable(true);
@@ -64,7 +66,7 @@
       padding: "1rem",
       whiteSpace: "pre-wrap",
       wordBreak: "break-all",
-      caretColor: "var(--reverse-primary-color)",
+      caretColor: "#f59e0b",
     },
     ".cm-line": {
       padding: "0",
@@ -73,7 +75,8 @@
       display: "none",
     },
     ".cm-cursor": {
-      borderLeftColor: "var(--reverse-primary-color)",
+      borderLeftColor: "#f59e0b",
+      borderLeftWidth: "2px",
     },
     ".cm-selectionBackground": {
       backgroundColor: "rgba(100, 149, 237, 0.3) !important",
@@ -182,6 +185,25 @@
   //       in `$:` blocks — Svelte tracks them as reactive dependencies
   //       and would cause infinite re-runs when createEditorView sets `view`.
 
+  function handlePreviewDblClick(e: MouseEvent) {
+    if ($relativeFilePath != "") {
+      const max = contentDiv.scrollHeight - contentDiv.clientHeight;
+      scrollRatio = max > 0 ? contentDiv.scrollTop / max : 0;
+      const target = (e.target as HTMLElement).closest('[data-line]');
+      targetLine = target ? parseInt(target.getAttribute('data-line')!) : 0;
+      // 클릭한 줄의 뷰포트 내 상대 위치 (0=상단, 1=하단)
+      if (target) {
+        const containerRect = contentDiv.getBoundingClientRect();
+        const lineRect = target.getBoundingClientRect();
+        targetYFraction = (lineRect.top - containerRect.top) / containerRect.height;
+      } else {
+        targetYFraction = 0;
+      }
+      highlightLine = 0;
+      editable = true;
+    }
+  }
+
   function enterEditMode() {
     isEditingContent.set(true);
     tick().then(() => {
@@ -191,8 +213,13 @@
           view.focus();
           requestAnimationFrame(() => {
             if (view) {
-              const max = view.scrollDOM.scrollHeight - view.scrollDOM.clientHeight;
-              view.scrollDOM.scrollTop = max > 0 ? scrollRatio * max : 0;
+              const lineNum = Math.min(targetLine + 1, view.state.doc.lines);
+              const line = view.state.doc.line(lineNum);
+              view.dispatch({ selection: { anchor: line.from } });
+              // 프리뷰에서의 뷰포트 상대 위치를 에디터에서도 유지
+              const lineBlock = view.lineBlockAt(line.from);
+              const vpHeight = view.scrollDOM.clientHeight;
+              view.scrollDOM.scrollTop = lineBlock.top - targetYFraction * vpHeight;
             }
           });
         }
@@ -205,15 +232,24 @@
     isEditingContent.set(false);
     if (view) {
       fileContent = view.state.doc.toString();
-      const max = view.scrollDOM.scrollHeight - view.scrollDOM.clientHeight;
-      scrollRatio = max > 0 ? view.scrollDOM.scrollTop / max : 0;
+      // 커서가 있는 줄 번호와 뷰포트 내 상대 위치 저장
+      const cursor = view.state.selection.main.head;
+      targetLine = view.state.doc.lineAt(cursor).number - 1;
+      const lineBlock = view.lineBlockAt(cursor);
+      const vpHeight = view.scrollDOM.clientHeight;
+      targetYFraction = vpHeight > 0 ? (lineBlock.top - view.scrollDOM.scrollTop) / vpHeight : 0;
       view.destroy();
       view = null;
     }
     tick().then(() => {
       if (contentDiv) {
-        const max = contentDiv.scrollHeight - contentDiv.clientHeight;
-        contentDiv.scrollTo(0, max > 0 ? scrollRatio * max : 0);
+        // 프리뷰에서 해당 줄을 같은 뷰포트 비율 위치에 놓기
+        const lineEl = contentDiv.querySelector(`[data-line="${targetLine}"]`);
+        if (lineEl) {
+          const containerRect = contentDiv.getBoundingClientRect();
+          const lineTop = (lineEl as HTMLElement).offsetTop - contentDiv.offsetTop;
+          contentDiv.scrollTop = lineTop - targetYFraction * containerRect.height;
+        }
       }
       stopAutoSave();
     });
@@ -589,20 +625,13 @@
       role="button"
       class="break-all w-full min-h-full whitespace-pre-wrap p-4"
       style="border: 2px solid transparent; border-radius: 8px;"
-      on:dblclick={() => {
-        if ($relativeFilePath != "") {
-          const max = contentDiv.scrollHeight - contentDiv.clientHeight;
-          scrollRatio = max > 0 ? contentDiv.scrollTop / max : 0;
-          highlightLine = 0;
-          editable = true;
-        }
-      }}
+      on:dblclick={handlePreviewDblClick}
     >
       {#each fileContent.split('\n') as line, i}
         {#if highlightLine === i + 1}
-          <div class="highlight-line" bind:this={highlightEl}>{line || ' '}</div>
+          <div data-line={i} class="highlight-line" bind:this={highlightEl}>{line || ' '}</div>
         {:else}
-          <div>{line || ' '}</div>
+          <div data-line={i}>{line || ' '}</div>
         {/if}
       {/each}
     </div>
