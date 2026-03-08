@@ -158,12 +158,12 @@ fn parse_find_output(output: &str, prefix: &str, root_name: &str, is_hidden: boo
     root
 }
 
-/// SSH find + grep을 하나의 명령으로 실행하여 파일 목록 + weight를 동시 수집.
-/// 반환: (find 출력, weight map)
-fn fetch_files_and_weights(base_path: &str, paths: &[String]) -> (String, HashMap<String, i32>) {
+/// SSH find + grep을 하나의 명령으로 실행하여 파일 목록 + weight + date를 동시 수집.
+/// 반환: (find 출력, weight map, date map)
+fn fetch_files_and_weights(base_path: &str, paths: &[String]) -> (String, HashMap<String, i32>, HashMap<String, String>) {
     let mut channel = match get_channel_session() {
         Ok(ch) => ch,
-        Err(_) => return (String::new(), HashMap::new()),
+        Err(_) => return (String::new(), HashMap::new(), HashMap::new()),
     };
 
     // find 대상 경로 조합
@@ -173,38 +173,49 @@ fn fetch_files_and_weights(base_path: &str, paths: &[String]) -> (String, HashMa
     let find_paths = find_targets.join(" ");
 
     let cmd = format!(
-        "echo '---FILES---'; find {} -maxdepth {} -print 2>/dev/null; echo '---WEIGHTS---'; grep -rn -E '^weight\\s*[=:]\\s*' {}/content --include='*.md' 2>/dev/null; true",
-        find_paths, FILE_TREE_MAX_DEPTH, base_path
+        "echo '---FILES---'; find {} -maxdepth {} -print 2>/dev/null; echo '---WEIGHTS---'; grep -rn -E '^weight\\s*[=:]\\s*' {}/content --include='*.md' 2>/dev/null; echo '---DATES---'; grep -rn -E '^date\\s*[=:]\\s*' {}/content --include='*.md' 2>/dev/null; true",
+        find_paths, FILE_TREE_MAX_DEPTH, base_path, base_path
     );
 
     let output = match execute_ssh_command(&mut channel, &cmd) {
         Ok(o) => o,
-        Err(_) => return (String::new(), HashMap::new()),
+        Err(_) => return (String::new(), HashMap::new(), HashMap::new()),
     };
 
-    // ---FILES--- 와 ---WEIGHTS--- 구분자로 분리
+    // ---FILES--- / ---WEIGHTS--- / ---DATES--- 구분자로 분리
     let files_section;
     let weights_section;
+    let dates_section;
 
     if let Some(files_start) = output.find("---FILES---") {
         let after_files = &output[files_start + "---FILES---".len()..];
         if let Some(weights_start) = after_files.find("---WEIGHTS---") {
             files_section = after_files[..weights_start].to_string();
-            weights_section = after_files[weights_start + "---WEIGHTS---".len()..].to_string();
+            let after_weights = &after_files[weights_start + "---WEIGHTS---".len()..];
+            if let Some(dates_start) = after_weights.find("---DATES---") {
+                weights_section = after_weights[..dates_start].to_string();
+                dates_section = after_weights[dates_start + "---DATES---".len()..].to_string();
+            } else {
+                weights_section = after_weights.to_string();
+                dates_section = String::new();
+            }
         } else {
             files_section = after_files.to_string();
             weights_section = String::new();
+            dates_section = String::new();
         }
     } else {
         files_section = String::new();
         weights_section = String::new();
+        dates_section = String::new();
     }
 
-    // weight 파싱
+    // weight / date 파싱
     let prefix = format!("{}/content", base_path);
     let weights = parse_weight_output(&weights_section, &prefix);
+    let dates = parse_date_output(&dates_section, &prefix);
 
-    (files_section, weights)
+    (files_section, weights, dates)
 }
 
 /// grep 출력에서 weight 값 파싱
@@ -229,20 +240,49 @@ fn parse_weight_output(output: &str, prefix: &str) -> HashMap<String, i32> {
     map
 }
 
-/// 트리의 children을 weight 기준으로 재귀 정렬.
+/// grep 출력에서 date 값 파싱
+fn parse_date_output(output: &str, prefix: &str) -> HashMap<String, String> {
+    let mut map = HashMap::new();
+    for line in output.lines() {
+        let Some((path, rest)) = line.split_once(':') else { continue };
+        let Some((_line_num, text)) = rest.split_once(':') else { continue };
+
+        let rel = match path.strip_prefix(prefix) {
+            Some(r) => r.to_string(),
+            None => continue,
+        };
+
+        let trimmed = text.trim();
+        let after_key = trimmed.strip_prefix("date").unwrap_or(trimmed).trim();
+        let after_sep = after_key.trim_start_matches(|c: char| c == '=' || c == ':').trim();
+        let date_str = after_sep.trim_matches('"').trim_matches('\'').trim();
+        if !date_str.is_empty() {
+            map.entry(rel).or_insert_with(|| date_str.to_string());
+        }
+    }
+    map
+}
+
+/// 트리의 children을 weight → date(최신순) → name 순으로 재귀 정렬.
 /// current_path: 이 노드까지의 상대 경로 (예: "/blog/post")
-fn sort_tree(node: &mut FileSystemNode, current_path: &str, weights: &HashMap<String, i32>) {
+fn sort_tree(node: &mut FileSystemNode, current_path: &str, weights: &HashMap<String, i32>, dates: &HashMap<String, String>) {
     for (name, child) in node.children.iter_mut() {
         if child.type_ == NodeType::Directory {
             let child_path = format!("{}/{}", current_path, name);
-            sort_tree(child, &child_path, weights);
+            sort_tree(child, &child_path, weights, dates);
         }
     }
 
     node.children.sort_by(|a_name, _a_node, b_name, _b_node| {
         let w_a = weight_for(current_path, a_name, _a_node, weights);
         let w_b = weight_for(current_path, b_name, _b_node, weights);
-        w_a.cmp(&w_b).then_with(|| a_name.cmp(b_name))
+        w_a.cmp(&w_b)
+            .then_with(|| {
+                let d_a = date_for(current_path, a_name, _a_node, dates);
+                let d_b = date_for(current_path, b_name, _b_node, dates);
+                d_b.cmp(&d_a) // 최신순 (내림차순)
+            })
+            .then_with(|| a_name.cmp(b_name))
     });
 }
 
@@ -255,6 +295,15 @@ fn weight_for(parent: &str, name: &str, node: &FileSystemNode, weights: &HashMap
     *weights.get(&key).unwrap_or(&i32::MAX)
 }
 
+/// 노드의 정렬 date를 조회. ISO 문자열이므로 사전순 비교 가능.
+fn date_for(parent: &str, name: &str, node: &FileSystemNode, dates: &HashMap<String, String>) -> String {
+    let key = match node.type_ {
+        NodeType::Directory => format!("{}/{}/_index.md", parent, name),
+        NodeType::File => format!("{}/{}", parent, name),
+    };
+    dates.get(&key).cloned().unwrap_or_default()
+}
+
 /// 파일 트리 구성: SSH find 1회 + grep 1회로 섹션별 트리 반환 (weight 정렬 + hidden 병합)
 pub fn build_file_tree() -> Result<Vec<FileSystemNode>> {
     let hugo_config = get_hugo_config()?;
@@ -264,7 +313,7 @@ pub fn build_file_tree() -> Result<Vec<FileSystemNode>> {
     for section in &hugo_config.content_paths {
         all_paths.push(format!("{}/{}", hugo_config.hidden_path, section));
     }
-    let (find_output, weights) = fetch_files_and_weights(&hugo_config.base_path, &all_paths);
+    let (find_output, weights, dates) = fetch_files_and_weights(&hugo_config.base_path, &all_paths);
 
     let content_prefix = format!("{}/content", hugo_config.base_path);
     let mut sections = Vec::new();
@@ -276,7 +325,7 @@ pub fn build_file_tree() -> Result<Vec<FileSystemNode>> {
 
         // weight 기준 정렬
         let section_prefix = format!("/{}", section);
-        sort_tree(&mut tree, &section_prefix, &weights);
+        sort_tree(&mut tree, &section_prefix, &weights, &dates);
 
         // hidden 트리 파싱 + 병합
         let hidden_abs = format!("{}/{}/{}", content_prefix, hugo_config.hidden_path, section);
