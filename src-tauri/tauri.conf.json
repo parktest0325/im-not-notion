@@ -16,7 +16,7 @@
     "windows": [
       {
          "title": "im not notion", "width": 1024, "height": 768,
-         "dragDropEnabled": false
+         "dragDropEnabled": true
       }
     ]
   },

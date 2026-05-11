@@ -20,6 +20,7 @@ pub fn load_app_config() -> Result<AppConfig> {
         cms_config: CmsConfig::default(),
         shortcuts: HashMap::new(),
         plugin_local_path: client.plugin_local_path.clone(),
+        download_path: client.download_path.clone(),
     };
 
     // 2. active server의 SSH 설정으로 연결 시도
@@ -101,6 +102,32 @@ pub fn save_plugin_local_path(path: String) -> Result<()> {
         config.save_client_config()?;
     }
     Ok(())
+}
+
+/// 다운로드 경로 저장 (ClientConfig만 업데이트)
+pub fn save_download_path(path: String) -> Result<()> {
+    let mut guard = APP_CONFIG.lock().unwrap();
+    if let Some(ref mut config) = *guard {
+        config.download_path = path;
+        config.save_client_config()?;
+    }
+    Ok(())
+}
+
+/// 현재 다운로드 경로 반환 (빈 경우 OS 기본 Downloads 폴더)
+pub fn get_download_path() -> String {
+    let guard = APP_CONFIG.lock().unwrap();
+    let configured = guard
+        .as_ref()
+        .map(|c| c.download_path.clone())
+        .unwrap_or_default();
+    if !configured.is_empty() {
+        return configured;
+    }
+    dirs_next::download_dir()
+        .or_else(dirs_next::home_dir)
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_default()
 }
 
 pub fn get_app_config() -> Result<AppConfig> {

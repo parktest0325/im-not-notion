@@ -17,6 +17,9 @@ pub struct ClientConfig {
     pub servers: Vec<ServerEntry>,
     #[serde(default)]
     pub plugin_local_path: String,
+    /// 다운로드 저장 위치. 빈 문자열이면 OS 기본 Downloads 폴더로 폴백.
+    #[serde(default)]
+    pub download_path: String,
 
     // 하위호환: 기존 단일 ssh_config → 마이그레이션용 (저장 시 제외)
     #[serde(default, skip_serializing)]
@@ -29,6 +32,7 @@ impl ClientConfig {
             active_server,
             servers,
             plugin_local_path,
+            download_path: String::new(),
             ssh_config: SshConfig::default(),
         }
     }
@@ -90,6 +94,7 @@ impl ClientConfig {
                 }
             }).collect(),
             plugin_local_path: self.plugin_local_path.clone(),
+            download_path: self.download_path.clone(),
             ssh_config: SshConfig::default(),
         };
 

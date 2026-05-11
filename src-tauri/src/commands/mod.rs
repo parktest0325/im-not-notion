@@ -4,3 +4,4 @@ pub mod config_command;
 pub mod setup_command;
 pub mod pty_command;
 pub mod plugin_command;
+pub mod transfer_command;

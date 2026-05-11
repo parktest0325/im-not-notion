@@ -30,7 +30,10 @@ use commands::{
         new_content_for_hugo, remove_file, save_file_content, save_file_image,
         toggle_hidden_file, check_file_hidden, download_remote_files, sync_pasted_refs,
     },
-    config_command::{load_config, save_config, save_plugin_local_path, switch_server, check_connection},
+    config_command::{
+        load_config, save_config, save_plugin_local_path, switch_server, check_connection,
+        save_download_path, get_download_path,
+    },
     ssh_command::{kill_server, start_server, check_server, execute_ssh, search_content_cmd},
     setup_command::{
         check_prerequisites_cmd, check_hugo_installed_cmd,
@@ -46,6 +49,13 @@ use commands::{
         register_plugin_cron, unregister_plugin_cron,
         list_registered_crons,
         pull_plugin, open_plugin_in_editor,
+    },
+    transfer_command::{
+        check_upload_conflicts, check_download_conflicts,
+        upload_to_remote, download_to_local,
+        list_remote_dir, delete_remote_paths,
+        move_remote_path, mkdir_remote_path,
+        remote_home_dir,
     },
 };
 
@@ -127,6 +137,17 @@ fn main() -> Result<()> {
             list_registered_crons,
             pull_plugin,
             open_plugin_in_editor,
+            check_upload_conflicts,
+            check_download_conflicts,
+            upload_to_remote,
+            download_to_local,
+            list_remote_dir,
+            delete_remote_paths,
+            move_remote_path,
+            mkdir_remote_path,
+            remote_home_dir,
+            save_download_path,
+            get_download_path,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

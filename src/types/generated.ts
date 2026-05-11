@@ -39,6 +39,7 @@ export interface AppConfig {
 	cms_config: CmsConfig;
 	shortcuts?: Record<string, string[]>;
 	plugin_local_path?: string;
+	download_path?: string;
 }
 
 export interface DownloadItem {

@@ -1,6 +1,11 @@
 use tauri::command;
 use tauri::ipc::InvokeError;
-use crate::services::config_service::{load_app_config, save_app_config, save_plugin_local_path as save_plugin_path};
+use crate::services::config_service::{
+    load_app_config, save_app_config,
+    save_plugin_local_path as save_plugin_path,
+    save_download_path as save_dl_path,
+    get_download_path as get_dl_path,
+};
 use crate::types::config::AppConfig;
 use crate::utils::IntoInvokeError;
 
@@ -20,6 +25,18 @@ pub fn save_config(config: AppConfig) -> Result<(), InvokeError> {
 #[command]
 pub fn save_plugin_local_path(path: String) -> Result<(), InvokeError> {
     save_plugin_path(path).into_invoke_err()
+}
+
+/// 다운로드 경로 저장
+#[command]
+pub fn save_download_path(path: String) -> Result<(), InvokeError> {
+    save_dl_path(path).into_invoke_err()
+}
+
+/// 다운로드 경로 조회 (빈 값이면 OS 기본 ~/Downloads)
+#[command]
+pub fn get_download_path() -> String {
+    get_dl_path()
 }
 
 /// SSH 연결 상태 확인

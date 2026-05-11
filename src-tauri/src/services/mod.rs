@@ -4,3 +4,5 @@ pub mod file_service;
 pub mod setup_service;
 pub mod pty_service;
 pub mod plugin_service;
+pub mod transfer_service;
+pub mod fs_service;
