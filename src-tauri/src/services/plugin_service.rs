@@ -303,8 +303,13 @@ pub fn respond_to_prompt(id: &str, value: Value) -> Result<()> {
 }
 
 fn emit_to_frontend<S: serde::Serialize>(event: &str, payload: &S) {
-    if let Some(app) = crate::app_handle() {
-        let _ = app.emit(event, payload);
+    let Some(app) = crate::app_handle() else {
+        eprintln!("[plugin] emit {} skipped: no app handle", event);
+        return;
+    };
+    match app.emit(event, payload) {
+        Ok(()) => eprintln!("[plugin] emit {} ok", event),
+        Err(e) => eprintln!("[plugin] emit {} failed: {:?}", event, e),
     }
 }
 

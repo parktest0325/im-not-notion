@@ -35,6 +35,7 @@
 
   async function executePlugin() {
     if (!plugin) return;
+    console.log("[exec] start", plugin.name);
     isExecuting = true;
     progress = null;
     prompt = null;
@@ -42,11 +43,14 @@
     // Listen for progress / prompt events for THIS plugin only
     const pluginName = plugin.name;
     unlistenProgress = await listen<PluginProgress>("plugin:progress", (e) => {
+      console.log("[exec] progress event", e.payload);
       if (e.payload.plugin === pluginName) progress = e.payload;
     });
     unlistenPrompt = await listen<PluginPrompt>("plugin:prompt", (e) => {
+      console.log("[exec] prompt event", e.payload);
       if (e.payload.plugin === pluginName) prompt = e.payload;
     });
+    console.log("[exec] listeners registered");
 
     try {
       // Read current values directly from DOM to avoid Svelte reactivity issues
@@ -61,10 +65,12 @@
         }
       }
       const inputJson = JSON.stringify(formData);
+      console.log("[exec] invoking run_plugin", inputJson);
       const result: PluginResult = await invoke("run_plugin", {
         name: plugin.name,
         input: inputJson,
       });
+      console.log("[exec] invoke resolved", result);
 
       if (result.success) {
         addToast(result.message ?? "Plugin executed.", "success");
