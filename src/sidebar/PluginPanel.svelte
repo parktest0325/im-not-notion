@@ -1,11 +1,15 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
+  import { listen, type UnlistenFn } from "@tauri-apps/api/event";
   import Popup from "../component/Popup.svelte";
   import PluginInputPopup from "./PluginInputPopup.svelte";
   import PluginResultPopup from "./PluginResultPopup.svelte";
   import PluginDownloadPopup from "./PluginDownloadPopup.svelte";
+  import PluginProgressModal from "./PluginProgressModal.svelte";
+  import PluginPromptModal from "./PluginPromptModal.svelte";
   import { addToast, triggerPluginShortcut } from "../stores";
   import type { PluginInfo, InputField, DownloadItem, AppConfig, PluginResult } from "../types/setting";
+  import type { PluginProgress, PluginPrompt } from "../types/generated";
   import { registerAction, unregisterAction, pluginShortcutDefs, buildShortcutMap } from "../shortcut";
   import { onMount, onDestroy } from "svelte";
 
@@ -36,6 +40,13 @@
   let showDownloadPopup = false;
   let downloadItems: DownloadItem[] = [];
 
+  // Plugin progress / prompt — listeners stay active for the whole panel
+  // lifetime, so fast-path triggers (no input form) still receive events.
+  let progress: PluginProgress | null = null;
+  let prompt: PluginPrompt | null = null;
+  let unlistenProgress: UnlistenFn | null = null;
+  let unlistenPrompt: UnlistenFn | null = null;
+
   // Cron 등록 상태: "pluginName:label" → true
   let cronEnabled: Set<string> = new Set();
 
@@ -53,7 +64,29 @@
       }
     } catch (_) {}
     loadPlugins();
+
+    unlistenProgress = await listen<PluginProgress>("plugin:progress", (e) => {
+      progress = e.payload;
+    });
+    unlistenPrompt = await listen<PluginPrompt>("plugin:prompt", (e) => {
+      prompt = e.payload;
+    });
   });
+
+  async function onPromptRespond(e: CustomEvent<{ id: string; value: any }>) {
+    prompt = null;
+    try {
+      await invoke("respond_to_plugin_prompt", { id: e.detail.id, value: e.detail.value });
+    } catch (err) {
+      addToast(`Failed to respond: ${err}`);
+    }
+  }
+  async function onPromptCancel(e: CustomEvent<{ id: string }>) {
+    prompt = null;
+    try {
+      await invoke("respond_to_plugin_prompt", { id: e.detail.id, value: null });
+    } catch {}
+  }
 
   $: if (show) {
     loadPlugins();
@@ -155,6 +188,8 @@
     for (const id of registeredActionIds) {
       unregisterAction(id);
     }
+    unlistenProgress?.();
+    unlistenPrompt?.();
   });
 
   async function installPlugin(name: string) {
@@ -195,9 +230,43 @@
     }
   }
 
-  function openManualInput(plugin: PluginInfo, inputFields: InputField[]) {
-    // Always route through PluginInputPopup so it can wire up
-    // plugin:progress / plugin:prompt listeners before invoking.
+  async function openManualInput(plugin: PluginInfo, inputFields: InputField[]) {
+    // Listeners live on this panel (onMount), so the fast-path is safe.
+    if (inputFields.length === 0) {
+      progress = null;
+      prompt = null;
+      try {
+        const inputJson = JSON.stringify({ trigger: "manual" });
+        const result: PluginResult = await invoke("run_plugin", {
+          name: plugin.manifest.name,
+          input: inputJson,
+        });
+        if (result.success) {
+          addToast(result.message ?? "Plugin executed.", "success");
+        } else {
+          addToast(result.error ?? "Plugin failed.");
+        }
+        if (result.actions) {
+          for (const action of result.actions) {
+            if (action.type === "refresh_tree") handleRefreshTree();
+            else if (action.type === "toast" && action.content) {
+              addToast(action.content.message, action.content.toast_type === "success" ? "success" : "error");
+            } else if (action.type === "show_result" && action.content) {
+              handleShowResult(action.content.title, action.content.body ?? "", action.content.pages);
+            } else if (action.type === "download_files" && action.content) {
+              handleDownloadFiles(action.content.items);
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Plugin execution failed:", error);
+        addToast("Plugin execution failed.");
+      } finally {
+        progress = null;
+        prompt = null;
+      }
+      return;
+    }
     selectedPlugin = plugin;
     selectedInputFields = inputFields;
     showInputPopup = true;
@@ -454,6 +523,9 @@
   items={downloadItems}
   onClose={() => { showDownloadPopup = false; }}
 />
+
+<PluginProgressModal {progress} />
+<PluginPromptModal {prompt} on:respond={onPromptRespond} on:cancel={onPromptCancel} />
 
 <style>
   .plugin-card {

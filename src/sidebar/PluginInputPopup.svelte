@@ -1,11 +1,7 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import { listen, type UnlistenFn } from "@tauri-apps/api/event";
   import { addToast } from "../stores";
   import type { PluginManifest, InputField, PluginResult } from "../types/setting";
-  import type { PluginProgress, PluginPrompt } from "../types/generated";
-  import PluginProgressModal from "./PluginProgressModal.svelte";
-  import PluginPromptModal from "./PluginPromptModal.svelte";
 
   export let show: boolean;
   export let plugin: PluginManifest | null = null;
@@ -17,18 +13,6 @@
 
   let values: Record<string, string | boolean> = {};
   let isExecuting = false;
-  let progress: PluginProgress | null = null;
-  let prompt: PluginPrompt | null = null;
-  let unlistenProgress: UnlistenFn | null = null;
-  let unlistenPrompt: UnlistenFn | null = null;
-  let autoExecuted = false;
-
-  // When opened with no input fields, auto-execute and skip the form UI.
-  $: if (show && plugin && inputFields.length === 0 && !autoExecuted && !isExecuting) {
-    autoExecuted = true;
-    executePlugin();
-  }
-  $: if (!show) autoExecuted = false;
 
   $: if (show && inputFields.length > 0) {
     values = {};
@@ -43,23 +27,7 @@
 
   async function executePlugin() {
     if (!plugin) return;
-    console.log("[exec] start", plugin.name);
     isExecuting = true;
-    progress = null;
-    prompt = null;
-
-    // Listen for progress / prompt events for THIS plugin only
-    const pluginName = plugin.name;
-    unlistenProgress = await listen<PluginProgress>("plugin:progress", (e) => {
-      console.log("[exec] progress event", e.payload);
-      if (e.payload.plugin === pluginName) progress = e.payload;
-    });
-    unlistenPrompt = await listen<PluginPrompt>("plugin:prompt", (e) => {
-      console.log("[exec] prompt event", e.payload);
-      if (e.payload.plugin === pluginName) prompt = e.payload;
-    });
-    console.log("[exec] listeners registered");
-
     try {
       // Read current values directly from DOM to avoid Svelte reactivity issues
       const formData: Record<string, string | boolean> = { trigger: "manual" };
@@ -73,12 +41,10 @@
         }
       }
       const inputJson = JSON.stringify(formData);
-      console.log("[exec] invoking run_plugin", inputJson);
       const result: PluginResult = await invoke("run_plugin", {
         name: plugin.name,
         input: inputJson,
       });
-      console.log("[exec] invoke resolved", result);
 
       if (result.success) {
         addToast(result.message ?? "Plugin executed.", "success");
@@ -109,33 +75,11 @@
       addToast("Plugin execution failed.");
     } finally {
       isExecuting = false;
-      progress = null;
-      prompt = null;
-      unlistenProgress?.();
-      unlistenPrompt?.();
-      unlistenProgress = null;
-      unlistenPrompt = null;
     }
-  }
-
-  async function onPromptRespond(e: CustomEvent<{ id: string; value: any }>) {
-    prompt = null;
-    try {
-      await invoke("respond_to_plugin_prompt", { id: e.detail.id, value: e.detail.value });
-    } catch (err) {
-      addToast(`Failed to respond: ${err}`);
-    }
-  }
-
-  async function onPromptCancel(e: CustomEvent<{ id: string }>) {
-    prompt = null;
-    try {
-      await invoke("respond_to_plugin_prompt", { id: e.detail.id, value: null });
-    } catch {}
   }
 </script>
 
-{#if show && inputFields.length > 0}
+{#if show}
   <!-- svelte-ignore a11y-click-events-have-key-events -->
   <!-- svelte-ignore a11y-no-static-element-interactions -->
   <div class="fixed inset-0 flex justify-center items-center p-4 input-overlay" on:click|self={onClose}>
@@ -185,9 +129,6 @@
     </div>
   </div>
 {/if}
-
-<PluginProgressModal {progress} />
-<PluginPromptModal {prompt} on:respond={onPromptRespond} on:cancel={onPromptCancel} />
 
 <style>
   .input-overlay {
