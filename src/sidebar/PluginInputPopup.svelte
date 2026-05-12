@@ -42,11 +42,9 @@
     // Listen for progress / prompt events for THIS plugin only
     const pluginName = plugin.name;
     unlistenProgress = await listen<PluginProgress>("plugin:progress", (e) => {
-      console.log("[plugin:progress]", e.payload);
       if (e.payload.plugin === pluginName) progress = e.payload;
     });
     unlistenPrompt = await listen<PluginPrompt>("plugin:prompt", (e) => {
-      console.log("[plugin:prompt]", e.payload);
       if (e.payload.plugin === pluginName) prompt = e.payload;
     });
 

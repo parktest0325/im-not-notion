@@ -195,38 +195,9 @@
     }
   }
 
-  async function openManualInput(plugin: PluginInfo, inputFields: InputField[]) {
-    // input이 없으면 바로 실행
-    if (inputFields.length === 0) {
-      try {
-        const inputJson = JSON.stringify({ trigger: "manual" });
-        const result: PluginResult = await invoke("run_plugin", {
-          name: plugin.manifest.name,
-          input: inputJson,
-        });
-        if (result.success) {
-          addToast(result.message ?? "Plugin executed.", "success");
-        } else {
-          addToast(result.error ?? "Plugin failed.");
-        }
-        if (result.actions) {
-          for (const action of result.actions) {
-            if (action.type === "refresh_tree") handleRefreshTree();
-            else if (action.type === "toast" && action.content) {
-              addToast(action.content.message, action.content.toast_type === "success" ? "success" : "error");
-            } else if (action.type === "show_result" && action.content) {
-              handleShowResult(action.content.title, action.content.body ?? "", action.content.pages);
-            } else if (action.type === "download_files" && action.content) {
-              handleDownloadFiles(action.content.items);
-            }
-          }
-        }
-      } catch (error) {
-        console.error("Plugin execution failed:", error);
-        addToast("Plugin execution failed.");
-      }
-      return;
-    }
+  function openManualInput(plugin: PluginInfo, inputFields: InputField[]) {
+    // Always route through PluginInputPopup so it can wire up
+    // plugin:progress / plugin:prompt listeners before invoking.
     selectedPlugin = plugin;
     selectedInputFields = inputFields;
     showInputPopup = true;
