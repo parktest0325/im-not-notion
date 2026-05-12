@@ -9,7 +9,7 @@
 </script>
 
 {#if progress}
-<div class="fixed inset-0 bg-black/70 z-[70] flex items-center justify-center" role="dialog">
+<div class="fixed inset-0 bg-black/70 flex items-center justify-center" style="z-index: 1200;" role="dialog">
   <div class="bg-zinc-900 border border-zinc-700 rounded-lg w-[440px] p-5">
     <h3 class="text-sm font-semibold mb-1">{progress.plugin}</h3>
     {#if progress.phase}

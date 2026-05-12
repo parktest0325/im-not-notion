@@ -55,7 +55,7 @@
 </script>
 
 {#if prompt}
-<div class="fixed inset-0 bg-black/70 z-[75] flex items-center justify-center" role="dialog">
+<div class="fixed inset-0 bg-black/70 flex items-center justify-center" style="z-index: 1250;" role="dialog">
   <div class="bg-zinc-900 border border-zinc-700 rounded-lg w-[500px] max-h-[80vh] flex flex-col p-5">
     <h3 class="text-sm font-semibold mb-1">{prompt.title}</h3>
     <p class="text-xs text-zinc-400 mb-1">{prompt.plugin}</p>
