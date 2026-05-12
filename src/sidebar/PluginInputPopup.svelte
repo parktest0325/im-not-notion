@@ -21,6 +21,14 @@
   let prompt: PluginPrompt | null = null;
   let unlistenProgress: UnlistenFn | null = null;
   let unlistenPrompt: UnlistenFn | null = null;
+  let autoExecuted = false;
+
+  // When opened with no input fields, auto-execute and skip the form UI.
+  $: if (show && plugin && inputFields.length === 0 && !autoExecuted && !isExecuting) {
+    autoExecuted = true;
+    executePlugin();
+  }
+  $: if (!show) autoExecuted = false;
 
   $: if (show && inputFields.length > 0) {
     values = {};
@@ -127,7 +135,7 @@
   }
 </script>
 
-{#if show}
+{#if show && inputFields.length > 0}
   <!-- svelte-ignore a11y-click-events-have-key-events -->
   <!-- svelte-ignore a11y-no-static-element-interactions -->
   <div class="fixed inset-0 flex justify-center items-center p-4 input-overlay" on:click|self={onClose}>
