@@ -1,7 +1,11 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
+  import { listen, type UnlistenFn } from "@tauri-apps/api/event";
   import { addToast } from "../stores";
   import type { PluginManifest, InputField, PluginResult } from "../types/setting";
+  import type { PluginProgress, PluginPrompt } from "../types/generated";
+  import PluginProgressModal from "./PluginProgressModal.svelte";
+  import PluginPromptModal from "./PluginPromptModal.svelte";
 
   export let show: boolean;
   export let plugin: PluginManifest | null = null;
@@ -13,6 +17,10 @@
 
   let values: Record<string, string | boolean> = {};
   let isExecuting = false;
+  let progress: PluginProgress | null = null;
+  let prompt: PluginPrompt | null = null;
+  let unlistenProgress: UnlistenFn | null = null;
+  let unlistenPrompt: UnlistenFn | null = null;
 
   $: if (show && inputFields.length > 0) {
     values = {};
@@ -28,6 +36,18 @@
   async function executePlugin() {
     if (!plugin) return;
     isExecuting = true;
+    progress = null;
+    prompt = null;
+
+    // Listen for progress / prompt events for THIS plugin only
+    const pluginName = plugin.name;
+    unlistenProgress = await listen<PluginProgress>("plugin:progress", (e) => {
+      if (e.payload.plugin === pluginName) progress = e.payload;
+    });
+    unlistenPrompt = await listen<PluginPrompt>("plugin:prompt", (e) => {
+      if (e.payload.plugin === pluginName) prompt = e.payload;
+    });
+
     try {
       // Read current values directly from DOM to avoid Svelte reactivity issues
       const formData: Record<string, string | boolean> = { trigger: "manual" };
@@ -75,7 +95,29 @@
       addToast("Plugin execution failed.");
     } finally {
       isExecuting = false;
+      progress = null;
+      prompt = null;
+      unlistenProgress?.();
+      unlistenPrompt?.();
+      unlistenProgress = null;
+      unlistenPrompt = null;
     }
+  }
+
+  async function onPromptRespond(e: CustomEvent<{ id: string; value: any }>) {
+    prompt = null;
+    try {
+      await invoke("respond_to_plugin_prompt", { id: e.detail.id, value: e.detail.value });
+    } catch (err) {
+      addToast(`Failed to respond: ${err}`);
+    }
+  }
+
+  async function onPromptCancel(e: CustomEvent<{ id: string }>) {
+    prompt = null;
+    try {
+      await invoke("respond_to_plugin_prompt", { id: e.detail.id, value: null });
+    } catch {}
   }
 </script>
 
@@ -129,6 +171,9 @@
     </div>
   </div>
 {/if}
+
+<PluginProgressModal {progress} />
+<PluginPromptModal {prompt} on:respond={onPromptRespond} on:cancel={onPromptCancel} />
 
 <style>
   .input-overlay {

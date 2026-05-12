@@ -117,3 +117,58 @@ pub struct DownloadItem {
     pub filename: String,
     pub size: String,
 }
+
+// ── NDJSON plugin protocol ──────────────────────────────────────────────
+
+/// 플러그인 실행 중 진행률 이벤트 (`plugin:progress`).
+#[typeshare]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PluginProgress {
+    pub plugin: String,
+    #[serde(default)]
+    pub phase: Option<String>,
+    #[serde(default)]
+    pub current: Option<f64>,
+    #[serde(default)]
+    pub total: Option<f64>,
+    #[serde(default)]
+    pub message: Option<String>,
+}
+
+/// 사용자 응답이 필요한 플러그인 메시지 (`plugin:prompt`).
+#[typeshare]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PluginPrompt {
+    pub plugin: String,
+    pub id: String,
+    pub kind: PromptKind,
+    pub title: String,
+    #[serde(default)]
+    pub message: Option<String>,
+    #[serde(default)]
+    pub items: Vec<PromptItem>,
+    #[serde(default)]
+    pub multiple: bool,
+    #[serde(default)]
+    pub default_value: Option<String>,
+}
+
+#[typeshare]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum PromptKind {
+    #[serde(rename = "confirm")]
+    Confirm,
+    #[serde(rename = "select")]
+    Select,
+    #[serde(rename = "input")]
+    Input,
+}
+
+#[typeshare]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PromptItem {
+    pub value: String,
+    pub label: String,
+    #[serde(default)]
+    pub description: Option<String>,
+}

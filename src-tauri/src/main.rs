@@ -24,6 +24,11 @@ pub fn emit_hook_actions(results: Vec<types::plugin::PluginResult>) {
         }
     }
 }
+
+/// 전역 AppHandle 접근자. 초기화되기 전 호출 시 None.
+pub fn app_handle() -> Option<&'static tauri::AppHandle> {
+    APP_HANDLE.get()
+}
 use commands::{
     file_command::{
         get_file_content, get_file_tree, move_file_or_folder,
@@ -46,6 +51,7 @@ use commands::{
     plugin_command::{
         list_plugins, install_plugin, uninstall_plugin,
         enable_plugin, disable_plugin, run_plugin,
+        respond_to_plugin_prompt,
         register_plugin_cron, unregister_plugin_cron,
         list_registered_crons,
         pull_plugin, open_plugin_in_editor,
@@ -132,6 +138,7 @@ fn main() -> Result<()> {
             enable_plugin,
             disable_plugin,
             run_plugin,
+            respond_to_plugin_prompt,
             register_plugin_cron,
             unregister_plugin_cron,
             list_registered_crons,

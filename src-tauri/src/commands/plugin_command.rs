@@ -1,6 +1,7 @@
 use crate::services::plugin_service;
 use crate::types::plugin::{PluginInfo, PluginResult};
 use crate::utils::IntoInvokeError;
+use serde_json::Value;
 use tauri::ipc::InvokeError;
 
 #[tauri::command]
@@ -31,6 +32,11 @@ pub fn disable_plugin(name: &str) -> Result<(), InvokeError> {
 #[tauri::command]
 pub fn run_plugin(name: &str, input: &str) -> Result<PluginResult, InvokeError> {
     plugin_service::execute_plugin(name, input).into_invoke_err()
+}
+
+#[tauri::command]
+pub fn respond_to_plugin_prompt(id: &str, value: Value) -> Result<(), InvokeError> {
+    plugin_service::respond_to_prompt(id, value).into_invoke_err()
 }
 
 #[tauri::command]

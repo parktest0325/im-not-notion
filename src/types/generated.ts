@@ -145,3 +145,36 @@ export enum HookEvent {
 	AfterFileCreate = "AfterFileCreate",
 }
 
+/** 플러그인 실행 중 진행률 이벤트 (`plugin:progress`). */
+export interface PluginProgress {
+	plugin: string;
+	phase?: string;
+	current?: number;
+	total?: number;
+	message?: string;
+}
+
+export enum PromptKind {
+	Confirm = "confirm",
+	Select = "select",
+	Input = "input",
+}
+
+export interface PromptItem {
+	value: string;
+	label: string;
+	description?: string;
+}
+
+/** 사용자 응답이 필요한 플러그인 메시지 (`plugin:prompt`). */
+export interface PluginPrompt {
+	plugin: string;
+	id: string;
+	kind: PromptKind;
+	title: string;
+	message?: string;
+	items: PromptItem[];
+	multiple: boolean;
+	default_value?: string;
+}
+

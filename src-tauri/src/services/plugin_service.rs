@@ -1,8 +1,13 @@
 use std::path::Path;
-use std::io::prelude::*;
+use std::io::{prelude::*, BufReader};
 use std::collections::HashMap;
+use std::sync::{Mutex, OnceLock, mpsc};
+use std::time::Duration;
 use sha2::{Sha256, Digest};
-use anyhow::{Result, Context, bail};
+use anyhow::{Result, Context, anyhow, bail};
+use serde_json::{json, Value};
+use ssh2::Channel;
+use tauri::Emitter;
 use crate::services::ssh_service::{get_channel_session, get_sftp_session, execute_ssh_command, get_server_home_path};
 use crate::services::config_service::get_hugo_config;
 use crate::services::file_service::{mkdir_recursive, rmrf_file};
@@ -270,72 +275,212 @@ pub fn disable_plugin(plugin_name: &str) -> Result<()> {
 }
 
 // ============================================================
-// 실행
+// 실행 (NDJSON 양방향 프로토콜)
 // ============================================================
+//
+// Host → Plugin (stdin, NDJSON):
+//   {"type":"input", "trigger":..., ...input_fields..., "context":{...}}
+//   {"type":"prompt_response", "id":"p1", "value":...}
+//
+// Plugin → Host (stdout, NDJSON):
+//   {"type":"progress", "phase":"...", "current":N, "total":M, "message":"..."}
+//   {"type":"prompt", "id":"p1", "kind":"confirm|select|input", "title":"...", ...}
+//   {"type":"result", "success":bool, "message":"...", "error":"...", "actions":[...]}
+
+/// 펜딩 프롬프트 응답을 라우팅하는 전역 레지스트리.
+fn pending_prompts() -> &'static Mutex<HashMap<String, mpsc::Sender<Value>>> {
+    static PENDING: OnceLock<Mutex<HashMap<String, mpsc::Sender<Value>>>> = OnceLock::new();
+    PENDING.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// 프론트엔드에서 사용자 응답이 도착했을 때 호출. 진행 중인 execute_plugin이 깨어남.
+pub fn respond_to_prompt(id: &str, value: Value) -> Result<()> {
+    let tx = pending_prompts().lock().unwrap().remove(id);
+    match tx {
+        Some(tx) => tx.send(value).map_err(|_| anyhow!("prompt receiver dropped")),
+        None => bail!("no pending prompt with id {}", id),
+    }
+}
+
+fn emit_to_frontend<S: serde::Serialize>(event: &str, payload: &S) {
+    if let Some(app) = crate::app_handle() {
+        let _ = app.emit(event, payload);
+    }
+}
+
+fn handle_progress(plugin: &str, msg: &Value) {
+    let progress = PluginProgress {
+        plugin: plugin.to_string(),
+        phase: msg.get("phase").and_then(|v| v.as_str()).map(String::from),
+        current: msg.get("current").and_then(|v| v.as_f64()),
+        total: msg.get("total").and_then(|v| v.as_f64()),
+        message: msg.get("message").and_then(|v| v.as_str()).map(String::from),
+    };
+    emit_to_frontend("plugin:progress", &progress);
+}
+
+fn parse_prompt(plugin: &str, msg: &Value) -> Result<PluginPrompt> {
+    let id = msg.get("id").and_then(|v| v.as_str())
+        .ok_or_else(|| anyhow!("prompt missing id"))?.to_string();
+    let kind_str = msg.get("kind").and_then(|v| v.as_str()).unwrap_or("confirm");
+    let kind = match kind_str {
+        "confirm" => PromptKind::Confirm,
+        "select" => PromptKind::Select,
+        "input" => PromptKind::Input,
+        other => bail!("unknown prompt kind: {}", other),
+    };
+    let items: Vec<PromptItem> = msg.get("items")
+        .and_then(|v| v.as_array())
+        .map(|arr| arr.iter().filter_map(|x| {
+            let value = x.get("value").and_then(|v| v.as_str())?.to_string();
+            let label = x.get("label").and_then(|v| v.as_str())
+                .unwrap_or(&value).to_string();
+            let description = x.get("description").and_then(|v| v.as_str()).map(String::from);
+            Some(PromptItem { value, label, description })
+        }).collect())
+        .unwrap_or_default();
+
+    Ok(PluginPrompt {
+        plugin: plugin.to_string(),
+        id,
+        kind,
+        title: msg.get("title").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+        message: msg.get("message").and_then(|v| v.as_str()).map(String::from),
+        items,
+        multiple: msg.get("multiple").and_then(|v| v.as_bool()).unwrap_or(false),
+        default_value: msg.get("default").and_then(|v| v.as_str()).map(String::from),
+    })
+}
+
+fn handle_prompt(
+    plugin: &str,
+    msg: &Value,
+    reader: &mut BufReader<Channel>,
+) -> Result<()> {
+    let prompt = parse_prompt(plugin, msg)?;
+    let id = prompt.id.clone();
+
+    // 응답 수신용 채널 등록 후 이벤트 전송
+    let (tx, rx) = mpsc::channel();
+    pending_prompts().lock().unwrap().insert(id.clone(), tx);
+    emit_to_frontend("plugin:prompt", &prompt);
+
+    // 응답 대기 (10분 타임아웃)
+    let response = match rx.recv_timeout(Duration::from_secs(600)) {
+        Ok(v) => v,
+        Err(_) => {
+            pending_prompts().lock().unwrap().remove(&id);
+            bail!("plugin '{}' prompt '{}' timed out", plugin, id);
+        }
+    };
+
+    // 응답을 plugin stdin에 NDJSON 한 줄로 전송
+    let line = serde_json::to_string(&json!({
+        "type": "prompt_response",
+        "id": id,
+        "value": response,
+    }))? + "\n";
+    reader.get_mut().write_all(line.as_bytes())?;
+    reader.get_mut().flush()?;
+    Ok(())
+}
+
+/// NDJSON 세션 — initial_input 송신 → 메시지 루프 → result 반환
+fn run_ndjson_session(plugin_name: &str, initial_input: Value) -> Result<PluginResult> {
+    // manifest에서 entry 읽기
+    let mut ch = get_channel_session()?;
+    let manifest_str = execute_ssh_command(
+        &mut ch,
+        &format!("cat {}/{}/plugin.json", PLUGIN_DIR, plugin_name),
+    )?;
+    let manifest: PluginManifest = serde_json::from_str(&manifest_str)
+        .context("Failed to parse plugin.json")?;
+
+    // 새 채널에서 plugin 실행
+    let mut channel = get_channel_session()?;
+    let cmd = format!("{}/{}/{}", PLUGIN_DIR, plugin_name, manifest.entry);
+    channel.exec(&cmd)?;
+
+    // 첫 입력 송신 (NDJSON 한 줄)
+    let input_line = serde_json::to_string(&initial_input)? + "\n";
+    channel.write_all(input_line.as_bytes())?;
+    channel.flush()?;
+
+    // 메시지 루프
+    let mut reader = BufReader::new(channel);
+    let mut buf = String::new();
+    loop {
+        buf.clear();
+        let n = reader.read_line(&mut buf)?;
+        if n == 0 { break; }
+        let trimmed = buf.trim();
+        if trimmed.is_empty() { continue; }
+
+        let msg: Value = match serde_json::from_str(trimmed) {
+            Ok(v) => v,
+            Err(_) => continue, // stderr 노이즈/디버그 라인 무시
+        };
+
+        match msg.get("type").and_then(|v| v.as_str()) {
+            Some("progress") => handle_progress(plugin_name, &msg),
+            Some("prompt") => handle_prompt(plugin_name, &msg, &mut reader)?,
+            Some("result") => {
+                let mut clean = msg.clone();
+                if let Value::Object(ref mut o) = clean { o.remove("type"); }
+                return serde_json::from_value::<PluginResult>(clean)
+                    .context("Failed to parse plugin result");
+            },
+            Some(other) => {
+                eprintln!("plugin '{}' sent unknown message type '{}'", plugin_name, other);
+            },
+            None => {
+                // type 필드 누락: success/error 있으면 result로 관용 처리 (마이그레이션 보호망)
+                if msg.get("success").is_some() {
+                    return serde_json::from_value::<PluginResult>(msg)
+                        .context("Failed to parse plugin result (legacy)");
+                }
+            }
+        }
+    }
+    bail!("plugin '{}' exited without emitting result", plugin_name)
+}
 
 /// Manual 플러그인 실행
 pub fn execute_plugin(plugin_name: &str, input_json: &str) -> Result<PluginResult> {
     let hugo_config = get_hugo_config()?;
-
-    let mut input: serde_json::Value = serde_json::from_str(input_json)
-        .unwrap_or(serde_json::json!({}));
-    input["context"] = serde_json::json!({
+    let mut input: Value = serde_json::from_str(input_json).unwrap_or(json!({}));
+    input["type"] = json!("input");
+    input["context"] = json!({
         "base_path": hugo_config.base_path,
         "content_paths": hugo_config.content_paths,
         "image_path": hugo_config.image_path,
         "hidden_path": hugo_config.hidden_path,
     });
-
-    // manifest에서 entry 읽기
-    let mut channel = get_channel_session()?;
-    let entry_cmd = format!("cat {}/{}/plugin.json", PLUGIN_DIR, plugin_name);
-    let manifest_str = execute_ssh_command(&mut channel, &entry_cmd)?;
-    let manifest: PluginManifest = serde_json::from_str(&manifest_str)
-        .context("Failed to parse plugin.json")?;
-
-    let escaped = serde_json::to_string(&input)?;
-    let mut channel = get_channel_session()?;
-    let cmd = format!(
-        "printf '%s' '{}' | {}/{}/{}",
-        escaped.replace('\'', "'\\''"),
-        PLUGIN_DIR, plugin_name, manifest.entry
-    );
-    let output = execute_ssh_command(&mut channel, &cmd)?;
-
-    let result: PluginResult = serde_json::from_str(&output)
-        .context("Failed to parse plugin output")?;
-    Ok(result)
+    run_ndjson_session(plugin_name, input)
 }
 
 /// Hook 이벤트에 등록된 **enabled** 플러그인만 priority 순으로 실행
-pub fn run_hooks(event: HookEvent, data: serde_json::Value) -> Result<Vec<PluginResult>> {
+pub fn run_hooks(event: HookEvent, data: Value) -> Result<Vec<PluginResult>> {
     let server_plugins = discover_server_plugins().unwrap_or_default();
     let hugo_config = get_hugo_config()?;
 
-    // 매칭되는 hook 수집: (priority, plugin_name, entry)
-    let mut matched: Vec<(u32, String, String)> = Vec::new();
+    let mut matched: Vec<(u32, String)> = Vec::new();
     for (plugin, enabled, _hash) in &server_plugins {
         if !enabled { continue; }
-
         for trigger in &plugin.triggers {
             if let Trigger::Hook { event: hook_event, priority } = trigger {
                 if hook_event == &event {
-                    matched.push((
-                        priority.unwrap_or(50),
-                        plugin.name.clone(),
-                        plugin.entry.clone(),
-                    ));
+                    matched.push((priority.unwrap_or(50), plugin.name.clone()));
                 }
             }
         }
     }
-
-    // priority 오름차순, 동일 시 이름순
     matched.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)));
 
     let mut results = Vec::new();
-    for (_, name, entry) in &matched {
-        let input = serde_json::json!({
+    for (_, name) in &matched {
+        let input = json!({
+            "type": "input",
             "trigger": "hook",
             "event": format!("{:?}", event),
             "data": data,
@@ -346,20 +491,8 @@ pub fn run_hooks(event: HookEvent, data: serde_json::Value) -> Result<Vec<Plugin
                 "hidden_path": hugo_config.hidden_path,
             }
         });
-
-        let mut channel = get_channel_session()?;
-        let cmd = format!(
-            "printf '%s' '{}' | {}/{}/{}",
-            serde_json::to_string(&input)?.replace('\'', "'\\''"),
-            PLUGIN_DIR, name, entry
-        );
-
-        match execute_ssh_command(&mut channel, &cmd) {
-            Ok(output) => {
-                if let Ok(result) = serde_json::from_str::<PluginResult>(&output) {
-                    results.push(result);
-                }
-            }
+        match run_ndjson_session(name, input) {
+            Ok(result) => results.push(result),
             Err(e) => eprintln!("Hook plugin {} failed: {}", name, e),
         }
     }
