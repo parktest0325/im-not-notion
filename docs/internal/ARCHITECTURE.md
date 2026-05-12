@@ -88,7 +88,9 @@ src/
 │   ├── SettingsPopup.svelte    # Settings dialog (SSH tab + Hugo tab)
 │   ├── PluginInputPopup.svelte # Manual plugin input form
 │   ├── PluginResultPopup.svelte # ShowResult result display popup
-│   ├── PluginDownloadPopup.svelte # Plugin download progress popup
+│   ├── PluginDownloadPopup.svelte # Plugin download files popup
+│   ├── PluginProgressModal.svelte # Plugin progress event modal
+│   ├── PluginPromptModal.svelte  # Plugin prompt (confirm/select/input)
 │   ├── TerminalPopup.svelte    # SSH terminal emulator
 │   └── RebootPopup.svelte      # Server reboot controls
 │

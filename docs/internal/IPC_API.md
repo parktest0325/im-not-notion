@@ -223,7 +223,12 @@ Frontend에서 `@tauri-apps/api/core`의 `invoke()`로 호출하는 Backend comm
 ### `run_plugin`
 - **Parameters**: `name: String`, `input: String`
 - **Returns**: `PluginResult`
-- **Description**: Manual 플러그인 실행 (SSH로 JSON stdin/stdout)
+- **Description**: 플러그인 실행 — SSH 채널로 NDJSON 양방향 세션을 열고, 플러그인이 emit하는 `progress`/`prompt`는 `plugin:progress`/`plugin:prompt` Tauri 이벤트로 전달. `result` 메시지가 도착하면 그 내용을 반환. (`spawn_blocking`으로 실행되어 main thread 점유하지 않음)
+
+### `respond_to_plugin_prompt`
+- **Parameters**: `id: String`, `value: serde_json::Value`
+- **Returns**: `Result<(), String>`
+- **Description**: 진행 중인 plugin의 prompt 요청에 사용자 응답 전달 — Rust 내부 레지스트리에서 해당 id의 mpsc sender를 찾아 값을 보냄. 실행 중인 plugin이 stdin readline에서 깨어남.
 
 ### `register_plugin_cron`
 - **Parameters**: `name: String`, `schedule: String`, `entry: String`, `label: String`
@@ -249,3 +254,14 @@ Frontend에서 `@tauri-apps/api/core`의 `invoke()`로 호출하는 Backend comm
 - **Parameters**: `local_path: String`, `name: String`
 - **Returns**: `Result<(), String>`
 - **Description**: 플러그인 디렉토리를 VS Code 또는 기본 에디터로 열기
+
+---
+
+## Tauri Events (Rust → Frontend)
+
+| 이벤트 이름 | Payload 타입 | 발신처 | 용도 |
+|---|---|---|---|
+| `plugin-hook-action` | `PluginAction` | `emit_hook_actions` (file_service hooks) | hook 플러그인 결과의 후속 action을 frontend에서 처리 |
+| `plugin:progress` | `PluginProgress` | `plugin_service::handle_progress` | 실행 중인 플러그인의 진행률 표시 |
+| `plugin:prompt` | `PluginPrompt` | `plugin_service::handle_prompt` | 사용자 응답이 필요한 플러그인 모달 표시 |
+| `transfer:progress` | `TransferProgress` | `transfer_service::emit_progress` | 파일 업로드/다운로드 진행률 |

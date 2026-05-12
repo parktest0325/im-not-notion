@@ -1,733 +1,360 @@
-# Plugin Feature
+# Plugin System
 
-> im-not-notion 플러그인 시스템 설계 문서
-
-**구현 상태:**
-- [x] 플러그인 시스템 코어 (discover, execute, run_hooks, cron, install/uninstall)
-- [x] 실행 우선순위 (priority 필드)
-- [x] P1. Web Clipper — `plugins/web-clipper/`
-- [x] P2. Git Auto-Push — `plugins/git-autopush/`
-- [x] P3. Link Updater — `plugins/link-updater/`
-- [x] P4. AI Draft — `plugins/ai-draft/`
-- [x] P5. Verify — `plugins/verify/`
-
----
-
-## 개요
-
-서버 위 스크립트를 플러그인으로 실행하는 시스템.
-기존 SSH 인프라를 재사용하며, 언어 무관 (Python, bash, Node.js 등).
+> im-not-notion 플러그인 시스템 — 서버에서 스크립트를 실행하고 NDJSON 양방향 프로토콜로 호스트와 통신.
 
 핵심 원칙:
-- **서버에 파일이 있으므로** 스크립트도 서버에서 실행 → SFTP 오버헤드 없음
-- **기존 SSH 인프라 재사용** → 새로운 통신 채널 불필요
-- **JSON 프로토콜** → stdin/stdout으로 앱과 데이터 교환
-- **언어 무관** → shebang으로 인터프리터 지정
+- **서버 실행**: 콘텐츠가 있는 서버에서 스크립트가 돌아 SFTP 왕복을 줄임
+- **언어 무관**: shebang으로 인터프리터 지정 (Python/bash/Node 등). 현재 모든 플러그인은 Python.
+- **NDJSON 양방향 프로토콜**: stdin/stdout으로 JSON 메시지를 줄 단위로 주고받음
+- **UI는 호스트가 제공**: 플러그인은 메시지만 emit, 화면은 im-not-notion이 그림
+- **느슨한 결합**: 플러그인이 호스트 코드를 import하지 않음 — 의존 대상은 JSON 스키마뿐
 
 ---
 
-## 구현 대상 플러그인
-
-### P1. Web Clipper — URL → 마크다운 변환
-
-URL을 입력하면 페이지를 다운로드, 마크다운으로 변환, 지정 폴더에 저장.
+## 디렉토리 구조
 
 ```
-사용자: URL 입력 + 대상 폴더 선택
-  → 앱: SSH로 스크립트 실행
-  → 스크립트: requests + html2text로 변환, 파일 저장
-  → 앱: 파일 트리 새로고침
-```
-
-- 트리거: **Manual** (UI 버튼)
-- 의존성: python3, requests, html2text (또는 beautifulsoup4)
-
-### P2. Git Auto-Push — 블로그 자동 보전
-
-10분마다 git push, 한 달 단위로 커밋 squash.
-
-```
-10분 주기 (cron):
-  → cd {base_path} && git add -A && git commit -m "auto: $(date)" && git push
-
-월간 (cron, 매월 1일):
-  → 이전 달 커밋들을 squash하여 단일 커밋으로 병합
-```
-
-- 트리거: **Cron** (서버 crontab)
-- 의존성: git, bash
-
-### P3. Link Updater — 파일 이동 시 내부 링크 동기화
-
-파일/폴더 이동 또는 이름 변경 시, 다른 글에서 참조하는 링크 경로를 자동 업데이트.
-
-```
-파일 이동 이벤트 발생
-  → 앱: hook 스크립트에 src/dst 전달
-  → 스크립트: base_path 내 모든 .md 파일에서 src 경로를 dst로 치환
-  → 앱: 변경된 파일 목록 토스트 표시
-```
-
-- 트리거: **Hook** (AfterFileMove)
-- 의존성: python3 (또는 bash sed)
-
-### P4. AI Draft — AI 글 초안 생성
-
-주제/키워드를 입력하면 LLM API로 블로그 글 초안을 생성하여 저장.
-P1(Web Clipper)과 동일한 "입력 → 외부 소스 → 마크다운 저장" 패턴.
-
-```
-사용자: 주제 입력 + 대상 폴더 선택
-  → 앱: SSH로 스크립트 실행
-  → 스크립트: LLM API 호출 → frontmatter 포함 마크다운 생성 → 파일 저장
-  → 앱: 파일 트리 새로고침
-```
-
-- 트리거: **Manual** (UI 버튼)
-- 의존성: python3, openai (또는 anthropic 등 LLM SDK)
-- 추가 필요: API 키 관리 (plugin.json `config` 필드 또는 서버 환경변수)
-
-### P5. Verify — 데이터 정합성 검증
-
-이미지 참조 정합성을 **검증**하는 복합 트리거 플러그인.
-이미지 동기화 자체는 Rust 기본기능으로 처리되며, 이 플러그인은 검증/리포팅만 담당.
-
-**Manual 트리거 (Verify Images):**
-```
-사용자: [Verify Images] 클릭 (입력 없음)
-  → 전체 이미지 디렉토리 + md 파일 스캔
-  → 전체 이미지 경로 목록 + Summary (Broken refs, Orphan files) 보고
-  → 스냅샷을 .state.json에 저장 (baseline)
-  → ShowResult 팝업으로 상세 보고서 표시
-```
-
-**Hook 트리거 (AfterFileSave/Move/Delete/Create):**
-```
-Rust 이미지 동기화 완료 후 hook 플러그인 실행
-  → verify 플러그인 실행 (priority: 99, 항상 마지막)
-  → .state.json baseline과 현재 상태 비교
-  → 변경 감지: 추가/삭제/이동된 이미지 (UUID 기반 이동 감지)
-  → baseline 업데이트
-  → emit_hook_actions()로 Toast 전달
-```
-
-- 트리거: **Manual** + **Hook** (AfterFileSave, AfterFileMove, AfterFileDelete, AfterFileCreate)
-- 우선순위: `99` (모든 hook 중 가장 나중에 실행)
-- 상태 관리: `.state.json` (이미지 목록 스냅샷)
-- 의존성: python3
-
----
-
-## 실행 모드
-
-| 모드 | 트리거 | 예시 | 앱 필요? |
-|------|--------|------|----------|
-| **Manual** | UI 버튼 클릭 | Web Clipper | O |
-| **Hook** | 백엔드 함수 전/후 | Link Updater | O |
-| **Cron** | 서버 crontab | Git Auto-Push | X |
-
----
-
-## 실행 우선순위 (Priority)
-
-같은 이벤트에 여러 Hook/Cron 플러그인이 등록된 경우, `priority` 값으로 실행 순서를 결정.
-
-### 규칙
-
-| 항목 | 값 |
-|------|------|
-| 필드 | `trigger.priority` (정수) |
-| 기본값 | `50` (미지정 시) |
-| 정렬 | **오름차순** — 낮은 숫자가 먼저 실행 |
-| 동일 우선순위 | 플러그인 이름 알파벳순 (결정적 순서 보장) |
-
-### 권장 범위
-
-| 범위 | 용도 | 예시 |
-|------|------|------|
-| `1–19` | 전처리 (데이터 준비, 캐시 무효화) | — |
-| `20–39` | 일반 초기 작업 | — |
-| `40–60` | 기본 작업 (대부분의 플러그인) | Link Updater (`50`) |
-| `61–80` | 후처리 (집계, 알림) | — |
-| `81–99` | 검증/감사 (가장 나중에 실행) | Verify (`99`) |
-
-### 적용 범위
-
-- **Hook**: 동일 `event`에 등록된 플러그인 간 순서 결정
-- **Cron**: 동일 `schedule`에 등록된 플러그인 간 순서 결정
-- **Manual**: 해당 없음 (사용자가 직접 실행하므로)
-
-### 실행 흐름 예시
-
-```
-AfterFileMove 이벤트 발생
-  → priority 정렬: link-updater(50) → verify(99)
-  → link-updater 실행 → 성공
-  → verify 실행 → 정합성 검증 → 문제 발견 시 warning toast
-```
-
-### Rust 구현 — 구현 완료
-
-> 파일: `src-tauri/src/services/plugin_service.rs`
-
-`run_hooks()`는 매칭되는 hook을 먼저 수집한 뒤 priority 정렬 후 순차 실행:
-
-```rust
-pub fn run_hooks(event: HookEvent, data: Value) -> Result<Vec<PluginResult>> {
-    let server_plugins = discover_server_plugins().unwrap_or_default();
-    let hugo_config = get_hugo_config()?;
-
-    // 매칭되는 hook 수집: (priority, plugin_name, entry)
-    let mut matched: Vec<(u32, String, String)> = Vec::new();
-    for (plugin, enabled, _) in &server_plugins {
-        if !enabled { continue; }
-        for trigger in &plugin.triggers {
-            if let Trigger::Hook { event: e, priority } = trigger {
-                if e == &event {
-                    matched.push((
-                        priority.unwrap_or(50),
-                        plugin.name.clone(),
-                        plugin.entry.clone(),
-                    ));
-                }
-            }
-        }
-    }
-
-    // priority 오름차순, 동일 시 이름순
-    matched.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)));
-
-    // 정렬된 순서로 SSH 실행
-    let mut results = Vec::new();
-    for (_, name, entry) in &matched {
-        // printf '%s' '{json}' | ~/.inn_plugins/{name}/{entry}
-        // ...
-    }
-    Ok(results)
-}
-```
-
----
-
-## 서버 디렉토리 구조
-
-```
+서버:
 ~/.inn_plugins/
-├── web-clipper/
-│   ├── plugin.json
-│   ├── main.py
-│   └── requirements.txt
-├── git-autopush/
-│   ├── plugin.json
-│   └── main.sh
-├── link-updater/
+├── <plugin-name>/
+│   ├── plugin.json        # 매니페스트
+│   ├── main.py            # 진입점 (shebang 포함, chmod +x)
+│   └── .disabled          # (선택) 존재하면 비활성화 상태
+└── ...
+
+로컬 (개발 시):
+<plugin_local_path>/
+├── <plugin-name>/
 │   ├── plugin.json
 │   └── main.py
-├── ai-draft/
-│   ├── plugin.json
-│   ├── main.py
-│   └── requirements.txt
-└── verify/
-    ├── plugin.json
-    └── main.py
 ```
+
+`im-not-notion-plugins/` 레포가 메인 앱 레포의 git submodule 후보. 실제 운영에서는 로컬 path 설정 → 앱에서 install/pull로 서버와 동기화.
 
 ---
 
 ## plugin.json 스펙
 
-> **중요**: Rust의 `Trigger` enum은 `#[serde(tag = "type", content = "content")]` (adjacently tagged).
-> 따라서 trigger 필드는 `"type"` + `"content"` 구조를 따라야 한다.
-> Manual의 `content`에는 `label`, `input` 등이, Hook의 `content`에는 `event`, `priority` 등이 들어간다.
-
-```json
+```jsonc
 {
-  "name": "web-clipper",
-  "description": "Download URL and convert to markdown",
-  "version": "1.0.0",
-  "entry": "main.py",
-  "triggers": [
-    {
-      "type": "manual",
-      "content": {
-        "label": "Clip URL",
-        "input": [
-          { "name": "url", "type": "string", "label": "URL" },
-          { "name": "folder", "type": "string", "label": "Target folder", "default": "/clipped" }
-        ]
-      }
-    }
-  ]
-}
-```
-
-```json
-{
-  "name": "git-autopush",
-  "description": "Auto commit and push every 10 minutes",
-  "version": "1.0.0",
-  "entry": "main.sh",
-  "triggers": [
-    { "type": "cron", "content": { "schedule": "*/10 * * * *", "label": "Auto push" } },
-    { "type": "cron", "content": { "schedule": "0 0 1 * *", "label": "Monthly squash" } }
-  ]
-}
-```
-
-```json
-{
-  "name": "link-updater",
-  "description": "Update internal links when files are moved",
-  "version": "1.0.0",
-  "entry": "main.py",
-  "triggers": [
-    { "type": "hook", "content": { "event": "AfterFileMove" } }
-  ]
-}
-```
-
-```json
-{
-  "name": "verify",
-  "description": "Verify data consistency — image reference integrity",
+  "name": "wayback",                                  // 유일한 식별자
+  "description": "Archive external URLs ...",
   "version": "2.0.0",
-  "entry": "main.py",
+  "entry": "main.py",                                 // 실행 가능한 진입점
   "triggers": [
     {
       "type": "manual",
       "content": {
-        "label": "Verify Images",
-        "input": []
+        "label": "Archive URL",
+        "input": [
+          { "name": "url",    "type": "text",    "label": "URL",     "default": "" },
+          { "name": "title",  "type": "text",    "label": "Title",   "default": "" },
+          { "name": "tags",   "type": "text",    "label": "Tags",    "default": "" }
+        ],
+        "shortcut": "Ctrl+Shift+A"                    // (선택) 단축키
       }
     },
-    { "type": "hook", "content": { "event": "AfterFileSave", "priority": 99 } },
-    { "type": "hook", "content": { "event": "AfterFileMove", "priority": 99 } },
-    { "type": "hook", "content": { "event": "AfterFileDelete", "priority": 99 } },
-    { "type": "hook", "content": { "event": "AfterFileCreate", "priority": 99 } }
+    { "type": "manual", "content": { "label": "Manage Archives", "input": [] } },
+
+    { "type": "cron", "content": {
+        "schedule": "0 19 * * 0",                     // 표준 cron 표현식
+        "label": "Weekly backup",
+        "priority": 50                                // (선택) 동일 schedule 내 순서
+    }},
+
+    { "type": "hook", "content": {
+        "event": "AfterFileSave",                     // HookEvent enum 값
+        "priority": 99                                // (선택, 기본 50) 낮을수록 먼저
+    }}
   ]
 }
 ```
 
+### Trigger 타입
+
+| 타입 | 사용 시점 | 우선순위 적용 |
+|---|---|---|
+| `manual` | 사용자가 PluginPanel에서 클릭 | — |
+| `cron` | 서버 crontab이 정해진 시각에 호출 (앱 불필요) | 동일 schedule 내 |
+| `hook` | 백엔드 이벤트(파일 저장/이동/삭제/생성)에 자동 실행 | 동일 event 내 |
+
+### Hook 이벤트
+
+`types/plugin.rs::HookEvent`:
+- `AfterFileSave` — 수동 저장(Ctrl+S) 시 이미지 동기화 직후
+- `AfterFileMove` — 파일/폴더 이동·이름변경 commit 직후
+- `AfterFileDelete` — 파일 삭제 직후
+- `AfterFileCreate` — 새 콘텐츠 생성 직후
+
+### InputField 타입 (현재 지원)
+
+- `text` — 일반 텍스트 입력 (PluginInputPopup에서 `<input type="text">`)
+- `password` — 마스킹 텍스트 입력
+- `boolean` — 체크박스
+
+---
+
+## NDJSON 프로토콜
+
+각 메시지는 **한 줄의 JSON + `\n`**. 플러그인은 stdin에서 메시지를 읽고 stdout으로 메시지를 보냄. stderr는 호스트가 읽지 않음 (debug용으로만 사용).
+
+### 흐름 (Manual 트리거 + 동적 prompt 케이스)
+
+```
+Host                              Plugin
+ │                                  │
+ │  {"type":"input", ...}\n  ────▶  │  stdin.readline()
+ │                                  │  ... 처리 ...
+ │  ◀────  {"type":"progress",...}\n   stdout.write+flush
+ │  → emit Tauri event              │  ... 더 처리 ...
+ │  ◀────  {"type":"prompt",...}\n     stdout.write+flush
+ │  → emit + recv_timeout(600s)     │  stdin.readline() (블록)
+ │                                  │
+ │ (user responds via IPC)          │
+ │  {"type":"prompt_response",...}\n ─▶│
+ │                                  │  ... 응답 처리 ...
+ │  ◀────  {"type":"result",...}\n     stdout.write+flush, exit
+ │  → 최종 PluginResult로 반환     │
+```
+
+### Host → Plugin 메시지
+
 ```json
+// 초기 입력 (항상 첫 줄, 1회)
 {
-  "name": "ai-draft",
-  "description": "Generate blog draft with AI",
-  "version": "1.0.0",
-  "entry": "main.py",
-  "triggers": [
-    {
-      "type": "manual",
-      "content": {
-        "label": "AI Draft",
-        "input": [
-          { "name": "topic", "type": "string", "label": "Topic" },
-          { "name": "folder", "type": "string", "label": "Target folder", "default": "/" }
-        ]
-      }
-    }
+  "type": "input",
+  "trigger": "manual",                    // "manual" | "cron" | "hook"
+  "url": "...", "title": "...", "tags": "...",   // manual: 입력 폼 필드 그대로 펼침
+  "event": "AfterFileSave",               // hook: 이벤트 이름
+  "data": { ... },                        // hook: 이벤트별 데이터 (예: {src, dst})
+  "context": {                            // 항상 포함
+    "base_path": "/home/user/blog",
+    "content_paths": ["content/posts"],
+    "image_path": "static/images",
+    "hidden_path": ".hidden"
+  }
+}
+
+// 사용자 응답 (prompt 이후, 필요한 만큼)
+{
+  "type": "prompt_response",
+  "id": "<uuid>",                         // 보냈던 prompt의 id
+  "value": "..."                          // confirm: bool, select: string|string[], input: string
+}
+```
+
+### Plugin → Host 메시지
+
+```json
+// 진행률 (선택, 횟수 무제한)
+{
+  "type": "progress",
+  "phase": "downloading",                 // 선택
+  "current": 3, "total": 10,              // 선택 (수치 진행률)
+  "message": "Fetching ..."               // 선택
+}
+
+// 사용자에게 묻기 (선택, 응답 받을 때까지 stdin readline에서 블록)
+{
+  "type": "prompt",
+  "id": "<uuid>",                         // 응답 매칭용
+  "kind": "confirm" | "select" | "input",
+  "title": "...",
+  "message": "...",                       // 선택
+  "items": [                              // select 전용
+    { "value": "v1", "label": "Display", "description": "..." }
   ],
-  "config": {
-    "api_key": { "type": "secret", "label": "API Key" },
-    "model": { "type": "string", "label": "Model", "default": "gpt-4o" }
-  }
+  "multiple": true,                       // select 전용 (체크박스 vs 라디오)
+  "default": "..."                        // input 전용 기본값
+}
+
+// 최종 결과 (반드시 1회, plugin 종료 직전)
+{
+  "type": "result",
+  "success": true,
+  "message": "Done",                      // 선택, toast로 표시
+  "error": "...",                         // success=false 시 toast로 표시
+  "actions": [ ... ]                      // 선택, 아래 PluginAction 참조
 }
 ```
+
+### PluginAction 타입
+
+`result.actions[]`에 들어가는 후속 동작. 모두 호스트가 처리.
+
+| Action | content | 효과 |
+|---|---|---|
+| `refresh_tree` | 없음 | 파일 트리 다시 로드 |
+| `toast` | `{ message, toast_type: "success"\|"error"\|"info" }` | 알림 토스트 |
+| `open_file` | `{ path }` | 에디터에서 파일 열기 |
+| `show_result` | `{ title, body, pages? }` | 결과 팝업 (탭 + copy 블록 지원) |
+| `download_files` | `{ items: [{path, filename, size}] }` | 서버 파일을 로컬로 다운로드 (체크박스 UI) |
+
+`show_result.body`는 일반 텍스트. `{{copy:Title}}...{{/copy}}` 블록을 포함하면 접을 수 있는 복사 영역이 됨. `pages`로 여러 탭 구성 가능.
 
 ---
 
-## JSON 프로토콜
+## Python 도우미 (참고용 스니펫)
 
-스크립트는 stdin으로 JSON을 받고, stdout으로 JSON을 반환.
+호스트가 강제하는 라이브러리는 없음. 각 플러그인이 필요한 만큼 inline으로 작성. 표준 패턴:
 
-### Manual 실행 (Web Clipper)
+```python
+import json, sys, uuid
 
-```json
-// stdin (앱 → 스크립트)
-{
-  "trigger": "manual",
-  "input": {
-    "url": "https://example.com/article",
-    "folder": "/clipped"
-  },
-  "context": {
-    "base_path": "/home/user/mysite",
-    "content_path": "posts",
-    "image_path": "static/images"
-  }
-}
+# (권장) 응답 전에 stdout이 flush되도록 line-buffered 모드
+try: sys.stdout.reconfigure(line_buffering=True)
+except (AttributeError, OSError): pass
 
-// stdout (스크립트 → 앱)
-{
-  "success": true,
-  "message": "Saved to /clipped/example-article.md",
-  "actions": [
-    { "type": "refresh_tree" }
-  ]
-}
+def _send(msg):
+    sys.stdout.write(json.dumps(msg) + "\n")
+    sys.stdout.flush()
+
+def send_progress(phase=None, current=None, total=None, message=None):
+    msg = {"type": "progress"}
+    if phase   is not None: msg["phase"]   = phase
+    if current is not None: msg["current"] = float(current)
+    if total   is not None: msg["total"]   = float(total)
+    if message is not None: msg["message"] = message
+    _send(msg)
+
+def prompt_select(title, items, multiple=False, message=None):
+    pid = str(uuid.uuid4())
+    req = {"type": "prompt", "id": pid, "kind": "select",
+           "title": title, "items": items, "multiple": multiple}
+    if message: req["message"] = message
+    _send(req)
+    resp = json.loads(sys.stdin.readline() or "{}")
+    if resp.get("type") != "prompt_response" or resp.get("id") != pid:
+        return None
+    return resp.get("value")
+
+def send_result(success, message=None, error=None, actions=None):
+    msg = {"type": "result", "success": success}
+    if message: msg["message"] = message
+    if error:   msg["error"]   = error
+    if actions: msg["actions"] = actions
+    _send(msg)
+
+def main():
+    data = json.loads(sys.stdin.readline())   # 첫 줄 = 초기 입력
+    # ...
+    send_result(True, message="OK", actions=[{"type": "refresh_tree"}])
 ```
 
-### Hook 실행 (Link Updater)
-
-```json
-// stdin (앱 → 스크립트)
-{
-  "trigger": "hook",
-  "event": "AfterFileMove",
-  "data": {
-    "src": "/posts/old-name.md",
-    "dst": "/posts/new-name.md"
-  },
-  "context": {
-    "base_path": "/home/user/mysite",
-    "content_path": "posts",
-    "image_path": "static/images"
-  }
-}
-
-// stdout (스크립트 → 앱)
-{
-  "success": true,
-  "message": "Updated 3 files",
-  "actions": [
-    { "type": "toast", "content": { "message": "3 files updated", "toast_type": "success" } }
-  ]
-}
-```
-
-### 에러 시
-
-```json
-{
-  "success": false,
-  "error": "Failed to download URL: connection timeout"
-}
-```
+**주의**:
+- 첫 줄을 `sys.stdin.read()`로 읽으면 안 됨 — 호스트가 stdin을 계속 열어두기 때문에 EOF가 안 와서 영원히 블록됨.
+- result는 반드시 한 번만, 마지막에 emit하고 종료.
 
 ---
 
-## 아키텍처
+## 호스트 아키텍처
 
-### 백엔드 (Rust)
+### Rust
 
 ```
 src-tauri/src/
-├── types/
-│   └── plugin.rs           # PluginManifest, Trigger, HookEvent 등
-├── services/
-│   └── plugin_service.rs   # 핵심 로직
-│       ├── discover()           → 서버에서 플러그인 목록 조회
-│       ├── install_deps()       → requirements.txt 기반 의존성 설치
-│       ├── execute()            → SSH로 스크립트 실행 (stdin JSON → stdout JSON)
-│       ├── run_hooks()          → 특정 이벤트에 등록된 hook 플러그인 실행
-│       ├── register_cron()      → crontab에 스케줄 등록
-│       └── unregister_cron()    → crontab에서 제거
-├── commands/
-│   └── plugin_command.rs    # IPC 커맨드 (thin wrapper)
-│       ├── list_plugins()       → 프론트엔드에 플러그인 목록 전달
-│       ├── run_plugin()         → Manual 플러그인 실행
-│       ├── toggle_plugin()      → 활성화/비활성화
-│       └── manage_cron()        → Cron 등록/해제
+├── types/plugin.rs           PluginManifest, Trigger, HookEvent, PluginResult,
+│                             PluginAction, PluginProgress, PluginPrompt, PromptKind
+├── services/plugin_service.rs
+│   ├── discover_server_plugins()   서버의 plugin.json + .disabled + 해시
+│   ├── compute_local_hash()        로컬 디렉토리 해시 (서버와 비교용)
+│   ├── list_all_plugins()          로컬+서버 병합 → PluginInfo[]
+│   ├── install_plugin()            로컬 → tar.gz → SFTP 업로드 → 서버에서 압축 해제
+│   ├── pull_plugin()               역방향: 서버 → tar.gz → 로컬 해제
+│   ├── enable/disable_plugin()     .disabled 마커 토글
+│   ├── execute_plugin()            Manual 실행 — NDJSON 세션
+│   ├── run_hooks()                 priority 정렬 후 hook 플러그인 순차 실행
+│   ├── register/unregister_cron()  서버 crontab 관리
+│   ├── respond_to_prompt()         프론트 응답 → 대기 중 plugin의 stdin으로 라우팅
+│   └── run_ndjson_session()        SSH 채널로 NDJSON 메시지 루프
+└── commands/plugin_command.rs      얇은 IPC 래퍼 (대부분 async)
 ```
 
-### 주요 타입
+`execute_plugin`은 `tauri::async_runtime::spawn_blocking`으로 돌림. plugin이 prompt에서 블록되는 동안 Tauri main thread는 자유로워야 다른 IPC(respond_to_plugin_prompt 포함)가 처리됨.
 
-> 파일: `src-tauri/src/types/plugin.rs`
+프롬프트 응답 라우팅:
+- plugin → `prompt` 메시지 emit
+- Rust: 전역 `Mutex<HashMap<id, mpsc::Sender>>`에 응답 채널 등록 + `plugin:prompt` Tauri 이벤트 emit
+- frontend: 모달로 응답 수집 → `respond_to_plugin_prompt(id, value)` IPC 호출
+- Rust IPC 핸들러: 레지스트리에서 sender 꺼내 send → execute_plugin 쓰레드 깨움 → stdin으로 응답 한 줄 write
 
-```rust
-#[typeshare]
-pub struct PluginManifest {
-    pub name: String,
-    pub description: String,
-    pub version: String,
-    pub entry: String,
-    pub triggers: Vec<Trigger>,
-}
-
-#[typeshare]
-#[serde(tag = "type", content = "content")]  // adjacently tagged
-pub enum Trigger {
-    #[serde(rename = "manual")]
-    Manual {
-        label: String,
-        input: Vec<InputField>,
-        #[serde(default)]
-        shortcut: Option<String>,
-    },
-    #[serde(rename = "hook")]
-    Hook {
-        event: HookEvent,
-        #[serde(default)]
-        priority: Option<u32>,   // 기본 50, 낮을수록 먼저 실행
-    },
-    #[serde(rename = "cron")]
-    Cron {
-        schedule: String,
-        label: String,
-        #[serde(default)]
-        priority: Option<u32>,
-    },
-}
-
-#[typeshare]
-pub enum HookEvent {
-    AfterFileMove,
-    AfterFileSave,
-    AfterFileDelete,
-    AfterFileCreate,
-}
-
-#[typeshare]
-pub struct InputField {
-    pub name: String,
-    #[serde(rename = "type")]
-    pub field_type: String,
-    pub label: String,
-    pub default: Option<String>,
-}
-
-/// 프론트엔드에 전달되는 플러그인 정보 (로컬+서버 병합)
-#[typeshare]
-pub struct PluginInfo {
-    pub manifest: PluginManifest,
-    pub local: bool,
-    pub installed: bool,
-    pub enabled: bool,
-    pub synced: bool,
-}
-
-#[typeshare]
-pub struct PluginResult {
-    pub success: bool,
-    pub message: Option<String>,
-    pub error: Option<String>,
-    #[serde(default)]
-    pub actions: Vec<PluginAction>,
-}
-
-#[typeshare]
-#[serde(tag = "type", content = "content")]
-pub enum PluginAction {
-    #[serde(rename = "refresh_tree")]
-    RefreshTree,
-    #[serde(rename = "toast")]
-    Toast { message: String, toast_type: String },
-    #[serde(rename = "open_file")]
-    OpenFile { path: String },
-    #[serde(rename = "show_result")]
-    ShowResult { title: String, body: String },
-}
-```
-
-### 핵심 함수: execute
-
-```rust
-/// 플러그인 스크립트를 SSH로 실행
-pub fn execute(plugin_name: &str, input_json: &str) -> Result<PluginResult> {
-    let mut channel = get_channel_session()?;
-
-    // stdin으로 JSON 전달, stdout에서 JSON 수신
-    let cmd = format!(
-        "echo '{}' | ~/.inn_plugins/{}/{}",
-        input_json, plugin_name, entry
-    );
-    let output = execute_ssh_command(&mut channel, &cmd)?;
-
-    let result: PluginResult = serde_json::from_str(&output)?;
-    Ok(result)
-}
-```
-
-### Hook 통합
-
-기존 서비스 함수에 이미지 동기화 + hook 호출을 삽입.
-Hook 결과는 `emit_hook_actions()`로 프론트엔드에 전달.
-
-- `move_content()`: copy-then-delete 트랜잭션 방식. 전체 md 참조 업데이트 후 hook 실행.
-- `write_content(manual=true)`: 수동 저장 시 이미지 sync + hook 실행. sync 실패 시 warning toast.
-- `write_content(manual=false)`: 자동 저장 시 순수 저장만. sync/hook 없음.
-- `remove_content()`: 삭제 후 이미지 디렉토리 정리 + hook 실행.
-
-상세 흐름은 `IMAGE_SYNC.md` 참조.
-
-### Hook 결과 전달 — emit_hook_actions
-
-> 파일: `src-tauri/src/main.rs`
-
-`OnceLock<AppHandle>`에 저장된 글로벌 핸들을 통해 hook 결과의 actions를 프론트엔드로 emit:
-
-```rust
-pub fn emit_hook_actions(results: Vec<PluginResult>) {
-    let Some(handle) = APP_HANDLE.get() else { return };
-    for result in results {
-        for action in result.actions {
-            let _ = handle.emit("plugin-hook-action", &action);
-        }
-    }
-}
-```
-
-프론트엔드 (`App.svelte`)에서 `listen("plugin-hook-action", ...)` 이벤트 리스너로 수신하여 toast/refresh_tree/show_result 처리.
-
-### Cron 관리
-
-```rust
-/// crontab에 플러그인 스케줄 등록
-pub fn register_cron(plugin_name: &str, schedule: &str, entry: &str) -> Result<()> {
-    let marker = format!("# inn-plugin:{}", plugin_name);
-    let job = format!(
-        "{} cd ~/.inn_plugins/{} && ./{} {}",
-        schedule, plugin_name, entry, marker
-    );
-
-    // 기존 항목 제거 후 추가
-    let cmd = format!(
-        "(crontab -l 2>/dev/null | grep -v 'inn-plugin:{}'; echo '{}') | crontab -",
-        plugin_name, job
-    );
-    run_ssh(&cmd)?;
-    Ok(())
-}
-
-/// crontab에서 플러그인 스케줄 제거
-pub fn unregister_cron(plugin_name: &str) -> Result<()> {
-    let cmd = format!(
-        "crontab -l 2>/dev/null | grep -v 'inn-plugin:{}' | crontab -",
-        plugin_name
-    );
-    run_ssh(&cmd)?;
-    Ok(())
-}
-```
-
-### 프론트엔드 (Svelte)
+### Svelte
 
 ```
-src/
-├── sidebar/
-│   ├── PluginPanel.svelte         # 플러그인 관리 UI
-│   ├── PluginInputPopup.svelte    # Manual 플러그인 입력 폼
-│   └── PluginResultPopup.svelte   # ShowResult 결과 표시 팝업
+src/sidebar/
+├── PluginPanel.svelte           플러그인 목록 + install/enable/cron 토글.
+│                                plugin:progress / plugin:prompt 리스너를 영구 보유.
+│                                input이 0개인 trigger는 popup 없이 바로 invoke.
+├── PluginInputPopup.svelte      input이 있는 trigger의 폼 + Execute 버튼.
+├── PluginProgressModal.svelte   progress 메시지 → phase + 진행률 바.
+├── PluginPromptModal.svelte     prompt 메시지 → confirm/select/input 모달.
+├── PluginResultPopup.svelte     show_result 액션 → 탭 + copy 블록.
+└── PluginDownloadPopup.svelte   download_files 액션 → 체크박스 + 진행률.
 ```
 
-**PluginPanel 구성:**
-```
-┌─ Plugins ──────────────────┐
-│                            │
-│  ☑ web-clipper      [Run]  │
-│    "Clip URL"              │
-│                            │
-│  ☑ git-autopush           │
-│    ⏱ */10 * * * *  [On]   │
-│    ⏱ 0 0 1 * *     [On]   │
-│                            │
-│  ☑ link-updater           │
-│    🔗 AfterFileMove        │
-│                            │
-└────────────────────────────┘
-```
-
-- Manual: [Run] 버튼 → InputPopup → 실행 → 토스트/ShowResult 결과
-- Cron: [On/Off] 토글 → crontab 등록/해제
-- Hook: 활성/비활성 토글 (자동 실행, 수동 트리거 없음)
+이벤트 라우팅:
+- 리스너는 `PluginPanel` 마운트 시 한 번 등록 → 어디서 invoke했든 이벤트가 잡힘
+- 프롬프트 응답은 `PluginPanel`이 IPC로 전송
 
 ---
 
-## 실행 흐름 정리
+## 현재 설치된 플러그인 (im-not-notion-plugins 레포)
 
-### Manual (Web Clipper)
-
-```
-User clicks [Run]
-  → PluginInputPopup 표시 (url, folder 입력)
-  → invoke("run_plugin", { name, input })
-  → plugin_service::execute()
-  → SSH: echo '{json}' | ~/.inn_plugins/web-clipper/main.py
-  → stdout JSON 파싱
-  → PluginAction 처리 (refresh_tree, toast 등)
-```
-
-### Hook (Link Updater + Verify)
-
-```
-User moves file (drag & drop or rename)
-  → file_service::move_content() [copy-then-delete 트랜잭션]
-  → Phase 1-3: 복사 + 이미지 복사 + 전체 md 참조 업데이트
-  → Phase 4: 원본 삭제 (commit)
-  → plugin_service::run_hooks(AfterFileMove, {src, dst})
-  → priority 정렬: link-updater(50) → verify(99)
-  → SSH: echo '{json}' | ~/.inn_plugins/link-updater/main.py
-  → SSH: echo '{json}' | ~/.inn_plugins/verify/main.py → baseline 비교, 변경 감지
-  → emit_hook_actions(results) → 프론트엔드에 toast/show_result 전달
-```
-
-### Manual (Verify Images)
-
-```
-User clicks [Verify Images]
-  → invoke("run_plugin", { name: "verify", input: {} })
-  → 전체 이미지/md 스캔 → baseline 저장 → 보고서 생성
-  → PluginAction::ShowResult → PluginResultPopup에 상세 보고서 표시
-  → 보고서: 전체 이미지 경로 목록 + Summary (Broken refs, Orphan files)
-```
-
-### Cron (Git Auto-Push)
-
-```
-User enables plugin in PluginPanel
-  → invoke("manage_cron", { name, action: "register" })
-  → plugin_service::register_cron()
-  → SSH: crontab에 등록
-  → 이후 서버에서 독립 실행 (앱 불필요)
-```
+| 이름 | 트리거 | 용도 |
+|---|---|---|
+| blog-backup | manual + cron(weekly) | Hugo 사이트 통째 tar.gz 백업 |
+| git-autopush | manual + cron | 자동 commit + push |
+| git-autosquash | manual | 기간 단위 커밋 squash |
+| deploy-theme | manual | 테마 submodule 추가/업데이트 |
+| remark42-setup | manual + cron | 댓글 서버 설치/백업 |
+| goatcounter-setup | manual + cron | 방문자 분석기 설치/백업 |
+| verify-image-link | manual | 이미지 참조 정합성 검증 |
+| fix-image-link | manual | 깨진 이미지 참조 자동 복구 |
+| wayback | manual | 외부 URL 단일 HTML 스냅샷 보관 (`monolith` 사용) |
 
 ---
 
-## 플러그인 설치/배포
+## 실행 우선순위 (priority)
 
-### 설치 방식
+같은 이벤트/스케줄에 여러 플러그인이 등록됐을 때의 정렬 규칙:
 
-앱에서 플러그인 디렉토리를 SFTP로 업로드:
+- 필드: `trigger.priority` (정수, 기본 `50`)
+- 정렬: 오름차순. 동일 시 플러그인 이름 알파벳순.
 
-```
-로컬 플러그인 zip/폴더 선택
-  → SFTP로 ~/.inn_plugins/{name}/ 에 업로드
-  → plugin.json 파싱하여 유효성 검증
-  → dependencies.packages 자동 설치 (pip install -r requirements.txt)
-  → 플러그인 목록 갱신
-```
+권장 범위:
+- `1–19` 전처리
+- `40–60` 일반 (기본값 50)
+- `81–99` 검증/감사 (마지막에)
 
-### 의존성 설치
-
-```rust
-pub fn install_deps(plugin_name: &str, runtime: &str, packages: &[String]) -> Result<()> {
-    // runtime 존재 확인
-    run_ssh(&format!("which {}", runtime))?;
-
-    if !packages.is_empty() && runtime == "python3" {
-        let req_path = format!("~/.inn_plugins/{}/requirements.txt", plugin_name);
-        run_ssh(&format!("pip3 install --user -r {}", req_path))?;
-    }
-    Ok(())
-}
-```
+manual에는 적용되지 않음.
 
 ---
 
-## 보안 고려
+## 설치 / 동기화
 
-- 플러그인은 서버에서 유저 권한으로 실행 → SSH 접속 가능한 범위와 동일
-- 신뢰할 수 없는 소스의 플러그인 설치 시 경고 표시
-- 플러그인이 base_path 외부 접근 가능 (제한 없음) → 유저 책임
+PluginPanel UI의 동작:
+- **로컬 path 지정** → `discover_local_plugins` 로 plugin.json 스캔
+- **Install** (로컬 → 서버): 로컬 폴더를 tar.gz로 압축 후 SFTP 1회 업로드 → 서버에서 압축 해제 + CRLF 제거 + `chmod +x entry`
+- **Pull** (서버 → 로컬): 서버에서 tar.gz 생성 → 다운로드 → 로컬 해제
+- **Enabled toggle**: `.disabled` 마커 파일 생성/삭제
+- **Synced 표시**: 로컬 해시와 서버 해시 비교 (각 파일 sha256 → 정렬 → 전체 sha256)
+- **Cron toggle**: 트리거 단위로 crontab에 등록/해제. 비활성화 시 모든 cron 자동 해제.
+
+설치 시 의존성 매니페스트는 없음 — 플러그인이 stdlib만 쓰거나, 서버에 미리 깔린 도구를 사용한다는 전제. wayback의 `monolith`처럼 외부 바이너리가 필요한 경우 플러그인이 직접 다운로드/설치 시도.
+
+---
+
+## 보안
+
+- 플러그인 코드는 서버에서 SSH 유저 권한으로 실행 → 그 유저가 할 수 있는 모든 일을 할 수 있음
+- base_path 외부 접근에 대한 샌드박싱 없음 — 신뢰할 수 있는 소스의 플러그인만 install
+- prompt 응답 라우팅의 timeout은 600초
 
 ---
 
 ## 미결 사항
 
-- [x] ~~플러그인 간 실행 순서~~ → `priority` 필드로 구현 완료
-- [x] ~~P5 Verify 플러그인~~ → `plugins/verify/` v2.0 구현 완료 (Manual + Hook + 상태 추적)
-- [x] ~~ShowResult 액션~~ → `PluginAction::ShowResult` + `PluginResultPopup.svelte` 구현 완료
-- [x] ~~hook 결과 프론트엔드 전달~~ → `emit_hook_actions()` + Tauri event 구현 완료
-- [ ] hook 실패 시 정책 (현재: 무시. 향후: 롤백? 유저 선택?)
-- [ ] 플러그인 업데이트 메커니즘
-- [ ] 플러그인 로그 확인 UI
-- [ ] 빌트인 플러그인 (앱에 기본 포함) vs 유저 설치 플러그인
+- [ ] hook 실패 시 정책 (현재: 에러 로그만, 무시)
+- [ ] 플러그인 업데이트 알림 (서버/로컬 hash 불일치 표시는 있음, 자동 sync는 없음)
+- [ ] 플러그인 stderr 캡처/표시 (현재 호스트가 안 읽음)
+- [ ] 빌트인 플러그인 (앱 번들 포함) vs 외부 설치 구분

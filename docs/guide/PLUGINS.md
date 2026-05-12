@@ -22,21 +22,17 @@
 ```
 ~/.inn_plugins/
 ├── git-autopush/
-│   ├── plugin.json
-│   └── main.py
 ├── git-autosquash/
-│   ├── plugin.json
-│   └── main.py
 ├── blog-backup/
-│   ├── plugin.json
-│   └── main.py
 ├── verify-image-link/
-│   ├── plugin.json
-│   └── main.py
-└── fix-image-link/
-    ├── plugin.json
-    └── main.py
+├── fix-image-link/
+├── deploy-theme/
+├── remark42-setup/
+├── goatcounter-setup/
+└── wayback/
 ```
+
+각 폴더에 `plugin.json` + `main.py`.
 
 ### 사전 요구사항
 
@@ -47,6 +43,10 @@
 | blog-backup | tar |
 | verify-image-link | python3 |
 | fix-image-link | python3, requests (외부 URL 다운로드 시) |
+| deploy-theme | git |
+| remark42-setup | docker, curl |
+| goatcounter-setup | docker, curl |
+| wayback | python3, monolith (자동 다운로드) |
 
 ---
 
@@ -267,3 +267,79 @@ Hugo 사이트를 tar.gz로 압축 백업합니다.
 
 - **깨진 링크**: 원본 이미지가 어디에도 없음 → 수동 확인 필요
 - **대소문자 불일치**: 어느 쪽이 맞는지 판단 필요 → 수동 수정
+
+---
+
+## 7. deploy-theme — Hugo 테마 배포
+
+`im-not-notion-theme`를 서버에 git submodule로 추가/업데이트.
+
+### 트리거
+
+| 트리거 | 설명 |
+|---|---|
+| **Manual** — "Deploy Theme" | 테마 다운로드 + Hugo 사이트에 연결 |
+
+### Manual 옵션
+
+| 옵션 | 기본값 | 설명 |
+|---|---|---|
+| Theme git URL | (번들 테마 URL) | 비우면 기본 테마 |
+| Deploy demo content | false | `content/`를 exampleSite로 덮어씀 |
+| Overwrite hugo.toml | false | exampleSite 설정으로 덮어씀 |
+| Clean overrides | false | `layouts/`, `archetypes/` 등 오버라이드 폴더 삭제 |
+
+---
+
+## 8. remark42-setup — 댓글 서버 설치
+
+[Remark42](https://remark42.com/) Docker 컨테이너 설치/관리.
+
+### 트리거
+
+| 트리거 | 설명 |
+|---|---|
+| **Manual** — "Setup Remark42" | 첫 설치 또는 재설정 |
+| **Manual** — "Restart Remark42" | 컨테이너 재시작 |
+| **Cron** — `0 3 * * *` | 매일 새벽 3시 DB 백업 |
+
+---
+
+## 9. goatcounter-setup — 방문자 분석기 설치
+
+[GoatCounter](https://www.goatcounter.com/) Docker 컨테이너 설치/관리.
+
+### 트리거
+
+| 트리거 | 설명 |
+|---|---|
+| **Manual** — "Setup GoatCounter" | 첫 설치 (관리자 계정 생성 포함) |
+| **Manual** — "Restart GoatCounter" | 컨테이너 재시작 |
+| **Cron** — (매일) | CSV 백업 |
+
+---
+
+## 10. wayback — 외부 URL 아카이브
+
+외부 페이지를 단일 HTML 스냅샷으로 저장 (CSS/이미지 base64 임베드). [monolith](https://github.com/Y2Z/monolith) 사용.
+
+### 트리거
+
+| 트리거 | 설명 |
+|---|---|
+| **Manual** — "Archive URL" | URL/제목/카테고리/태그 입력 → 스냅샷 + Hugo frontmatter 생성 |
+| **Manual** — "Manage Archives" | 보관 목록 조회 → 체크박스로 선택 삭제 |
+
+### 저장 구조
+
+```
+content/archive/<category>/<slug>.md        # Hugo frontmatter (title, source_url, tags, date 등)
+static/snapshot/<category>/<slug>/index.html # monolith 단일 HTML
+```
+
+- 마크다운 페이지 URL: `/archive/<category>/<slug>/`
+- 스냅샷 URL: `/snapshot/<category>/<slug>/` (frontmatter `archive_path` 참조)
+
+### monolith 자동 설치
+
+서버에 monolith가 없으면 첫 실행 시 GitHub Releases에서 플랫폼별 프리빌트 바이너리를 `~/.local/bin/monolith`로 자동 다운로드. 실패 시 수동 설치 가이드 표시.
