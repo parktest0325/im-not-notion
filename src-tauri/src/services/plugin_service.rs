@@ -415,15 +415,23 @@ fn run_ndjson_session(plugin_name: &str, initial_input: Value) -> Result<PluginR
         if n == 0 { break; }
         let trimmed = buf.trim();
         if trimmed.is_empty() { continue; }
+        eprintln!("[plugin:{}] <- {}", plugin_name,
+                  if trimmed.len() > 200 { format!("{}...", &trimmed[..200]) } else { trimmed.to_string() });
 
         let msg: Value = match serde_json::from_str(trimmed) {
             Ok(v) => v,
-            Err(_) => continue, // stderr 노이즈/디버그 라인 무시
+            Err(e) => {
+                eprintln!("[plugin:{}] parse error: {}", plugin_name, e);
+                continue;
+            }
         };
 
         match msg.get("type").and_then(|v| v.as_str()) {
             Some("progress") => handle_progress(plugin_name, &msg),
-            Some("prompt") => handle_prompt(plugin_name, &msg, &mut reader)?,
+            Some("prompt") => {
+                eprintln!("[plugin:{}] emitting prompt event", plugin_name);
+                handle_prompt(plugin_name, &msg, &mut reader)?;
+            },
             Some("result") => {
                 let mut clean = msg.clone();
                 if let Value::Object(ref mut o) = clean { o.remove("type"); }
