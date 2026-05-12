@@ -19,9 +19,10 @@
 
   function toggleSelect(value: string) {
     if (prompt?.multiple) {
-      if (selectedValues.has(value)) selectedValues.delete(value);
-      else selectedValues.add(value);
-      selectedValues = selectedValues;
+      const next = new Set(selectedValues);
+      if (next.has(value)) next.delete(value);
+      else next.add(value);
+      selectedValues = next;
     } else {
       selectedValues = new Set([value]);
     }
@@ -103,7 +104,7 @@
         Cancel
       </button>
       <button
-        class="px-3 py-1 bg-blue-700 hover:bg-blue-600 rounded text-xs"
+        class="px-3 py-1 bg-blue-700 hover:bg-blue-600 rounded text-xs disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-blue-700"
         on:click={submit}
         disabled={prompt.kind === PromptKind.Select && selectedValues.size === 0}
       >
