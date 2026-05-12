@@ -30,13 +30,21 @@ pub fn disable_plugin(name: &str) -> Result<(), InvokeError> {
 }
 
 #[tauri::command]
-pub fn run_plugin(name: &str, input: &str) -> Result<PluginResult, InvokeError> {
-    plugin_service::execute_plugin(name, input).into_invoke_err()
+pub async fn run_plugin(name: String, input: String) -> Result<PluginResult, InvokeError> {
+    // Run on the blocking pool — execute_plugin blocks on SSH reads and
+    // on prompt responses, which would otherwise freeze the Tauri main
+    // thread and stop respond_to_plugin_prompt from ever running.
+    tauri::async_runtime::spawn_blocking(move || {
+        plugin_service::execute_plugin(&name, &input)
+    })
+    .await
+    .map_err(|e| InvokeError::from(format!("Plugin task panicked: {}", e)))?
+    .into_invoke_err()
 }
 
 #[tauri::command]
-pub fn respond_to_plugin_prompt(id: &str, value: Value) -> Result<(), InvokeError> {
-    plugin_service::respond_to_prompt(id, value).into_invoke_err()
+pub async fn respond_to_plugin_prompt(id: String, value: Value) -> Result<(), InvokeError> {
+    plugin_service::respond_to_prompt(&id, value).into_invoke_err()
 }
 
 #[tauri::command]
