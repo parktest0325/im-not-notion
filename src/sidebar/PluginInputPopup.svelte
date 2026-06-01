@@ -84,12 +84,13 @@
 </script>
 
 {#if show}
-  <!-- svelte-ignore a11y-click-events-have-key-events -->
-  <!-- svelte-ignore a11y-no-static-element-interactions -->
-  <div class="fixed inset-0 flex justify-center items-center p-4 input-overlay" on:click|self={onClose}>
+  <div class="fixed inset-0 flex justify-center items-center p-4 input-overlay">
     <div class="input-popup-content">
       {#if plugin}
-        <h3 class="text-lg font-bold">{plugin.name}</h3>
+        <div class="input-popup-header">
+          <h3 class="text-lg font-bold">{plugin.name}</h3>
+          <button class="input-popup-close" on:click={onClose} title="Close" aria-label="Close">✕</button>
+        </div>
         <p class="text-sm opacity-70">{plugin.description}</p>
 
         <div class="space-y-3">
@@ -150,5 +151,27 @@
     display: flex;
     flex-direction: column;
     gap: 1rem;
+  }
+  .input-popup-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+  .input-popup-close {
+    background: none;
+    border: none;
+    color: inherit;
+    opacity: 0.5;
+    cursor: pointer;
+    padding: 0.25rem 0.5rem;
+    font-size: 1rem;
+    line-height: 1;
+    border-radius: 0.25rem;
+    transition: opacity 0.15s ease, background-color 0.15s ease;
+  }
+  .input-popup-close:hover {
+    opacity: 1;
+    background-color: var(--button-active-bg-color);
   }
 </style>
