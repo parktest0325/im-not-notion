@@ -505,6 +505,7 @@
   plugin={selectedPlugin?.manifest ?? null}
   inputFields={selectedInputFields}
   onClose={() => { showInputPopup = false; }}
+  onComplete={() => { progress = null; prompt = null; }}
   onRefreshTree={handleRefreshTree}
   onShowResult={handleShowResult}
   onDownloadFiles={handleDownloadFiles}

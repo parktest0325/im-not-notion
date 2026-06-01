@@ -10,6 +10,9 @@
   export let onRefreshTree: () => void;
   export let onShowResult: (title: string, body: string, pages?: any[]) => void = () => {};
   export let onDownloadFiles: (items: any[]) => void = () => {};
+  // Called when run_plugin settles (success or error). PluginPanel uses it
+  // to clear lingering progress/prompt state so the modal disappears.
+  export let onComplete: () => void = () => {};
 
   let values: Record<string, string | boolean> = {};
   let isExecuting = false;
@@ -75,6 +78,7 @@
       addToast("Plugin execution failed.");
     } finally {
       isExecuting = false;
+      onComplete();
     }
   }
 </script>
