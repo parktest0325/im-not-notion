@@ -212,15 +212,21 @@
         if (view) {
           view.focus();
           requestAnimationFrame(() => {
-            if (view) {
-              const lineNum = Math.min(targetLine + 1, view.state.doc.lines);
-              const line = view.state.doc.line(lineNum);
-              view.dispatch({ selection: { anchor: line.from } });
-              // 프리뷰에서의 뷰포트 상대 위치를 에디터에서도 유지
-              const lineBlock = view.lineBlockAt(line.from);
-              const vpHeight = view.scrollDOM.clientHeight;
-              view.scrollDOM.scrollTop = lineBlock.top - targetYFraction * vpHeight;
-            }
+            if (!view) return;
+            const lineNum = Math.min(targetLine + 1, view.state.doc.lines);
+            const line = view.state.doc.line(lineNum);
+            const vpHeight = view.scrollDOM.clientHeight;
+            // EditorView.scrollIntoView 는 layout이 settle된 뒤 처리되므로
+            // 직접 scrollTop을 쓰는 것보다 측정 정확도가 높다.
+            // y:"start" + yMargin = 프리뷰에서 클릭한 줄이 뷰포트의 어느 높이에
+            // 있었는지를 그대로 재현 (yMargin은 viewport top으로부터의 여백).
+            view.dispatch({
+              selection: { anchor: line.from },
+              effects: EditorView.scrollIntoView(line.from, {
+                y: "start",
+                yMargin: Math.max(0, Math.min(1, targetYFraction)) * vpHeight,
+              }),
+            });
           });
         }
       });
