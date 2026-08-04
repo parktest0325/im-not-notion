@@ -165,7 +165,9 @@ fn io_loop(
         }
 
         // 4) idle일 때만 sleep — 활동이 있으면 즉시 다음 루프
-        if !had_activity && pending_write.is_empty() {
+        // (쓰기가 WouldBlock으로 막힌 상태도 idle로 취급해야 한다 —
+        //  pending_write만 보면 원격 윈도우가 풀릴 때까지 busy-spin이 된다)
+        if !had_activity {
             thread::sleep(IO_LOOP_SLEEP);
         }
     }

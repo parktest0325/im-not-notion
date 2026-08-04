@@ -20,6 +20,8 @@ export const isEditingContent = writable(false);
 export const renamingPath = writable<string>("");
 // Set to a line number to jump to after loading a file (0 = ignore).
 export const gotoLine = writable<number>(0);
+// 마지막 저장 시각 (상태바 표시용)
+export const lastSavedAt = writable<Date | null>(null);
 // Set to trigger a plugin via shortcut: { pluginName, triggerLabel, inputFields }
 export const triggerPluginShortcut = writable<{
   pluginName: string;

@@ -1,5 +1,5 @@
 use ssh2::{Session, Channel, Sftp};
-use std::{net::{TcpStream, ToSocketAddrs}, sync::Mutex, io::Read, time::Duration, path::Path, ops::{Deref, DerefMut}};
+use std::{net::{TcpStream, ToSocketAddrs}, sync::Mutex, sync::atomic::{AtomicU64, Ordering}, io::Read, time::Duration, path::Path, ops::{Deref, DerefMut}};
 use anyhow::{Result, Context};
 use serde::Serialize;
 use crate::types::config::SshConfig;
@@ -11,14 +11,19 @@ const ALIVE_CHECK_TIMEOUT_MS: u32 = 2000;
 
 static SSH_CLIENT: Lazy<Mutex<Option<Session>>> = Lazy::new(|| Mutex::new(None));
 static SFTP_CACHE: Lazy<Mutex<Option<Sftp>>> = Lazy::new(|| Mutex::new(None));
+// 재연결 시 증가 — 이전 세션에서 대여된 SftpHandle이 죽은 Sftp를
+// 캐시에 되돌려 넣는 것을 방지한다
+static SSH_GENERATION: AtomicU64 = AtomicU64::new(0);
 
-/// RAII wrapper: drop 시 SFTP 세션을 캐시에 반환
-pub struct SftpHandle(Option<Sftp>);
+/// RAII wrapper: drop 시 SFTP 세션을 캐시에 반환 (같은 세션 세대일 때만)
+pub struct SftpHandle(Option<Sftp>, u64);
 
 impl Drop for SftpHandle {
     fn drop(&mut self) {
         if let Some(sftp) = self.0.take() {
-            *SFTP_CACHE.lock().unwrap() = Some(sftp);
+            if self.1 == SSH_GENERATION.load(Ordering::SeqCst) {
+                *SFTP_CACHE.lock().unwrap_or_else(|p| p.into_inner()) = Some(sftp);
+            }
         }
     }
 }
@@ -46,7 +51,7 @@ fn is_session_alive(session: &Session) -> bool {
 /// SshConfig를 직접 받아 SSH 연결
 fn connect_inner(ssh_config: &SshConfig, force: bool) -> Result<()> {
     if !force {
-        let mut client = SSH_CLIENT.lock().unwrap();
+        let mut client = SSH_CLIENT.lock().unwrap_or_else(|p| p.into_inner());
         if let Some(ref session) = *client {
             if is_session_alive(session) {
                 return Ok(());
@@ -54,11 +59,13 @@ fn connect_inner(ssh_config: &SshConfig, force: bool) -> Result<()> {
         }
         // 죽은 세션 정리 — 이후 get_channel_session 등에서 블로킹 방지
         *client = None;
-        *SFTP_CACHE.lock().unwrap() = None;
+        *SFTP_CACHE.lock().unwrap_or_else(|p| p.into_inner()) = None;
+        SSH_GENERATION.fetch_add(1, Ordering::SeqCst);
     } else {
         // force: 기존 세션 즉시 정리
-        *SSH_CLIENT.lock().unwrap() = None;
-        *SFTP_CACHE.lock().unwrap() = None;
+        *SSH_CLIENT.lock().unwrap_or_else(|p| p.into_inner()) = None;
+        *SFTP_CACHE.lock().unwrap_or_else(|p| p.into_inner()) = None;
+        SSH_GENERATION.fetch_add(1, Ordering::SeqCst);
     }
 
     let mut session = Session::new().context("Failed to create SSH session")?;
@@ -71,13 +78,15 @@ fn connect_inner(ssh_config: &SshConfig, force: bool) -> Result<()> {
         .context("Failed to connect to SSH server (timeout)")?;
     session.set_tcp_stream(tcp);
     session.handshake().context("Failed to perform SSH handshake")?;
+    // NAT 타임아웃/무단절 링크 감지용 keepalive
+    session.set_keepalive(true, 30);
 
     if !ssh_config.password.is_empty() {
         session.userauth_password(&ssh_config.username, &ssh_config.password)
             .context("Failed to authenticate with password")?;
     }
 
-    let mut ssh_client = SSH_CLIENT.lock().unwrap();
+    let mut ssh_client = SSH_CLIENT.lock().unwrap_or_else(|p| p.into_inner());
     *ssh_client = Some(session);
 
     Ok(())
@@ -96,7 +105,7 @@ pub fn reconnect_ssh_with_config(ssh_config: &SshConfig) -> Result<()> {
 
 /// SSH 세션이 살아있는지 확인
 pub fn is_ssh_connected() -> bool {
-    let client = SSH_CLIENT.lock().unwrap();
+    let client = SSH_CLIENT.lock().unwrap_or_else(|p| p.into_inner());
     if let Some(ref session) = *client {
         is_session_alive(session)
     } else {
@@ -105,7 +114,7 @@ pub fn is_ssh_connected() -> bool {
 }
 
 pub fn get_channel_session() -> Result<Channel> {
-    let channel = SSH_CLIENT.lock().unwrap()
+    let channel = SSH_CLIENT.lock().unwrap_or_else(|p| p.into_inner())
         .as_ref()
         .context("SSH session not initialized")?
         .channel_session().context("Failed to open SSH channel session")?;
@@ -113,20 +122,21 @@ pub fn get_channel_session() -> Result<Channel> {
 }
 
 pub fn get_sftp_session() -> Result<SftpHandle> {
+    let generation = SSH_GENERATION.load(Ordering::SeqCst);
     // 캐시에서 꺼내기
-    let cached = SFTP_CACHE.lock().unwrap().take();
+    let cached = SFTP_CACHE.lock().unwrap_or_else(|p| p.into_inner()).take();
     if let Some(sftp) = cached {
         // 살아있는지 간단 확인
         if sftp.stat(Path::new(".")).is_ok() {
-            return Ok(SftpHandle(Some(sftp)));
+            return Ok(SftpHandle(Some(sftp), generation));
         }
     }
     // 새로 생성
-    let sftp = SSH_CLIENT.lock().unwrap()
+    let sftp = SSH_CLIENT.lock().unwrap_or_else(|p| p.into_inner())
         .as_ref()
         .context("SSH session not initialized")?
         .sftp().context("Failed to open SFTP session")?;
-    Ok(SftpHandle(Some(sftp)))
+    Ok(SftpHandle(Some(sftp), generation))
 }
 
 /// SSH 서버의 홈 디렉토리 경로를 가져옴
@@ -134,6 +144,29 @@ pub fn get_server_home_path() -> Result<String> {
     let mut channel = get_channel_session()?;
     let output = execute_ssh_command(&mut channel, "echo $HOME")?;
     Ok(output.trim().to_string())
+}
+
+/// 원격 명령 실행 + exit code 확인. 비0 종료를 stderr와 함께 에러로 전파한다.
+/// (grep/pkill처럼 비0 종료가 정상인 명령에는 execute_ssh_command를 사용)
+pub fn execute_ssh_command_checked(channel: &mut Channel, command: &str) -> Result<String> {
+    channel.exec(command).context("Failed to execute SSH command")?;
+
+    let mut stdout = String::new();
+    channel.read_to_string(&mut stdout).context("Failed to read from SSH stdout")?;
+
+    let mut stderr = String::new();
+    channel.stderr().read_to_string(&mut stderr).context("Failed to read from SSH stderr")?;
+
+    channel.wait_close().context("Failed to close SSH channel")?;
+    let exit_status = channel.exit_status().context("Failed to get SSH exit status")?;
+    if exit_status != 0 {
+        return Err(anyhow::anyhow!(
+            "Remote command failed (exit {}): {}",
+            exit_status,
+            stderr.trim()
+        ));
+    }
+    Ok(stdout)
 }
 
 pub fn execute_ssh_command(channel: &mut Channel, command: &str) -> Result<String> {
@@ -162,11 +195,7 @@ pub struct SearchMatch {
     pub is_hidden: bool,
 }
 
-/// Shell-escape a string for use inside single quotes.
-fn shell_escape(s: &str) -> String {
-    // Wrap in single quotes; escape any embedded single quotes.
-    format!("'{}'", s.replace('\'', "'\\''"))
-}
+use crate::utils::shell::quote as shell_escape;
 
 /// Search Hugo content (both public + hidden) via SSH grep.
 pub fn search_content(query: &str) -> Result<Vec<SearchMatch>> {
@@ -178,7 +207,7 @@ pub fn search_content(query: &str) -> Result<Vec<SearchMatch>> {
     let mut channel = get_channel_session()?;
 
     let escaped = shell_escape(query);
-    let content_dir = format!("{}/content", hugo.base_path);
+    let content_dir = shell_escape(&format!("{}/content", hugo.base_path));
     let cmd = format!(
         "grep -rn --include='*.md' -F -- {} {} 2>/dev/null || true",
         escaped, content_dir

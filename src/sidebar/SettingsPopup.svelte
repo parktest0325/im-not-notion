@@ -220,14 +220,33 @@
     deletingServerId = id;
   }
 
-  function proceedDeleteServer(confirmed: boolean) {
+  async function proceedDeleteServer(confirmed: boolean) {
     if (confirmed && deletingServerId) {
-      if (!config.servers) return;
+      if (!config.servers) { deletingServerId = null; return; }
+      const wasActive = config.active_server === deletingServerId;
       config.servers = config.servers.filter(s => s.id !== deletingServerId);
-      if (config.active_server === deletingServerId) {
+      if (wasActive) {
         config.active_server = config.servers.length > 0 ? config.servers[0].id : "";
       }
-      invoke("save_config", { config }).catch(() => {});
+      try {
+        if (wasActive && config.active_server) {
+          // active 서버를 지웠으면 남은 서버로 세션까지 전환
+          const newConfig: AppConfig = await invoke("switch_server", {
+            servers: config.servers,
+            serverId: config.active_server,
+          });
+          config = newConfig;
+          onServerSwitch();
+        } else {
+          await invoke("save_config", { config });
+        }
+        addToast("Server deleted.", "success");
+      } catch (error) {
+        // 저장/전환 실패를 조용히 삼키면 UI와 설정 파일이 어긋난다
+        console.error("Failed to delete server:", error);
+        addToast("Failed to save after deleting server.");
+        await loadConfig();
+      }
     }
     deletingServerId = null;
   }

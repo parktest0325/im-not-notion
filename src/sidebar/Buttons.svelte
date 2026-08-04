@@ -1,11 +1,7 @@
 <script lang="ts">
-  import MdSettings from "svelte-icons/md/MdSettings.svelte";
-  import SettingsPopup from "./SettingsPopup.svelte";
-  import FaFolderOpen from "svelte-icons/fa/FaFolderOpen.svelte";
-  import FaPuzzlePiece from "svelte-icons/fa/FaPuzzlePiece.svelte";
-  import GiNuclear from "svelte-icons/gi/GiNuclear.svelte";
-  import RebootPopup from "./RebootPopup.svelte";
-  import FaTerminal from "svelte-icons/fa/FaTerminal.svelte";
+    import SettingsPopup from "./SettingsPopup.svelte";
+        import RebootPopup from "./RebootPopup.svelte";
+  import { Settings, SquareTerminal, FolderOpen, Puzzle, Power } from "lucide-svelte";
   import TerminalPopup from "./TerminalPopup.svelte";
   import PluginPanel from "./PluginPanel.svelte";
   import FileExplorerPopup from "./FileExplorerPopup.svelte";
@@ -29,23 +25,23 @@
 
 <div class="flex justify-between max-w-4xl mx-auto">
   <button class="p-2" on:click={toggleSettings} title="Settings">
-    <div class="w-6 h-6"><MdSettings /></div>
+    <div class="w-6 h-6"><Settings size="100%" /></div>
   </button>
 
   <button class="p-2" on:click={toggleTerminal} title="Terminal">
-    <div class="w-6 h-6"><FaTerminal /></div>
+    <div class="w-6 h-6"><SquareTerminal size="100%" /></div>
   </button>
 
   <button class="p-2" on:click={toggleExplorer} title="File Explorer">
-    <div class="w-6 h-6"><FaFolderOpen /></div>
+    <div class="w-6 h-6"><FolderOpen size="100%" /></div>
   </button>
 
   <button class="p-2" on:click={togglePlugin} title="Plugins">
-    <div class="w-6 h-6"><FaPuzzlePiece /></div>
+    <div class="w-6 h-6"><Puzzle size="100%" /></div>
   </button>
 
   <button class="p-2" on:click={toggleReboot} title="Reboot">
-    <div class="w-6 h-6"><GiNuclear /></div>
+    <div class="w-6 h-6"><Power size="100%" /></div>
   </button>
 </div>
 

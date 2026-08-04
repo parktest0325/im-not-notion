@@ -25,8 +25,14 @@ pub fn get_latest_hugo_version_cmd() -> Result<String, InvokeError> {
 }
 
 #[tauri::command]
-pub fn install_hugo_cmd(os: &str, arch: &str, version: &str) -> Result<String, InvokeError> {
-    setup_service::install_hugo(os, arch, version).into_invoke_err()
+pub async fn install_hugo_cmd(os: String, arch: String, version: String) -> Result<String, InvokeError> {
+    // 다운로드/설치 동안 UI가 멈추지 않도록 blocking pool에서 실행
+    tauri::async_runtime::spawn_blocking(move || {
+        setup_service::install_hugo(&os, &arch, &version)
+    })
+    .await
+    .map_err(|e| InvokeError::from(format!("Install task panicked: {}", e)))?
+    .into_invoke_err()
 }
 
 #[tauri::command]

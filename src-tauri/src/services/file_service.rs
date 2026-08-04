@@ -9,7 +9,7 @@ use rand::Rng;
 
 use typeshare::typeshare;
 
-use crate::services::ssh_service::{get_sftp_session, get_channel_session, execute_ssh_command, SftpHandle};
+use crate::services::ssh_service::{get_sftp_session, get_channel_session, execute_ssh_command, execute_ssh_command_checked, SftpHandle};
 use crate::services::config_service::get_hugo_config;
 use crate::services::plugin_service;
 use crate::types::config::cms_config::HugoConfig;
@@ -118,8 +118,14 @@ fn parse_find_output(output: &str, prefix: &str, root_name: &str, is_hidden: boo
         let line = line.trim();
         if line.is_empty() { continue; }
 
+        // find -printf '%y %p' 형식: 타입 문자 + 공백 + 절대경로
+        let (type_char, path) = match line.split_once(' ') {
+            Some((t, p)) if t.len() == 1 => (t.as_bytes()[0], p),
+            _ => continue,
+        };
+
         // Strip prefix → 상대경로 (예: "/subdir/file.md")
-        let rel = match line.strip_prefix(prefix) {
+        let rel = match path.strip_prefix(prefix) {
             Some(r) if !r.is_empty() => r,
             _ => continue, // prefix 자체 또는 매칭 안 되는 줄 스킵
         };
@@ -134,11 +140,12 @@ fn parse_find_output(output: &str, prefix: &str, root_name: &str, is_hidden: boo
             let name = part.to_string();
 
             if is_last {
-                // 마지막 컴포넌트: 확장자가 있으면 File, 없으면 Directory
-                let has_ext = name.contains('.');
+                // 마지막 컴포넌트: find가 알려준 실제 타입 사용
+                // (기존의 "확장자 유무" 추정은 v1.0 같은 폴더를 파일로 오판했다)
+                let node_type = if type_char == b'd' { NodeType::Directory } else { NodeType::File };
                 current.children.entry(name.clone()).or_insert_with(|| FileSystemNode {
                     name: name.clone(),
-                    type_: if has_ext { NodeType::File } else { NodeType::Directory },
+                    type_: node_type,
                     is_hidden,
                     children: IndexMap::new(),
                 });
@@ -166,15 +173,16 @@ fn fetch_files_and_weights(base_path: &str, paths: &[String]) -> (String, HashMa
         Err(_) => return (String::new(), HashMap::new(), HashMap::new()),
     };
 
-    // find 대상 경로 조합
+    // find 대상 경로 조합 (경로에 공백/특수문자가 있어도 깨지지 않도록 quoting)
     let find_targets: Vec<String> = paths.iter()
-        .map(|p| format!("{}/content/{}", base_path, p))
+        .map(|p| crate::utils::shell::quote(&format!("{}/content/{}", base_path, p)))
         .collect();
     let find_paths = find_targets.join(" ");
+    let content_dir = crate::utils::shell::quote(&format!("{}/content", base_path));
 
     let cmd = format!(
-        "echo '---FILES---'; find {} -maxdepth {} -print 2>/dev/null; echo '---WEIGHTS---'; grep -rn -E '^weight\\s*[=:]\\s*' {}/content --include='*.md' 2>/dev/null; echo '---DATES---'; grep -rn -E '^date\\s*[=:]\\s*' {}/content --include='*.md' 2>/dev/null; true",
-        find_paths, FILE_TREE_MAX_DEPTH, base_path, base_path
+        "echo '---FILES---'; find {} -maxdepth {} -printf '%y %p\\n' 2>/dev/null; echo '---WEIGHTS---'; grep -rn -E '^weight\\s*[=:]\\s*' {} --include='*.md' 2>/dev/null; echo '---DATES---'; grep -rn -E '^date\\s*[=:]\\s*' {} --include='*.md' 2>/dev/null; true",
+        find_paths, FILE_TREE_MAX_DEPTH, content_dir, content_dir
     );
 
     let output = match execute_ssh_command(&mut channel, &cmd) {
@@ -397,6 +405,11 @@ pub fn write_content(file_path: &str, data: &str, manual: bool) -> Result<bool> 
 pub fn write_image(file_path: &str, file_name: &str, data: Vec<u8>) -> Result<String> {
     let (sftp, hugo_config) = sftp_and_config()?;
 
+    // 이미지 디렉토리 밖으로 나가는 경로 차단
+    if file_path.split('/').any(|c| c == "..") || file_name.contains('/') || file_name.contains("..") {
+        anyhow::bail!("Invalid image path: {}/{}", file_path, file_name);
+    }
+
     // TODO: extract image_ext from image raw data
     let image_ext = "";
     let ret_path = format!("{}/{}{}", file_path, file_name, image_ext);
@@ -418,13 +431,15 @@ pub fn create_content(file_path: &str) -> Result<String> {
 
     // unique_path에 섹션이 포함됨: e.g. "/posts/my-post/_index.md"
     let clean_path = unique_path.trim_start_matches('/');
-    execute_ssh_command(
+    // clean_path(사용자 입력 유래)와 base_path는 quoting 필수.
+    // hugo_cmd_path는 `~` 확장이 필요할 수 있어 quoting하지 않는다 (설정값).
+    execute_ssh_command_checked(
         &mut channel,
         &format!(
             "cd {} ; {} new {}",
-            &hugo_config.base_path,
+            crate::utils::shell::quote(&hugo_config.base_path),
             &hugo_config.hugo_cmd_path,
-            clean_path,
+            crate::utils::shell::quote(clean_path),
         ),
     )?;
 

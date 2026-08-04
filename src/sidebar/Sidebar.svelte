@@ -1,23 +1,23 @@
 <script lang="ts">
   export let isMenuOpen: boolean;
   export let toggleMenu: () => void;
-  import MdArrowBack from "svelte-icons/md/MdArrowBack.svelte";
+  import { PanelLeftClose } from "lucide-svelte";
   import Buttons from "./Buttons.svelte";
   import FileControlSection from "./FileControlSection.svelte";
   import LogoSVG from '../resource/LogoSVG.svelte';
-  import { isConnected, activeServerName } from "../stores";
+  import { isConnected } from "../stores";
   import { currentTheme, cycleTheme } from "../theme";
 </script>
 
 <div
-  class={`flex flex-col h-screen transition-all duration-300 overflow-hidden ${isMenuOpen ? "w-72" : "w-0"}`}
+  class={`flex flex-col h-full transition-all duration-300 overflow-hidden ${isMenuOpen ? "w-72" : "w-0"}`}
   style="flex-shrink: 0; background-color: var(--sidebar-bg-color);"
 >
   <div class="flex items-center justify-between p-4" style="background-color: var(--sidebar-bg-color);">
     {#if isMenuOpen}
       <LogoSVG />
       <button on:click={toggleMenu} class="text-lg w-6 h-6">
-        <MdArrowBack />
+        <PanelLeftClose size="100%" />
       </button>
     {/if}
   </div>
@@ -27,18 +27,8 @@
   <div class="flex-grow overflow-y-auto p-4">
     <FileControlSection {isConnected} />
   </div>
-  <div class="p-4 flex items-center justify-between">
-    {#if $isConnected}
-      <div class="flex items-center" style="color: var(--status-connected-color)">
-        <div class="w-2 h-2 rounded-full mr-2" style="background-color: var(--status-connected-color)"></div>
-        Connected{$activeServerName ? ` · ${$activeServerName}` : ""}
-      </div>
-    {:else}
-      <div class="flex items-center" style="color: var(--status-disconnected-color)">
-        <div class="w-2 h-2 rounded-full mr-2" style="background-color: var(--status-disconnected-color)"></div>
-        Not Connected{$activeServerName ? ` · ${$activeServerName}` : ""}
-      </div>
-    {/if}
+  <!-- 연결 상태는 하단 StatusBar로 이동 -->
+  <div class="p-4 flex items-center justify-end">
     <button
       on:click={cycleTheme}
       class="theme-btn"

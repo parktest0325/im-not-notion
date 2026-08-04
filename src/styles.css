@@ -13,41 +13,45 @@
 }
 
 :root {
-  /* ========== Background (surface hierarchy) ========== */
-  --primary-color: #f8f9fb;
-  --secondary-color: #eef0f4;
-  --tertiary-color: #dfe2e8;
+  /* ========== Background (surface hierarchy, 블로그 테마와 동일 계열) ========== */
+  --primary-color: #f8fafc;
+  --secondary-color: #f1f5f9;
+  --tertiary-color: #e2e8f0;
 
-  /* ========== Foreground (text hierarchy) ========== */
+  /* ========== Foreground (text hierarchy, 이전 밝기 유지) ========== */
   --reverse-primary-color: #1c1e21;
   --reverse-secondary-color: #4a4f57;
-  --reverse-third-color: #7c3aed;
-  --reverse-third-color-selected: #5b21b6;
+  /* 숨김 파일: 주황 계열 (Hide 버튼과 동일 계열, 이탤릭과 함께 사용) */
+  --reverse-third-color: #b45309;
+  --reverse-third-color-selected: #92400e;
 
   /* ========== Semantic colors ========== */
   --success-color: #0d9668;
   --warning-color: #d97706;
   --error-color: #dc2626;
   --info-color: #2563eb;
-  --highlight-color: #0d7c87;
-  --accent-color: #3aad5c;
+  /* 단일 액센트: teal (블로그 --accent와 동일 계열) */
+  --highlight-color: #0d9488;
+  --accent-color: #0d9488;
+  --accent-tint: #ccfbf1;   /* 선택/활성 배경용 옅은 teal */
+  --accent-strong: #0f766e; /* 선택 텍스트용 진한 teal */
 
-  /* ========== Status ========== */
-  --status-connected-color: #0d9668;
+  /* ========== Status (액센트와 동일한 teal — 초록 남발 줄이기) ========== */
+  --status-connected-color: var(--accent-color);
   --status-disconnected-color: #dc2626;
 
   /* ========== Toggle switch ========== */
   --toggle-off-bg: #c4c9d2;
-  --toggle-on-bg: var(--success-color);
+  --toggle-on-bg: var(--accent-color);
 
   /* ========== Active/Enabled border ========== */
-  --active-border-color: var(--success-color);
+  --active-border-color: var(--accent-color);
 
-  /* ========== Badges ========== */
-  --badge-local-bg: #7e22ce;
-  --badge-local-text: #f3e8ff;
-  --badge-server-bg: #166534;
-  --badge-server-text: #dcfce7;
+  /* ========== Badges (무채색 + teal — 색 수 줄이기) ========== */
+  --badge-local-bg: var(--tertiary-color);
+  --badge-local-text: var(--reverse-secondary-color);
+  --badge-server-bg: var(--accent-tint);
+  --badge-server-text: var(--accent-strong);
 
   /* ========== Confirm/Danger buttons ========== */
   --btn-danger-bg: #dc2626;
@@ -71,38 +75,38 @@
   --search-match-bg: rgba(253, 230, 138, 0.6);
   --search-match-current-bg: #f97316;
   --search-match-current-text: #ffffff;
-  --search-btn-active-bg: #dbeafe;
+  --search-btn-active-bg: var(--accent-tint);
 
   /* ========== Toast ========== */
   --toast-text: #ffffff;
 
   /* ========== Recording state (SettingsPopup) ========== */
-  --recording-border: var(--info-color);
-  --recording-bg: #dbeafe;
+  --recording-border: var(--accent-color);
+  --recording-bg: var(--accent-tint);
 
-  /* ========== TopBar visibility toggle ========== */
-  --btn-visible-bg: #dbeafe;
-  --btn-visible-text: #1e40af;
-  --btn-visible-border: #93c5fd;
-  --btn-visible-hover-bg: #bfdbfe;
-  --btn-hidden-bg: #ffedd5;
-  --btn-hidden-text: #9a3412;
-  --btn-hidden-border: #fdba74;
-  --btn-hidden-hover-bg: #fed7aa;
+  /* ========== TopBar visibility toggle (솔리드 — 상태가 한눈에 보이도록) ========== */
+  --btn-visible-bg: #d97706;
+  --btn-visible-text: #ffffff;
+  --btn-visible-border: transparent;
+  --btn-visible-hover-bg: #b45309;
+  --btn-hidden-bg: #0d9488;
+  --btn-hidden-text: #ffffff;
+  --btn-hidden-border: transparent;
+  --btn-hidden-hover-bg: #0f766e;
 
   /* ========== Create folder button ========== */
   --btn-create-bg: var(--tertiary-color);
-  --btn-create-border: var(--info-color);
-  --btn-create-hover-bg: var(--info-color);
-  --btn-create-hover-border: var(--reverse-secondary-color);
+  --btn-create-border: var(--accent-color);
+  --btn-create-hover-bg: var(--accent-tint);
+  --btn-create-hover-border: var(--accent-strong);
 
   /* ========== Sync warning icon ========== */
   --sync-warn-color: #d97706;
 
-  /* ========== Terminal ========== */
-  --terminal-bg: #1e1e1e;
-  --terminal-fg: #d4d4d4;
-  --terminal-cursor: #d4d4d4;
+  /* ========== Terminal (라이트 테마에서도 다크 유지 — 블로그와 동일 슬레이트 네이비) ========== */
+  --terminal-bg: #0f172a;
+  --terminal-fg: #e2e8f0;
+  --terminal-cursor: #2dd4bf;
 
   /* ========== Shortcut remove hover ========== */
   --shortcut-remove-hover: var(--error-color);
@@ -112,41 +116,45 @@
 }
 
 :root.dark {
-    /* ========== Background (surface hierarchy) ========== */
-    --primary-color: #1a1b1e;
-    --secondary-color: #212225;
-    --tertiary-color: #2c2d31;
+    /* ========== Background (surface hierarchy, 블로그 다크와 동일) ========== */
+    --primary-color: #14151a;
+    --secondary-color: #1b1c24;
+    --tertiary-color: #23252e;
 
-    /* ========== Foreground (text hierarchy) ========== */
+    /* ========== Foreground (text hierarchy, 이전 밝기 유지) ========== */
     --reverse-primary-color: #f0f1f3;
     --reverse-secondary-color: #c0c4cc;
-    --reverse-third-color: #7c3aed;
-    --reverse-third-color-selected: #a78bfa;
+    /* 숨김 파일: 주황 계열 (Hide 버튼과 동일 계열, 이탤릭과 함께 사용) */
+    --reverse-third-color: #d9a05b;
+    --reverse-third-color-selected: #e8b878;
 
     /* ========== Semantic colors ========== */
-    --success-color: #22c55e;
+    --success-color: #2f9e6b;
     --warning-color: #f59e0b;
     --error-color: #f87171;
     --info-color: #60a5fa;
-    --highlight-color: #0e7490;
-    --accent-color: #1a7a35;
+    /* 단일 액센트: teal (블로그 --accent-text와 동일) */
+    --highlight-color: #2dd4bf;
+    --accent-color: #2dd4bf;
+    --accent-tint: #134e4a;   /* 선택/활성 배경용 어두운 teal */
+    --accent-strong: #2dd4bf; /* 선택 텍스트용 밝은 teal */
 
-    /* ========== Status ========== */
-    --status-connected-color: #34d399;
+    /* ========== Status (teal) ========== */
+    --status-connected-color: var(--accent-color);
     --status-disconnected-color: #f87171;
 
     /* ========== Toggle ========== */
     --toggle-off-bg: #4b5563;
-    --toggle-on-bg: #22c55e;
+    --toggle-on-bg: #0d9488;
 
     /* ========== Active border ========== */
-    --active-border-color: #22c55e;
+    --active-border-color: var(--accent-color);
 
-    /* ========== Badges ========== */
-    --badge-local-bg: #581c87;
-    --badge-local-text: #d8b4fe;
-    --badge-server-bg: #14532d;
-    --badge-server-text: #86efac;
+    /* ========== Badges (무채색 + teal) ========== */
+    --badge-local-bg: var(--tertiary-color);
+    --badge-local-text: var(--reverse-secondary-color);
+    --badge-server-bg: var(--accent-tint);
+    --badge-server-text: var(--accent-strong);
 
     /* ========== Confirm/Danger ========== */
     --btn-danger-bg: #b91c1c;
@@ -170,51 +178,76 @@
     --search-match-bg: rgba(133, 77, 14, 0.5);
     --search-match-current-bg: #f97316;
     --search-match-current-text: #ffffff;
-    --search-btn-active-bg: #1e3a5f;
+    --search-btn-active-bg: var(--accent-tint);
 
     /* ========== Toast ========== */
     --toast-text: #ffffff;
 
     /* ========== Recording ========== */
-    --recording-border: #3b82f6;
-    --recording-bg: #1e3a5f;
+    --recording-border: var(--accent-color);
+    --recording-bg: var(--accent-tint);
 
-    /* ========== TopBar visibility ========== */
-    --btn-visible-bg: #1e3a5f;
-    --btn-visible-text: #93c5fd;
-    --btn-visible-border: #1d4ed8;
-    --btn-visible-hover-bg: #1e40af;
-    --btn-hidden-bg: #431407;
-    --btn-hidden-text: #fdba74;
-    --btn-hidden-border: #9a3412;
-    --btn-hidden-hover-bg: #7c2d12;
+    /* ========== TopBar visibility (솔리드 — 상태가 한눈에 보이도록) ========== */
+    --btn-visible-bg: #b45309;
+    --btn-visible-text: #fffbeb;
+    --btn-visible-border: transparent;
+    --btn-visible-hover-bg: #92400e;
+    --btn-hidden-bg: #0d9488;
+    --btn-hidden-text: #f0fdfa;
+    --btn-hidden-border: transparent;
+    --btn-hidden-hover-bg: #0f766e;
 
     /* ========== Create folder ========== */
     --btn-create-bg: var(--tertiary-color);
-    --btn-create-border: var(--info-color);
-    --btn-create-hover-bg: var(--info-color);
-    --btn-create-hover-border: var(--reverse-secondary-color);
+    --btn-create-border: var(--accent-color);
+    --btn-create-hover-bg: var(--accent-tint);
+    --btn-create-hover-border: var(--accent-strong);
 
     /* ========== Sync warning ========== */
     --sync-warn-color: #fbbf24;
 
     /* ========== Terminal ========== */
-    --terminal-bg: #1a1b1e;
+    --terminal-bg: #14151a;
     --terminal-fg: #d4d4d4;
-    --terminal-cursor: #d4d4d4;
+    --terminal-cursor: #2dd4bf;
 
     /* ========== Shortcut remove hover ========== */
     --shortcut-remove-hover: #f87171;
 
     /* ========== Input background ========== */
     --input-bg-color: var(--secondary-color);
+
+    /* ========== Hover border (은은하게) ========== */
+    --hover-border-color: #3f4351;
+
+    /* ========== Scrollbar ========== */
+    --scrollbar-thumb: rgba(255, 255, 255, 0.16);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.3);
+
+    /* ========== Code block & syntax (one-dark 계열, 블로그 code-bg와 동일) ========== */
+    --code-block-bg: #0d0e12;
+    --code-block-border: #2b2e3a;
+    --code-keyword: #c678dd;
+    --code-string: #98c379;
+    --code-comment: #7f848e;
+    --code-number: #d19a66;
+    --code-fn: #61afef;
+    --code-type: #e5c07b;
+    --code-prop: #e06c75;
+    --code-operator: #abb2bf;
 }
 
 :root {
 /* config */
-  font-family: 'D2Coding', Inter, Avenir, Helvetica, Arial, sans-serif;
-  font-size: 16px;
-  line-height: 24px;
+  /* UI는 산세리프, 콘텐츠(에디터/터미널/파일트리)는 D2Coding —
+     VSCode/Obsidian처럼 크롬은 작고 조용하게, 글이 주인공이 되도록 */
+  --font-ui: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont,
+             'Segoe UI', 'Noto Sans KR', 'Malgun Gothic', Helvetica, Arial, sans-serif;
+  --font-mono: 'D2Coding', Consolas, 'Courier New', monospace;
+
+  font-family: var(--font-ui);
+  font-size: 16px; /* rem 기준 — UI 텍스트 크기는 body에서 지정 */
+  line-height: 1.5;
   font-weight: 400;
 
   font-synthesis: none;
@@ -224,7 +257,7 @@
   -webkit-text-size-adjust: 100%;
 
   --textarea-border-width: 2px;
-  --overlay-bg-color: rgba(0, 0, 0, 0.3);
+  --overlay-bg-color: rgba(0, 0, 0, 0.45);
 
 /* svg */
   --svg-open-color: var(--warning-color);
@@ -235,13 +268,13 @@
   --text-color: var(--reverse-secondary-color);
   --button-text-color: var(--reverse-secondary-color);
   --popup-text-color: var(--reverse-secondary-color);
-  --button-selected-text-color: var(--reverse-secondary-color);
+  --button-selected-text-color: var(--accent-strong);
 
 /* background */
   --button-bg-color: var(--primary-color);
   --button-hover-bg-color: var(--secondary-color);
-  --button-active-bg-color: var(--highlight-color);
-  --button-selected-bg-color: var(--accent-color);
+  --button-active-bg-color: var(--accent-tint);
+  --button-selected-bg-color: var(--accent-tint);
 
   --background-color: var(--primary-color);
   --content-bg-color: var(--primary-color);
@@ -251,7 +284,23 @@
 
 /* etc */
   --border-color: var(--tertiary-color);
-  --hover-border-color: var(--reverse-secondary-color);
+  --hover-border-color: #94a3b8;
+
+/* scrollbar */
+  --scrollbar-thumb: rgba(15, 23, 42, 0.2);
+  --scrollbar-thumb-hover: rgba(15, 23, 42, 0.35);
+
+/* code block & syntax (one-light 계열) */
+  --code-block-bg: #e9eef6;
+  --code-block-border: #cfd8e4;
+  --code-keyword: #a626a4;
+  --code-string: #50a14f;
+  --code-comment: #a0a1a7;
+  --code-number: #986801;
+  --code-fn: #4078f2;
+  --code-type: #c18401;
+  --code-prop: #e45649;
+  --code-operator: #383a42;
 
 /* shadows */
   --shadow-popup: 0 10px 20px rgba(0, 0, 0, 0.25);
@@ -261,8 +310,92 @@
 body {
   color: var(--text-color);
   background-color: var(--background-color);
+  font-size: 13px; /* UI 크롬 기본 크기 (VSCode와 동일) */
 }
 
+/* ── 스크롤바: 얇고 둥글게, 테마 연동 ── */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-thumb);
+  border-radius: 6px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scrollbar-thumb-hover);
+  border-width: 2px;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+body.tree-dragging {
+  user-select: none;
+  cursor: grabbing;
+}
+
+body.tree-dragging * {
+  cursor: grabbing !important;
+}
+
+.tree-drag-ghost {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 9999;
+  pointer-events: none;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 1px solid var(--border-color);
+  border-radius: 0.3rem;
+  background-color: var(--button-bg-color);
+  color: var(--button-text-color);
+  box-shadow: var(--shadow-toast);
+  max-width: 16rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 유효한 드롭 대상 위: 목적지("이름 → 폴더")가 표시되며 강조 테두리 */
+.tree-drag-ghost.on-target {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 1px var(--accent-color), var(--shadow-toast);
+}
+
+/* ── Modal kit: 테마 변수 기반 공용 모달 스타일 (라이트/다크 모두 대응) ── */
+.modal-surface {
+  background-color: var(--popup-bg-color);
+  color: var(--popup-text-color);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-popup);
+}
+.modal-divider { border-color: var(--border-color) !important; }
+.surface-1 { background-color: var(--primary-color); }
+.surface-2 { background-color: var(--secondary-color); }
+.text-muted-2 { color: inherit; opacity: 0.6; }
+.hover-surface:hover { background-color: var(--button-hover-bg-color); }
+.btn-plain { border: none; background: none; box-shadow: none; color: inherit; }
+.btn-plain:hover { border: none; }
+.icon-btn { color: inherit; opacity: 0.6; }
+.icon-btn:hover { opacity: 1; }
+.btn-primary { background-color: var(--btn-confirm-bg); color: var(--btn-confirm-text); border-color: transparent; }
+.btn-primary:hover { background-color: var(--btn-confirm-hover-bg); border-color: transparent; }
+.btn-danger-solid { background-color: var(--btn-danger-bg); color: var(--btn-danger-text); border-color: transparent; }
+.btn-danger-solid:hover { background-color: var(--btn-danger-hover-bg); border-color: transparent; }
+.text-danger { color: var(--error-color); }
+.row-selected { background-color: var(--button-selected-bg-color); color: var(--button-selected-text-color); }
+.fill-info { background-color: var(--info-color); }
+.fill-success { background-color: var(--success-color); }
+
+/* 조용한 크롬: 그림자 없이 보더+배경 단차로. 그림자는 떠 있는 요소(팝업/토스트/고스트)만 */
 input,
 button {
   border-radius: 0.4em;
@@ -271,8 +404,7 @@ button {
   padding: 0.6em 1.2em;
   color: var(--button-text-color);
   background-color: var(--button-bg-color);
-  transition: border-color 0.25s;
-  box-shadow: 0 2px 2px rgba(0, 0, 0, 0.2);
+  transition: border-color 0.15s, background-color 0.15s;
   outline: none;
 }
 
@@ -285,9 +417,14 @@ button:hover {
   background-color: var(--button-hover-bg-color);
 }
 
+input:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 1px;
+}
+
 textarea {
   background-color: var(--content-bg-color);
-  border: 2px solid var(--hover-border-color);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
-  box-shadow: 0 2px 2px rgba(0, 0, 0, 0.2);
 }

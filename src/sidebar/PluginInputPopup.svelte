@@ -1,13 +1,13 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { addToast } from "../stores";
+  import { dispatchPluginActions } from "../pluginActions";
   import type { PluginManifest, InputField, PluginResult } from "../types/setting";
 
   export let show: boolean;
   export let plugin: PluginManifest | null = null;
   export let inputFields: InputField[] = [];
   export let onClose: () => void;
-  export let onRefreshTree: () => void;
   export let onShowResult: (title: string, body: string, pages?: any[]) => void = () => {};
   export let onDownloadFiles: (items: any[]) => void = () => {};
   // Called when run_plugin settles (success or error). PluginPanel uses it
@@ -32,17 +32,9 @@
     if (!plugin) return;
     isExecuting = true;
     try {
-      // Read current values directly from DOM to avoid Svelte reactivity issues
-      const formData: Record<string, string | boolean> = { trigger: "manual" };
-      for (const field of inputFields) {
-        if (field.type === "boolean") {
-          const el = document.getElementById(field.name) as HTMLInputElement;
-          formData[field.name] = el?.checked ?? false;
-        } else {
-          const el = document.getElementById(field.name) as HTMLInputElement;
-          formData[field.name] = el?.value ?? values[field.name] ?? "";
-        }
-      }
+      // values는 각 input의 on:input/on:change 핸들러가 최신으로 유지한다.
+      // (getElementById로 DOM을 다시 읽으면 전역 id 충돌 시 엉뚱한 값을 읽는다)
+      const formData: Record<string, string | boolean> = { trigger: "manual", ...values };
       const inputJson = JSON.stringify(formData);
       const result: PluginResult = await invoke("run_plugin", {
         name: plugin.name,
@@ -55,22 +47,10 @@
         addToast(result.error ?? "Plugin failed.");
       }
 
-      if (result.actions) {
-        for (const action of result.actions) {
-          if (action.type === "refresh_tree") {
-            onRefreshTree();
-          } else if (action.type === "toast" && action.content) {
-            addToast(
-              action.content.message,
-              action.content.toast_type === "success" ? "success" : "error"
-            );
-          } else if (action.type === "show_result" && action.content) {
-            onShowResult(action.content.title, action.content.body ?? "", action.content.pages);
-          } else if (action.type === "download_files" && action.content) {
-            onDownloadFiles(action.content.items);
-          }
-        }
-      }
+      dispatchPluginActions(result.actions, {
+        onShowResult,
+        onDownloadFiles,
+      });
 
       onClose();
     } catch (error) {

@@ -1,8 +1,7 @@
 <script lang="ts">
   export let isMenuOpen: boolean;
   export let toggleMenu: () => void;
-  import MdArrowForward from "svelte-icons/md/MdArrowForward.svelte";
-  import DiIe from 'svelte-icons/di/DiIe.svelte'
+  import { PanelLeftOpen, ExternalLink, ChevronRight } from "lucide-svelte";
   import { relativeFilePath, url, hiddenPath, fullFilePath, addToast } from "../stores";
   import { type GlobalFunctions, GLOBAL_FUNCTIONS } from "../context";
   import { invoke } from "@tauri-apps/api/core";
@@ -19,9 +18,14 @@
       .replace(/\.md$/, "")
       .replace(/\/_index$/, "")
       .toLowerCase();
-    
-    const fullUrl = new URL(cleanedPath, $url);
-    open(fullUrl.toString().toLowerCase());
+
+    try {
+      const fullUrl = new URL(cleanedPath, $url);
+      open(fullUrl.toString().toLowerCase());
+    } catch (error) {
+      console.error("Failed to open page:", error);
+      addToast("Invalid blog URL. Check the url in settings.");
+    }
   }
 
   async function checkHidden() {
@@ -68,10 +72,21 @@
   <div class="flex items-center">
     {#if !isMenuOpen}
       <button on:click={toggleMenu} class="w-6 h-6 mr-4">
-        <MdArrowForward />
+        <PanelLeftOpen size="100%" />
       </button>
     {/if}
-    <span>{$fullFilePath}</span>
+    <!-- 현재 위치 브레드크럼 -->
+    {#if $fullFilePath}
+      {@const crumbs = $fullFilePath.split("/").filter(Boolean)}
+      <div class="breadcrumb">
+        {#each crumbs as crumb, i}
+          {#if i > 0}
+            <span class="crumb-sep"><ChevronRight size={12} /></span>
+          {/if}
+          <span class="crumb" class:last={i === crumbs.length - 1}>{crumb}</span>
+        {/each}
+      </div>
+    {/if}
   </div>
   <div class="flex items-center gap-2">
     {#if $relativeFilePath && !$relativeFilePath.endsWith('_index.md')}
@@ -85,12 +100,37 @@
       </button>
     {/if}
     <button on:click={handleOpenPage} class="w-6 h-6 border flex items-center justify-center">
-      <DiIe />
+      <ExternalLink size="100%" />
     </button>
   </div>
 </div>
 
 <style>
+  .breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--reverse-secondary-color);
+    overflow: hidden;
+    white-space: nowrap;
+  }
+  .crumb {
+    opacity: 0.75;
+  }
+  .crumb.last {
+    opacity: 1;
+    font-weight: 700;
+    color: var(--reverse-primary-color);
+  }
+  .crumb-sep {
+    display: flex;
+    align-items: center;
+    opacity: 0.4;
+    flex-shrink: 0;
+  }
+
   .btn-visible {
     background-color: var(--btn-visible-bg);
     color: var(--btn-visible-text);

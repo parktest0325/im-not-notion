@@ -70,6 +70,19 @@ impl<'de> Deserialize<'de> for HugoConfig {
     }
 }
 
+/// suffix에서 `..`/`.` 컴포넌트를 제거해 content 디렉토리 밖 접근을 차단
+fn sanitize_suffix(suffix: &str) -> String {
+    let cleaned: Vec<&str> = suffix
+        .split('/')
+        .filter(|c| !c.is_empty() && *c != "." && *c != "..")
+        .collect();
+    if cleaned.is_empty() {
+        String::new()
+    } else {
+        format!("/{}", cleaned.join("/"))
+    }
+}
+
 impl HugoConfig {
     pub fn is_empty(&self) -> bool {
         self.base_path.is_empty() && self.content_paths.is_empty()
@@ -78,12 +91,12 @@ impl HugoConfig {
     /// 일반 콘텐츠 절대경로: {base_path}/content{suffix}
     /// suffix에 섹션이 포함됨: e.g. "/posts/my-post/_index.md"
     pub fn content_abs(&self, suffix: &str) -> String {
-        format!("{}/content{}", self.base_path, suffix)
+        format!("{}/content{}", self.base_path, sanitize_suffix(suffix))
     }
 
     /// 숨김 콘텐츠 절대경로: {base_path}/content/{hidden_path}{suffix}
     pub fn hidden_abs(&self, suffix: &str) -> String {
-        format!("{}/content/{}{}", self.base_path, self.hidden_path, suffix)
+        format!("{}/content/{}{}", self.base_path, self.hidden_path, sanitize_suffix(suffix))
     }
 }
 

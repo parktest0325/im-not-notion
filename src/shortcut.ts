@@ -266,10 +266,17 @@ export function handleShortcutEvent(event: KeyboardEvent): void {
 
   if (!actionId) return;
 
-  // For simple keys (no modifier) inside input fields, skip dispatch
-  // to allow normal typing. Exception: Escape and F-keys always dispatch.
+  // For simple keys (no modifier) inside input fields or on interactive
+  // elements, skip dispatch to allow normal typing / keyboard activation
+  // (e.g. Enter on a focused button must click it, not trigger rename).
+  // Exception: Escape and F-keys always dispatch.
+  const isInteractive =
+    target.tagName === "BUTTON" ||
+    target.tagName === "A" ||
+    target.tagName === "SELECT" ||
+    target.closest?.("button, a, select, [role='button']") != null;
   const isFunctionKey = event.key.startsWith("F") && event.key.length > 1;
-  if (isInput && !hasModifier && event.key !== "Escape" && !isFunctionKey) {
+  if ((isInput || isInteractive) && !hasModifier && event.key !== "Escape" && !isFunctionKey) {
     return;
   }
 

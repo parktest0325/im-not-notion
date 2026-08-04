@@ -76,6 +76,25 @@ impl ClientConfig {
     }
 
     pub fn save_to_file(&self) -> Result<()> {
+        // 암호화를 먼저 끝낸다 — 실패 시 기존 설정 파일을 건드리지 않아야 한다.
+        // (암호화 실패를 default로 삼키면 저장된 접속정보가 통째로 소실된다)
+        let mut servers = Vec::with_capacity(self.servers.len());
+        for s in &self.servers {
+            servers.push(ServerEntry {
+                id: s.id.clone(),
+                name: s.name.clone(),
+                ssh_config: s.ssh_config.prepare_for_save()
+                    .context(format!("Failed to encrypt credentials for server '{}'", s.name))?,
+            });
+        }
+        let save_config = ClientConfig {
+            active_server: self.active_server.clone(),
+            servers,
+            plugin_local_path: self.plugin_local_path.clone(),
+            download_path: self.download_path.clone(),
+            ssh_config: SshConfig::default(),
+        };
+
         let config_file_path = Self::get_config_path()?;
         let file = OpenOptions::new()
             .write(true)
@@ -83,20 +102,6 @@ impl ClientConfig {
             .truncate(true)
             .open(&config_file_path)
             .context(format!("Failed to create config file: {:?}", config_file_path))?;
-
-        let save_config = ClientConfig {
-            active_server: self.active_server.clone(),
-            servers: self.servers.iter().map(|s| {
-                ServerEntry {
-                    id: s.id.clone(),
-                    name: s.name.clone(),
-                    ssh_config: s.ssh_config.prepare_for_save().unwrap_or_default(),
-                }
-            }).collect(),
-            plugin_local_path: self.plugin_local_path.clone(),
-            download_path: self.download_path.clone(),
-            ssh_config: SshConfig::default(),
-        };
 
         serde_json::to_writer_pretty(file, &save_config)?;
         Ok(())

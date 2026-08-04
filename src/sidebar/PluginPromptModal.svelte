@@ -57,11 +57,11 @@
 
 {#if prompt}
 <div class="fixed inset-0 bg-black/70 flex items-center justify-center" style="z-index: 1250;" role="dialog">
-  <div class="bg-zinc-900 border border-zinc-700 rounded-lg w-[500px] max-h-[80vh] flex flex-col p-5">
+  <div class="modal-surface rounded-lg w-[500px] max-h-[80vh] flex flex-col p-5">
     <h3 class="text-sm font-semibold mb-1">{prompt.title}</h3>
-    <p class="text-xs text-zinc-400 mb-1">{prompt.plugin}</p>
+    <p class="text-xs text-muted-2 mb-1">{prompt.plugin}</p>
     {#if prompt.message}
-      <p class="text-xs text-zinc-300 mb-3 whitespace-pre-line">{prompt.message}</p>
+      <p class="text-xs mb-3 whitespace-pre-line">{prompt.message}</p>
     {/if}
 
     <div class="flex-1 overflow-auto mb-4">
@@ -70,7 +70,7 @@
       {:else if prompt.kind === PromptKind.Select}
         <div class="space-y-1">
           {#each prompt.items as item}
-            <label class="flex items-start gap-2 px-2 py-1.5 rounded hover:bg-zinc-800 cursor-pointer text-xs">
+            <label class="flex items-start gap-2 px-2 py-1.5 rounded hover-surface cursor-pointer text-xs">
               <input
                 type={prompt.multiple ? "checkbox" : "radio"}
                 checked={selectedValues.has(item.value)}
@@ -80,7 +80,7 @@
               <div class="flex-1 min-w-0">
                 <div class="truncate">{item.label}</div>
                 {#if item.description}
-                  <div class="text-[10px] text-zinc-500 truncate">{item.description}</div>
+                  <div class="text-[10px] text-muted-2 truncate">{item.description}</div>
                 {/if}
               </div>
             </label>
@@ -89,7 +89,7 @@
       {:else if prompt.kind === PromptKind.Input}
         <input
           type="text"
-          class="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs"
+          class="w-full rounded px-2 py-1 text-xs"
           bind:value={inputValue}
           on:keydown={(e) => e.key === "Enter" && submit()}
         />
@@ -98,13 +98,13 @@
 
     <div class="flex gap-2 justify-end">
       <button
-        class="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 rounded text-xs"
+        class="px-3 py-1  rounded text-xs"
         on:click={cancel}
       >
         Cancel
       </button>
       <button
-        class="px-3 py-1 bg-blue-700 hover:bg-blue-600 rounded text-xs disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-blue-700"
+        class="px-3 py-1 btn-primary rounded text-xs disabled:opacity-40 disabled:cursor-not-allowed"
         on:click={submit}
         disabled={prompt.kind === PromptKind.Select && selectedValues.size === 0}
       >

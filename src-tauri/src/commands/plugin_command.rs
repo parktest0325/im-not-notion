@@ -10,8 +10,14 @@ pub fn list_plugins(local_path: &str) -> Result<Vec<PluginInfo>, InvokeError> {
 }
 
 #[tauri::command]
-pub fn install_plugin(local_path: &str, name: &str) -> Result<(), InvokeError> {
-    plugin_service::install_plugin(local_path, name).into_invoke_err()
+pub async fn install_plugin(local_path: String, name: String) -> Result<(), InvokeError> {
+    // tar 생성/업로드/해제 동안 UI가 멈추지 않도록 blocking pool에서 실행
+    tauri::async_runtime::spawn_blocking(move || {
+        plugin_service::install_plugin(&local_path, &name)
+    })
+    .await
+    .map_err(|e| InvokeError::from(format!("Install task panicked: {}", e)))?
+    .into_invoke_err()
 }
 
 #[tauri::command]
@@ -63,8 +69,13 @@ pub fn list_registered_crons() -> Result<Vec<String>, InvokeError> {
 }
 
 #[tauri::command]
-pub fn pull_plugin(local_path: &str, name: &str) -> Result<(), InvokeError> {
-    plugin_service::pull_plugin(local_path, name).into_invoke_err()
+pub async fn pull_plugin(local_path: String, name: String) -> Result<(), InvokeError> {
+    tauri::async_runtime::spawn_blocking(move || {
+        plugin_service::pull_plugin(&local_path, &name)
+    })
+    .await
+    .map_err(|e| InvokeError::from(format!("Pull task panicked: {}", e)))?
+    .into_invoke_err()
 }
 
 #[tauri::command]

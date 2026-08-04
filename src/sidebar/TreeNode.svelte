@@ -1,10 +1,10 @@
 <script lang="ts">
-    import FaFileMedical from "svelte-icons/fa/FaFileMedical.svelte";
-    import FaTrash from "svelte-icons/fa/FaTrash.svelte";
-    import FaFolderPlus from "svelte-icons/fa/FaFolderPlus.svelte";
+    import { FilePlus, FolderPlus, Trash2 } from "lucide-svelte";
     import { writable } from "svelte/store";
     import TreeNode from "./TreeNode.svelte";
     import { relativeFilePath, selectedCursor, draggingInfo, isEditingFileName, renamingPath, addToast } from "../stores";
+    import { dropTargetPath, onNodePointerDown, HOVER_EXPAND_MS } from "./treeDrag";
+    import { onDestroy } from "svelte";
     import { type GlobalFunctions, GLOBAL_FUNCTIONS } from "../context";
     import { invoke } from "@tauri-apps/api/core";
     import { getContext } from "svelte";
@@ -145,83 +145,34 @@
         renamingPath.set("");
     }
 
-    let isDragOver = false;
     $: isDragging = $draggingInfo?.path === filePath;
-    $: dragDisabled = $isEditingFileName;
 
-    function onDragStart(event: DragEvent) {
-        if (dragDisabled) return;
-        event.stopPropagation();
-        event.dataTransfer?.setData('application/x-imnotnotion-path', filePath);
-        draggingInfo.set({ path: filePath });
-    }
-
-    function onDragEnd(event: DragEvent) {
-        if (dragDisabled) return;
-        event.stopPropagation();
-        draggingInfo.set(null);
-        isDragOver = false;
-    }
-
-    function onDragOver(event: DragEvent) {
-        if (dragDisabled) return;
-        event.stopPropagation();
-        if (node.type_ === NodeType.Directory) {
-            event.preventDefault();
-            event.dataTransfer!.dropEffect = 'move';
+    // 드래그 중 닫힌 폴더 위에 잠시 머물면 자동으로 펼침
+    let hoverExpandTimer: ReturnType<typeof setTimeout> | null = null;
+    $: {
+        if ($draggingInfo && $dropTargetPath === filePath
+            && node.type_ === NodeType.Directory && !$isExpanded) {
+            if (!hoverExpandTimer) {
+                hoverExpandTimer = setTimeout(() => {
+                    hoverExpandTimer = null;
+                    isExpanded.set(true);
+                }, HOVER_EXPAND_MS);
+            }
+        } else if (hoverExpandTimer) {
+            clearTimeout(hoverExpandTimer);
+            hoverExpandTimer = null;
         }
     }
 
-    function onDragEnter(event: DragEvent) {
-        if (dragDisabled) return;
-        event.stopPropagation();
-        if (node.type_ === NodeType.Directory) {
-            event.preventDefault();
-            isDragOver = true;
-        }
-    }
-
-    function onDragLeave(event: DragEvent) {
-        if (dragDisabled) return;
-        event.stopPropagation();
-        isDragOver = false;
-    }
-
-    async function onDrop(event: DragEvent) {
-        if (dragDisabled || node.type_ !== NodeType.Directory) return;
-        event.stopPropagation();
-        event.preventDefault();
-
-        isDragOver = false;
-        const info = $draggingInfo;
-        if (!info || info.path === filePath) return;
-
-        const src = info.path;
-        const name = src.split('/').pop();
-        const dst  = `${filePath}/${name}`;
-
-        try {
-            await invoke('move_file_or_folder', { src, dst });
-            selectedCursor.set(dst);
-            relativeFilePath.set(dst);
-            await refreshList();
-            addToast("Item moved.", "success");
-        } catch (e) {
-            console.error('Failed to move file:', e);
-            addToast("Failed to move item.");
-        }
-    }
+    onDestroy(() => {
+        if (hoverExpandTimer) clearTimeout(hoverExpandTimer);
+    });
 </script>
 
-<li draggable={!dragDisabled}
-    class:drag-over-target={isDragOver}
+<li data-drop-dir={node.type_ === NodeType.Directory ? filePath : undefined}
+    class:drag-over-target={$dropTargetPath === filePath}
     class:dragging={isDragging}
-    on:dragstart={onDragStart}
-    on:dragend={onDragEnd}
-    on:dragenter={onDragEnter}
-    on:dragover={onDragOver}
-    on:dragleave={onDragLeave}
-    on:drop={onDrop}
+    on:pointerdown={(e) => onNodePointerDown(e, filePath)}
     >
     <div class="flex items-center">
         {#if node.type_ === NodeType.Directory}
@@ -270,20 +221,20 @@
                     on:click={(event) => createItem(event, "File")}
                     class="cursor-pointer w-4 h-4 ml-1"
                 >
-                    <FaFileMedical />
+                    <FilePlus size="100%" />
                 </button>
                 <button
                     on:click={(event) => createItem(event, "Directory")}
                     class="cursor-pointer w-4 h-4 ml-1"
                 >
-                    <FaFolderPlus />
+                    <FolderPlus size="100%" />
                 </button>
             {/if}
             <button
                 on:click={confirmDeleteItem}
                 class="cursor-pointer w-4 h-4 ml-1"
             >
-                <FaTrash />
+                <Trash2 size="100%" />
             </button>
         {/if}
     </div>
@@ -326,15 +277,19 @@
         background-color: var(--button-selected-bg-color);
         color: var(--button-selected-text-color);
     }
+    /* 드롭 대상: 흐려지는 대신 뚜렷한 테두리 + 배경 강조로 표시 */
     .drag-over-target {
-        background-color: var(--button-selected-bg-color);
-        opacity: 0.5;
+        outline: 2px dashed var(--accent-color);
+        outline-offset: -2px;
+        border-radius: 0.25rem;
+        background-color: var(--button-hover-bg-color);
     }
     .dragging {
         opacity: 0.5;
     }
     .text-hidden {
         color: var(--reverse-third-color);
+        font-style: italic;
     }
     .bg-selected-file.text-hidden {
         color: var(--reverse-third-color-selected);

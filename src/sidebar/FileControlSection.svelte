@@ -25,13 +25,12 @@
 </script>
 
 <script lang="ts">
-    import FaSearch from "svelte-icons/fa/FaSearch.svelte";
-    import IoMdRefresh from "svelte-icons/io/IoMdRefresh.svelte";
-    import FaFileMedical from "svelte-icons/fa/FaFileMedical.svelte";
-    import FaFolderPlus from "svelte-icons/fa/FaFolderPlus.svelte";
+    import { Search, RefreshCw, FilePlus, FolderPlus } from "lucide-svelte";
     import TreeNode from "./TreeNode.svelte";
     import { onMount } from "svelte";
-    import { selectedCursor, relativeFilePath, draggingInfo, isEditingFileName, gotoLine } from "../stores";
+    import { selectedCursor, relativeFilePath, gotoLine } from "../stores";
+    import { dropTargetPath, registerMoveHandler, HOVER_EXPAND_MS } from "./treeDrag";
+    import { onDestroy } from "svelte";
 
     interface SearchMatch {
         file_path: string;
@@ -49,7 +48,6 @@
     let searchTerm: string = "";
     let activeSection: string | null = null;
     let initialized = false;
-    let dragOverSection: string | null = null;
 
     let searchResults: GroupedResult[] = [];
     let isSearching = false;
@@ -74,6 +72,37 @@
         }
     }
 
+    // 드래그 중 닫힌 섹션 헤더 위에 잠시 머물면 자동으로 열기
+    let sectionHoverTimer: ReturnType<typeof setTimeout> | null = null;
+    let sectionHoverName: string | null = null;
+    $: {
+        const target = $dropTargetPath;
+        const hovered = target
+            ? $directoryStructure.find(s => `/${s.name}` === target)?.name ?? null
+            : null;
+        if (hovered && hovered !== activeSection) {
+            if (sectionHoverName !== hovered) {
+                if (sectionHoverTimer) clearTimeout(sectionHoverTimer);
+                sectionHoverName = hovered;
+                sectionHoverTimer = setTimeout(() => {
+                    activeSection = sectionHoverName;
+                    sectionHoverTimer = null;
+                    sectionHoverName = null;
+                }, HOVER_EXPAND_MS);
+            }
+        } else {
+            if (sectionHoverTimer) {
+                clearTimeout(sectionHoverTimer);
+                sectionHoverTimer = null;
+            }
+            sectionHoverName = null;
+        }
+    }
+
+    onDestroy(() => {
+        if (sectionHoverTimer) clearTimeout(sectionHoverTimer);
+    });
+
     async function createInSection(event: MouseEvent, sectionName: string, createType: string) {
         event.stopPropagation();
         try {
@@ -94,31 +123,9 @@
         }
     }
 
-    function onSectionDragOver(event: DragEvent, sectionName: string) {
-        if ($isEditingFileName) return;
-        event.preventDefault();
-        event.stopPropagation();
-        event.dataTransfer!.dropEffect = 'move';
-        dragOverSection = sectionName;
-    }
-
-    function onSectionDragLeave(event: DragEvent) {
-        event.stopPropagation();
-        dragOverSection = null;
-    }
-
-    async function onSectionDrop(event: DragEvent, sectionName: string) {
-        if ($isEditingFileName) return;
-        event.preventDefault();
-        event.stopPropagation();
-        dragOverSection = null;
-
-        const info = $draggingInfo;
-        if (!info) return;
-
-        const src = info.path;
+    registerMoveHandler(async (src: string, dstDir: string) => {
         const name = src.split('/').pop();
-        const dst = `/${sectionName}/${name}`;
+        const dst = `${dstDir}/${name}`;
 
         // 같은 위치면 무시
         if (src === dst) return;
@@ -133,7 +140,7 @@
             console.error('Failed to move file:', e);
             addToast("Failed to move item.");
         }
-    }
+    });
 
     function groupByFile(matches: SearchMatch[]): GroupedResult[] {
         const map = new Map<string, { is_hidden: boolean; items: { line_num: number; line_text: string }[] }>();
@@ -203,7 +210,7 @@
     }
 </script>
 
-<div class="flex flex-col h-full">
+<div class="flex flex-col h-full" style="font-family: var(--font-mono);">
     <!-- 검색 영역 -->
     <div class="flex space-x-2 h-6 mb-4" style="flex-wrap: nowrap;">
         <input
@@ -216,12 +223,12 @@
         />
         <button on:click={doSearch} title="Search">
             <div class="w-5 h-5">
-                <FaSearch />
+                <Search size="100%" />
             </div>
         </button>
         <button on:click={refreshList} title="Refresh">
             <div class="w-5 h-5">
-                <IoMdRefresh />
+                <RefreshCw size="100%" />
             </div>
         </button>
     </div>
@@ -266,12 +273,10 @@
         <div class="section-accordion">
             {#each $directoryStructure as section}
                 <button class="section-header"
+                    data-drop-dir={`/${section.name}`}
                     class:active={activeSection === section.name}
-                    class:drag-over-section={dragOverSection === section.name}
+                    class:drag-over-section={$dropTargetPath === `/${section.name}`}
                     on:click={() => toggleSection(section.name)}
-                    on:dragover={(e) => onSectionDragOver(e, section.name)}
-                    on:dragleave={onSectionDragLeave}
-                    on:drop={(e) => onSectionDrop(e, section.name)}
                 >
                     <span class="section-arrow">{activeSection === section.name ? '\u25BC' : '\u25B6'}</span>
                     <span class="section-name">{section.name}</span>
@@ -281,14 +286,14 @@
                             on:click|stopPropagation={(e) => createInSection(e, section.name, "File")}
                             title="New file"
                         >
-                            <div class="w-3 h-3"><FaFileMedical /></div>
+                            <div class="w-3 h-3"><FilePlus size="100%" /></div>
                         </button>
                         <button
                             class="section-action-btn"
                             on:click|stopPropagation={(e) => createInSection(e, section.name, "Directory")}
                             title="New folder"
                         >
-                            <div class="w-3 h-3"><FaFolderPlus /></div>
+                            <div class="w-3 h-3"><FolderPlus size="100%" /></div>
                         </button>
                     </span>
                 </button>
@@ -389,9 +394,12 @@
         min-height: 0;
     }
 
+    /* 드롭 대상 섹션: 흐려지는 대신 뚜렷한 테두리 + 배경 강조로 표시 */
     .drag-over-section {
-        background-color: var(--button-selected-bg-color);
-        opacity: 0.5;
+        outline: 2px dashed var(--accent-color);
+        outline-offset: -2px;
+        background-color: var(--button-hover-bg-color);
+        opacity: 1;
     }
 
     /* ── Search Results ── */
@@ -451,6 +459,11 @@
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+    }
+
+    .result-file.text-hidden {
+        color: var(--reverse-third-color);
+        font-style: italic;
     }
 
     .result-file-path {

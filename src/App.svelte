@@ -8,10 +8,12 @@
   import TopBar from "./topbar/TopBar.svelte";
   import { GLOBAL_FUNCTIONS } from "./context";
   import Toast from "./component/Toast.svelte";
+  import StatusBar from "./component/StatusBar.svelte";
   import PluginResultPopup from "./sidebar/PluginResultPopup.svelte";
   import PluginDownloadPopup from "./sidebar/PluginDownloadPopup.svelte";
   import { handleShortcutEvent, buildShortcutMap, registerAction } from "./shortcut";
-  import { addToast, selectedCursor, isEditingFileName, isEditingContent, renamingPath } from "./stores";
+  import { selectedCursor, isEditingFileName, isEditingContent, renamingPath } from "./stores";
+  import { dispatchPluginActions } from "./pluginActions";
   import type { PluginAction, DownloadItem } from "./types/setting";
   import "./theme"; // Initialize theme on app startup
 
@@ -45,23 +47,18 @@
 
   onMount(async () => {
     unlisten = await listen<PluginAction>("plugin-hook-action", (event) => {
-      const action = event.payload;
-      if (action.type === "toast" && action.content) {
-        addToast(
-          action.content.message,
-          action.content.toast_type === "success" ? "success" : "error"
-        );
-      } else if (action.type === "refresh_tree") {
-        refreshList();
-      } else if (action.type === "show_result" && action.content) {
-        hookResultTitle = action.content.title;
-        hookResultBody = action.content.body ?? "";
-        hookResultPages = action.content.pages ?? [];
-        showHookResult = true;
-      } else if (action.type === "download_files" && action.content) {
-        hookDownloadItems = action.content.items;
-        showHookDownload = true;
-      }
+      dispatchPluginActions([event.payload], {
+        onShowResult: (title, body, pages) => {
+          hookResultTitle = title;
+          hookResultBody = body;
+          hookResultPages = pages ?? [];
+          showHookResult = true;
+        },
+        onDownloadFiles: (items) => {
+          hookDownloadItems = items;
+          showHookDownload = true;
+        },
+      });
     });
   });
 
@@ -72,12 +69,15 @@
 
 <svelte:window on:keydown={handleShortcutEvent} />
 
-<div class="flex h-screen">
-  <Sidebar {isMenuOpen} {toggleMenu} />
-  <div class="flex-grow flex flex-col bg-maincontent">
-    <TopBar {isMenuOpen} {toggleMenu} />
-    <MainContent />
+<div class="flex flex-col h-screen">
+  <div class="flex flex-1 min-h-0">
+    <Sidebar {isMenuOpen} {toggleMenu} />
+    <div class="flex-grow flex flex-col bg-maincontent min-w-0">
+      <TopBar {isMenuOpen} {toggleMenu} />
+      <MainContent />
+    </div>
   </div>
+  <StatusBar />
 </div>
 
 <Toast />

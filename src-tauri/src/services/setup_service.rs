@@ -2,12 +2,19 @@ use std::path::Path;
 use anyhow::{Result, bail};
 use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
-use crate::services::ssh_service::{get_channel_session, get_sftp_session, execute_ssh_command, get_server_home_path};
+use crate::services::ssh_service::{get_channel_session, get_sftp_session, execute_ssh_command, execute_ssh_command_checked, get_server_home_path};
+use crate::utils::shell::quote as shq;
 
-/// channel 생성 + 명령 실행을 한 줄로 처리
+/// channel 생성 + 명령 실행을 한 줄로 처리 (비0 종료가 정상인 확인용 명령)
 fn run_ssh(cmd: &str) -> Result<String> {
     let mut channel = get_channel_session()?;
     execute_ssh_command(&mut channel, cmd)
+}
+
+/// channel 생성 + 명령 실행 + exit code 확인 (변경 작업용)
+fn run_ssh_checked(cmd: &str) -> Result<String> {
+    let mut channel = get_channel_session()?;
+    execute_ssh_command_checked(&mut channel, cmd)
 }
 
 const GREEK_NAMES: [&str; 24] = [
@@ -93,7 +100,13 @@ pub fn get_latest_hugo_version() -> Result<String> {
 /// Install Hugo on the server
 /// Returns the absolute path to the installed hugo binary
 pub fn install_hugo(os: &str, arch: &str, version: &str) -> Result<String> {
-    run_ssh("mkdir -p ~/.local/bin")?;
+    // URL 조립에 들어가는 값들 검증 (셸 명령 문자열에 삽입됨)
+    let token_ok = |s: &str| !s.is_empty()
+        && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-' || c == '_');
+    if !token_ok(os) || !token_ok(arch) || !token_ok(version) {
+        bail!("Invalid platform/version: {} {} {}", os, arch, version);
+    }
+    run_ssh_checked("mkdir -p ~/.local/bin")?;
 
     // Build download URL
     let platform = if os == "Darwin" {
@@ -106,13 +119,13 @@ pub fn install_hugo(os: &str, arch: &str, version: &str) -> Result<String> {
         version, version, platform
     );
 
-    run_ssh(&format!("curl -sL '{}' -o /tmp/hugo_extended.tar.gz", url))?;
-    run_ssh("tar -xzf /tmp/hugo_extended.tar.gz -C ~/.local/bin/ hugo")?;
+    run_ssh_checked(&format!("curl -sL '{}' -o /tmp/hugo_extended.tar.gz", url))?;
+    run_ssh_checked("tar -xzf /tmp/hugo_extended.tar.gz -C ~/.local/bin/ hugo")?;
     run_ssh("rm -f /tmp/hugo_extended.tar.gz")?;
-    run_ssh("chmod +x ~/.local/bin/hugo")?;
+    run_ssh_checked("chmod +x ~/.local/bin/hugo")?;
 
     // Verify
-    let verify = run_ssh("~/.local/bin/hugo version")?;
+    let verify = run_ssh_checked("~/.local/bin/hugo version")?;
     if verify.trim().is_empty() {
         bail!("Hugo installation verification failed");
     }
@@ -152,7 +165,7 @@ pub fn generate_site_name() -> Result<(String, String)> {
 
 /// Create a new Hugo site at the given path
 pub fn create_hugo_site(hugo_cmd_path: &str, site_path: &str) -> Result<()> {
-    run_ssh(&format!("{} new site {}", hugo_cmd_path, site_path))?;
+    run_ssh_checked(&format!("{} new site {}", shq(hugo_cmd_path), shq(site_path)))?;
     // Verify site was created
     let sftp = get_sftp_session()?;
     if sftp.stat(Path::new(site_path)).is_err() {
@@ -164,7 +177,7 @@ pub fn create_hugo_site(hugo_cmd_path: &str, site_path: &str) -> Result<()> {
 
 /// Initialize git repo in the site directory
 pub fn git_init_site(site_path: &str) -> Result<()> {
-    run_ssh(&format!("cd {} && git init", site_path))?;
+    run_ssh_checked(&format!("cd {} && git init", shq(site_path)))?;
     Ok(())
 }
 
@@ -182,10 +195,17 @@ pub fn install_theme(theme_url: &str, site_path: &str) -> Result<String> {
         .unwrap_or("theme")
         .to_string();
 
+    // theme_name은 경로/설정 파일에 삽입되므로 안전한 문자만 허용
+    if theme_name.is_empty()
+        || !theme_name.chars().all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-' || c == '_')
+    {
+        bail!("Invalid theme name derived from URL: {:?}", theme_name);
+    }
+
     // git submodule add
-    run_ssh(&format!(
+    run_ssh_checked(&format!(
         "cd {} && git submodule add {} themes/{}",
-        site_path, theme_url, theme_name
+        shq(site_path), shq(theme_url), theme_name
     ))?;
     // Verify theme directory exists
     let sftp = get_sftp_session()?;
@@ -196,7 +216,7 @@ pub fn install_theme(theme_url: &str, site_path: &str) -> Result<String> {
 
     // Append theme to hugo.toml
     let config_path = format!("{}/hugo.toml", site_path);
-    run_ssh(&format!("printf '\\ntheme = \"{}\"\\n' >> {}", theme_name, config_path))?;
+    run_ssh_checked(&format!("printf '\\ntheme = \"{}\"\\n' >> {}", theme_name, shq(&config_path)))?;
 
     Ok(theme_name)
 }

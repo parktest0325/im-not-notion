@@ -14,18 +14,18 @@
 </script>
 
 <div class="fixed inset-0 bg-black/70 z-[65] flex items-center justify-center" role="dialog">
-  <div class="bg-zinc-900 border border-zinc-700 rounded-lg w-[400px] p-5">
+  <div class="modal-surface rounded-lg w-[400px] p-5">
     <h3 class="text-sm font-semibold mb-2">{title}</h3>
-    <p class="text-xs text-zinc-300 mb-4 whitespace-pre-line">{message}</p>
+    <p class="text-xs mb-4 whitespace-pre-line">{message}</p>
     <div class="flex gap-2 justify-end">
       <button
-        class="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 rounded text-xs"
+        class="px-3 py-1  rounded text-xs"
         on:click={onCancel}
       >
         {cancelLabel}
       </button>
       <button
-        class="px-3 py-1 rounded text-xs font-medium {danger ? 'bg-red-700 hover:bg-red-600' : 'bg-blue-700 hover:bg-blue-600'}"
+        class="px-3 py-1 rounded text-xs font-medium {danger ? 'btn-danger-solid' : 'btn-primary'}"
         on:click={onConfirm}
       >
         {confirmLabel}

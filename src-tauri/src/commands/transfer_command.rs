@@ -36,23 +36,35 @@ pub fn check_download_conflicts(
 }
 
 #[tauri::command]
-pub fn upload_to_remote(
+pub async fn upload_to_remote(
     local_paths: Vec<String>,
     remote_dir: String,
     policy: ConflictPolicy,
     app: AppHandle,
 ) -> Result<String, InvokeError> {
-    svc_upload(local_paths, remote_dir, policy, app).map_err(to_invoke)
+    // 대용량 전송은 blocking pool에서 — 메인 스레드에서 실행하면 UI와
+    // transfer:progress 이벤트 렌더링이 전송 내내 멈춘다
+    tauri::async_runtime::spawn_blocking(move || {
+        svc_upload(local_paths, remote_dir, policy, app)
+    })
+    .await
+    .map_err(|e| InvokeError::from(format!("Upload task panicked: {}", e)))?
+    .map_err(to_invoke)
 }
 
 #[tauri::command]
-pub fn download_to_local(
+pub async fn download_to_local(
     remote_paths: Vec<String>,
     local_dir: String,
     policy: ConflictPolicy,
     app: AppHandle,
 ) -> Result<String, InvokeError> {
-    svc_download(remote_paths, local_dir, policy, app).map_err(to_invoke)
+    tauri::async_runtime::spawn_blocking(move || {
+        svc_download(remote_paths, local_dir, policy, app)
+    })
+    .await
+    .map_err(|e| InvokeError::from(format!("Download task panicked: {}", e)))?
+    .map_err(to_invoke)
 }
 
 /* ===== Remote file operations ===== */

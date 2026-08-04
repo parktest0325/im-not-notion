@@ -41,7 +41,7 @@
   }
 
   async function startTerminal() {
-    if (started) return;
+    if (started || terminal) return; // 이전 인스턴스가 남아있으면 중복 생성 금지
     await tick();
     if (!termContainer) return;
 
@@ -49,7 +49,7 @@
     terminal = new Terminal({
       cursorBlink: true,
       fontSize: 14,
-      fontFamily: "'Menlo', 'Monaco', 'Courier New', monospace",
+      fontFamily: "'D2Coding', 'Menlo', 'Monaco', 'Courier New', monospace",
       theme: {
         background: cs.getPropertyValue("--terminal-bg").trim() || "#1e1e1e",
         foreground: cs.getPropertyValue("--terminal-fg").trim() || "#d4d4d4",
@@ -128,7 +128,9 @@
 
   $: if (show) {
     startTerminal();
-  } else if (!show && started) {
+  } else {
+    // started 여부와 무관하게 정리 — 시작 실패 시에도 xterm 인스턴스가
+    // 컨테이너에 남아 재오픈 때 중첩 생성되는 것을 방지
     stopTerminal();
   }
 

@@ -8,6 +8,7 @@
   import PluginProgressModal from "./PluginProgressModal.svelte";
   import PluginPromptModal from "./PluginPromptModal.svelte";
   import { addToast, triggerPluginShortcut } from "../stores";
+  import { dispatchPluginActions } from "../pluginActions";
   import type { PluginInfo, InputField, DownloadItem, AppConfig, PluginResult } from "../types/setting";
   import type { PluginProgress, PluginPrompt } from "../types/generated";
   import { registerAction, unregisterAction, pluginShortcutDefs, buildShortcutMap } from "../shortcut";
@@ -230,9 +231,13 @@
     }
   }
 
+  let fastPathRunning = false;
+
   async function openManualInput(plugin: PluginInfo, inputFields: InputField[]) {
     // Listeners live on this panel (onMount), so the fast-path is safe.
     if (inputFields.length === 0) {
+      if (fastPathRunning) return; // 같은 트리거 연타로 동시 실행 방지
+      fastPathRunning = true;
       progress = null;
       prompt = null;
       try {
@@ -246,22 +251,15 @@
         } else {
           addToast(result.error ?? "Plugin failed.");
         }
-        if (result.actions) {
-          for (const action of result.actions) {
-            if (action.type === "refresh_tree") handleRefreshTree();
-            else if (action.type === "toast" && action.content) {
-              addToast(action.content.message, action.content.toast_type === "success" ? "success" : "error");
-            } else if (action.type === "show_result" && action.content) {
-              handleShowResult(action.content.title, action.content.body ?? "", action.content.pages);
-            } else if (action.type === "download_files" && action.content) {
-              handleDownloadFiles(action.content.items);
-            }
-          }
-        }
+        dispatchPluginActions(result.actions, {
+          onShowResult: handleShowResult,
+          onDownloadFiles: handleDownloadFiles,
+        });
       } catch (error) {
         console.error("Plugin execution failed:", error);
         addToast("Plugin execution failed.");
       } finally {
+        fastPathRunning = false;
         progress = null;
         prompt = null;
       }
@@ -307,12 +305,6 @@
     } catch (error) {
       addToast(`Failed to open editor: ${error}`);
     }
-  }
-
-  async function handleRefreshTree() {
-    try {
-      await invoke("get_file_tree");
-    } catch (_) {}
   }
 
   function handleShowResult(title: string, body: string, pages?: any[]) {
@@ -506,7 +498,6 @@
   inputFields={selectedInputFields}
   onClose={() => { showInputPopup = false; }}
   onComplete={() => { progress = null; prompt = null; }}
-  onRefreshTree={handleRefreshTree}
   onShowResult={handleShowResult}
   onDownloadFiles={handleDownloadFiles}
 />

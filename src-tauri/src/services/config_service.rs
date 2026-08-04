@@ -28,15 +28,22 @@ pub fn load_app_config() -> Result<AppConfig> {
         if !ssh_config.host.is_empty() {
             if let Ok(()) = connect_ssh_with_config(&ssh_config) {
                 // 3. 연결 성공하면 서버 설정 로드
-                let sftp = get_sftp_session()?;
-                let home_path = get_server_home_path()?;
-                config.load_server_config(&sftp, &home_path)?;
+                // 실패해도 로컬 설정은 살린다 — 여기서 에러를 전파하면
+                // APP_CONFIG가 None으로 남아 이후 모든 커맨드가 실패한다
+                let server_result = (|| -> Result<()> {
+                    let sftp = get_sftp_session()?;
+                    let home_path = get_server_home_path()?;
+                    config.load_server_config(&sftp, &home_path)
+                })();
+                if let Err(e) = server_result {
+                    eprintln!("Failed to load server config: {:#}", e);
+                }
             }
         }
     }
 
     // 4. 메모리에 저장
-    *APP_CONFIG.lock().unwrap() = Some(config.clone());
+    *APP_CONFIG.lock().unwrap_or_else(|p| p.into_inner()) = Some(config.clone());
 
     Ok(config)
 }
@@ -64,7 +71,7 @@ pub fn save_app_config(mut new_config: AppConfig) -> Result<()> {
     }
 
     // 4. 메모리에 저장
-    *APP_CONFIG.lock().unwrap() = Some(new_config);
+    *APP_CONFIG.lock().unwrap_or_else(|p| p.into_inner()) = Some(new_config);
 
     Ok(())
 }
@@ -80,6 +87,10 @@ pub fn switch_server(servers: Vec<crate::types::config::ServerEntry>, server_id:
     config.cms_config = CmsConfig::default();
     config.shortcuts = HashMap::new();
 
+    // 서버 목록을 먼저 로컬에 저장 — 연결에 실패해도(오프라인 서버 추가 등)
+    // UI에서 편집한 서버 목록이 사라지지 않도록 한다
+    config.save_client_config()?;
+
     // 새 서버로 SSH 연결
     if let Some(ssh_config) = config.get_active_ssh_config() {
         reconnect_ssh_with_config(&ssh_config)?;
@@ -88,15 +99,13 @@ pub fn switch_server(servers: Vec<crate::types::config::ServerEntry>, server_id:
         config.load_server_config(&sftp, &home_path)?;
     }
 
-    // 로컬에 저장 (서버 목록 + active_server)
-    config.save_client_config()?;
-    *APP_CONFIG.lock().unwrap() = Some(config.clone());
+    *APP_CONFIG.lock().unwrap_or_else(|p| p.into_inner()) = Some(config.clone());
     Ok(config)
 }
 
 /// 플러그인 로컬 경로만 저장 (ClientConfig만 업데이트, SSH 재연결 없음)
 pub fn save_plugin_local_path(path: String) -> Result<()> {
-    let mut guard = APP_CONFIG.lock().unwrap();
+    let mut guard = APP_CONFIG.lock().unwrap_or_else(|p| p.into_inner());
     if let Some(ref mut config) = *guard {
         config.plugin_local_path = path;
         config.save_client_config()?;
@@ -106,7 +115,7 @@ pub fn save_plugin_local_path(path: String) -> Result<()> {
 
 /// 다운로드 경로 저장 (ClientConfig만 업데이트)
 pub fn save_download_path(path: String) -> Result<()> {
-    let mut guard = APP_CONFIG.lock().unwrap();
+    let mut guard = APP_CONFIG.lock().unwrap_or_else(|p| p.into_inner());
     if let Some(ref mut config) = *guard {
         config.download_path = path;
         config.save_client_config()?;
@@ -116,7 +125,7 @@ pub fn save_download_path(path: String) -> Result<()> {
 
 /// 현재 다운로드 경로 반환 (빈 경우 OS 기본 Downloads 폴더)
 pub fn get_download_path() -> String {
-    let guard = APP_CONFIG.lock().unwrap();
+    let guard = APP_CONFIG.lock().unwrap_or_else(|p| p.into_inner());
     let configured = guard
         .as_ref()
         .map(|c| c.download_path.clone())
@@ -131,13 +140,13 @@ pub fn get_download_path() -> String {
 }
 
 pub fn get_app_config() -> Result<AppConfig> {
-    APP_CONFIG.lock().unwrap()
+    APP_CONFIG.lock().unwrap_or_else(|p| p.into_inner())
         .clone()
         .context("APP_CONFIG not initialized")
 }
 
 pub fn get_hugo_config() -> Result<HugoConfig> {
-    APP_CONFIG.lock().unwrap()
+    APP_CONFIG.lock().unwrap_or_else(|p| p.into_inner())
         .clone()
         .context("APP_CONFIG not initialized")
         .map(|c| c.cms_config.hugo_config)

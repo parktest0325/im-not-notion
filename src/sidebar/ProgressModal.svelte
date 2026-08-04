@@ -33,36 +33,36 @@
 
 {#if progress}
 <div class="fixed inset-0 bg-black/70 z-[70] flex items-center justify-center" role="dialog">
-  <div class="bg-zinc-900 border border-zinc-700 rounded-lg w-[420px] p-5">
+  <div class="modal-surface rounded-lg w-[420px] p-5">
     <h3 class="text-sm font-semibold mb-3">
       {phaseLabel(progress.phase)}
     </h3>
 
     {#if progress.phase === "error"}
-      <p class="text-red-400 text-xs mb-3">{progress.error ?? "Unknown error"}</p>
+      <p class="text-danger text-xs mb-3">{progress.error ?? "Unknown error"}</p>
     {/if}
 
     <div class="mb-2">
-      <div class="flex justify-between text-xs text-zinc-400 mb-1">
+      <div class="flex justify-between text-xs text-muted-2 mb-1">
         <span class="truncate flex-1 mr-2">{progress.current_file || ""}</span>
         <span>{Math.round(pct)}%</span>
       </div>
-      <div class="h-2 bg-zinc-800 rounded overflow-hidden">
-        <div class="h-full bg-blue-500 transition-all" style="width: {pct}%"></div>
+      <div class="h-2 surface-2 rounded overflow-hidden">
+        <div class="h-full fill-info transition-all" style="width: {pct}%"></div>
       </div>
       {#if progress.total_bytes > 0}
-        <div class="text-[10px] text-zinc-500 mt-1">
+        <div class="text-[10px] text-muted-2 mt-1">
           {fmtSize(progress.current_bytes)} / {fmtSize(progress.total_bytes)}
         </div>
       {/if}
     </div>
 
     {#if progress.files_total > 0}
-      <div class="text-xs text-zinc-400">
+      <div class="text-xs text-muted-2">
         Files {progress.files_done} / {progress.files_total}
       </div>
-      <div class="h-1 bg-zinc-800 rounded overflow-hidden mt-1">
-        <div class="h-full bg-emerald-500 transition-all" style="width: {filePct}%"></div>
+      <div class="h-1 surface-2 rounded overflow-hidden mt-1">
+        <div class="h-full fill-success transition-all" style="width: {filePct}%"></div>
       </div>
     {/if}
   </div>

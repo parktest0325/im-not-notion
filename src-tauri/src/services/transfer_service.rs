@@ -17,7 +17,7 @@ use tar::Builder;
 use tauri::Emitter;
 use walkdir::WalkDir;
 
-use crate::services::ssh_service::{execute_ssh_command, get_channel_session, get_sftp_session};
+use crate::services::ssh_service::{execute_ssh_command, execute_ssh_command_checked, get_channel_session, get_sftp_session};
 
 /* ===== Types ===== */
 
@@ -65,10 +65,7 @@ fn emit_progress(app: &tauri::AppHandle, p: &TransferProgress) {
     let _ = app.emit("transfer:progress", p);
 }
 
-/// Quote a path for safe inclusion in a single SSH command line.
-fn shq(s: &str) -> String {
-    format!("'{}'", s.replace('\'', "'\\''"))
-}
+use crate::utils::shell::quote as shq;
 
 /* ===== Conflict check ===== */
 
@@ -258,7 +255,7 @@ fn upload_inner(
     });
     let mut ch = get_channel_session()?;
     let mkdir_cmd = format!("mkdir -p {}", shq(&remote_dir));
-    execute_ssh_command(&mut ch, &mkdir_cmd)
+    execute_ssh_command_checked(&mut ch, &mkdir_cmd)
         .with_context(|| format!("mkdir failed: {}", mkdir_cmd))?;
     let mut ch = get_channel_session()?;
     let extract_cmd = format!(
@@ -266,7 +263,7 @@ fn upload_inner(
         shq(&remote_tar),
         shq(&remote_dir),
     );
-    execute_ssh_command(&mut ch, &extract_cmd)
+    execute_ssh_command_checked(&mut ch, &extract_cmd)
         .with_context(|| format!("tar extract failed: {}", extract_cmd))?;
 
     // ── Phase 4: Cleanup ──
@@ -363,7 +360,7 @@ fn download_inner(
         error: None,
     });
     let mut ch = get_channel_session()?;
-    execute_ssh_command(&mut ch, &pack_cmd)
+    execute_ssh_command_checked(&mut ch, &pack_cmd)
         .with_context(|| format!("tar pack failed: {}", pack_cmd))?;
 
     // ── Phase 2: SFTP download ──
@@ -400,19 +397,31 @@ fn download_inner(
         current_file: local_dir.clone(), error: None,
     });
     std::fs::create_dir_all(&local_dir)?;
-    extract_local_tar(&temp_tar, Path::new(&local_dir))?;
-
-    // For Rename policy, post-rename files on local side
-    if matches!(policy, ConflictPolicy::Rename) {
-        for (orig, archive_name) in &entries {
-            let from = PathBuf::from(&local_dir)
-                .join(Path::new(orig).file_name().unwrap_or_default());
-            let to = PathBuf::from(&local_dir).join(archive_name);
-            if from != to && from.exists() {
-                let _ = std::fs::rename(&from, &to);
+    // 스테이징 디렉토리에 풀고 정책이 정한 최종 이름으로 이동한다.
+    // (기존 파일 위에 원본 이름으로 풀고 나서 rename하던 방식은 Rename 정책이
+    //  보존하려던 기존 로컬 파일을 먼저 덮어써 파괴했다)
+    let staging = PathBuf::from(&local_dir).join(format!(".inn-extract-{}", id));
+    std::fs::create_dir_all(&staging)?;
+    let extract_result = (|| -> Result<()> {
+        extract_local_tar(&temp_tar, &staging)?;
+        for (orig, final_name) in &entries {
+            let src = staging.join(Path::new(orig).file_name().unwrap_or_default());
+            if !src.exists() { continue; }
+            let dst = PathBuf::from(&local_dir).join(final_name);
+            if dst.exists() {
+                // Overwrite 정책(또는 비충돌)에서만 도달 — 기존 항목을 교체
+                if dst.is_dir() {
+                    std::fs::remove_dir_all(&dst)?;
+                } else {
+                    std::fs::remove_file(&dst)?;
+                }
             }
+            std::fs::rename(&src, &dst)?;
         }
-    }
+        Ok(())
+    })();
+    let _ = std::fs::remove_dir_all(&staging);
+    extract_result?;
 
     // ── Phase 4: Cleanup ──
     emit_progress(app, &TransferProgress {

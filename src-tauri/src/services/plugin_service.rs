@@ -8,7 +8,7 @@ use anyhow::{Result, Context, anyhow, bail};
 use serde_json::{json, Value};
 use ssh2::Channel;
 use tauri::Emitter;
-use crate::services::ssh_service::{get_channel_session, get_sftp_session, execute_ssh_command, get_server_home_path};
+use crate::services::ssh_service::{get_channel_session, get_sftp_session, execute_ssh_command, execute_ssh_command_checked, get_server_home_path};
 use crate::services::config_service::get_hugo_config;
 use crate::services::file_service::{mkdir_recursive, rmrf_file};
 use crate::types::plugin::*;
@@ -19,6 +19,62 @@ const PLUGIN_DIR: &str = "$HOME/.inn_plugins";
 fn resolve_plugin_dir() -> Result<String> {
     let home = get_server_home_path()?;
     Ok(format!("{}/.inn_plugins", home))
+}
+
+/// 플러그인 이름 검증: 셸 명령/로컬·원격 경로에 그대로 삽입되므로
+/// 알파벳/숫자로 시작하는 [A-Za-z0-9_-]만 허용 (`..`, 따옴표, 공백 차단)
+fn validate_plugin_name(name: &str) -> Result<()> {
+    let mut chars = name.chars();
+    let valid = matches!(chars.next(), Some(c) if c.is_ascii_alphanumeric())
+        && chars.all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
+    if !valid {
+        bail!("Invalid plugin name: {:?}", name);
+    }
+    Ok(())
+}
+
+/// entry 검증: 상대경로 파일명만 허용 (`..`·절대경로·셸 특수문자 차단)
+fn validate_plugin_entry(entry: &str) -> Result<()> {
+    let valid = !entry.is_empty()
+        && !entry.starts_with('/')
+        && entry.split('/').all(|c| {
+            !c.is_empty() && c != ".." && c != "."
+                && c.chars().all(|ch| ch.is_ascii_alphanumeric() || ch == '.' || ch == '-' || ch == '_')
+        });
+    if !valid {
+        bail!("Invalid plugin entry: {:?}", entry);
+    }
+    Ok(())
+}
+
+/// cron 표현식 검증: `@daily` 형태 또는 5필드([0-9A-Za-z*/,-])만 허용
+fn validate_cron_schedule(schedule: &str) -> Result<()> {
+    let s = schedule.trim();
+    if let Some(keyword) = s.strip_prefix('@') {
+        if !keyword.is_empty() && keyword.chars().all(|c| c.is_ascii_alphanumeric()) {
+            return Ok(());
+        }
+        bail!("Invalid cron schedule: {:?}", schedule);
+    }
+    let fields: Vec<&str> = s.split_whitespace().collect();
+    let valid = fields.len() == 5
+        && fields.iter().all(|f| {
+            f.chars().all(|c| c.is_ascii_alphanumeric() || "*/,-".contains(c))
+        });
+    if !valid {
+        bail!("Invalid cron schedule: {:?}", schedule);
+    }
+    Ok(())
+}
+
+/// cron 라벨 검증: 마커/grep 패턴에 들어가므로 [A-Za-z0-9_-]만 허용
+fn validate_cron_label(label: &str) -> Result<()> {
+    let valid = !label.is_empty()
+        && label.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
+    if !valid {
+        bail!("Invalid cron label: {:?}", label);
+    }
+    Ok(())
 }
 
 // ============================================================
@@ -195,6 +251,7 @@ pub fn list_all_plugins(local_path: &str) -> Result<Vec<PluginInfo>> {
 
 /// 로컬 플러그인 하나를 서버에 설치 (tar 압축 → 단일 업로드 → 서버 해제)
 pub fn install_plugin(local_path: &str, plugin_name: &str) -> Result<()> {
+    validate_plugin_name(plugin_name)?;
     let sftp = get_sftp_session()?;
     let remote_base = resolve_plugin_dir()?;
 
@@ -215,7 +272,7 @@ pub fn install_plugin(local_path: &str, plugin_name: &str) -> Result<()> {
     // 3. 서버에서 기존 폴더 삭제 → 압축 해제 → tar.gz 삭제
     let remote_dir = format!("{}/{}", remote_base, plugin_name);
     let mut channel = get_channel_session()?;
-    execute_ssh_command(
+    execute_ssh_command_checked(
         &mut channel,
         &format!(
             "rm -rf '{}' && mkdir -p '{}' && tar -xzf '{}' -C '{}' && rm -f '{}' && find '{}' -type f \\( -name '*.py' -o -name '*.sh' -o -name '*.json' \\) -exec sed -i 's/\\r$//' {{}} +",
@@ -240,6 +297,7 @@ pub fn install_plugin(local_path: &str, plugin_name: &str) -> Result<()> {
 
 /// 서버에서 플러그인 삭제
 pub fn uninstall_plugin(plugin_name: &str) -> Result<()> {
+    validate_plugin_name(plugin_name)?;
     let mut sftp = get_sftp_session()?;
     let remote_dir = format!("{}/{}", resolve_plugin_dir()?, plugin_name);
     rmrf_file(&mut sftp, Path::new(&remote_dir))?;
@@ -255,6 +313,7 @@ pub fn uninstall_plugin(plugin_name: &str) -> Result<()> {
 
 /// 플러그인 활성화 (.disabled 마커 제거)
 pub fn enable_plugin(plugin_name: &str) -> Result<()> {
+    validate_plugin_name(plugin_name)?;
     let sftp = get_sftp_session()?;
     let marker = format!("{}/{}/.disabled", resolve_plugin_dir()?, plugin_name);
     // 파일이 있으면 삭제, 없으면 무시
@@ -264,6 +323,7 @@ pub fn enable_plugin(plugin_name: &str) -> Result<()> {
 
 /// 플러그인 비활성화 (.disabled 마커 생성)
 pub fn disable_plugin(plugin_name: &str) -> Result<()> {
+    validate_plugin_name(plugin_name)?;
     let sftp = get_sftp_session()?;
     let marker = format!("{}/{}/.disabled", resolve_plugin_dir()?, plugin_name);
     let mut file = sftp.create(Path::new(&marker))?;
@@ -447,6 +507,7 @@ fn run_ndjson_session(plugin_name: &str, initial_input: Value) -> Result<PluginR
 
 /// Manual 플러그인 실행
 pub fn execute_plugin(plugin_name: &str, input_json: &str) -> Result<PluginResult> {
+    validate_plugin_name(plugin_name)?;
     let hugo_config = get_hugo_config()?;
     let mut input: Value = serde_json::from_str(input_json).unwrap_or(json!({}));
     input["type"] = json!("input");
@@ -514,6 +575,10 @@ fn check_crontab_available() -> Result<()> {
 }
 
 pub fn register_cron(plugin_name: &str, schedule: &str, entry: &str, label: &str) -> Result<()> {
+    validate_plugin_name(plugin_name)?;
+    validate_cron_schedule(schedule)?;
+    validate_plugin_entry(entry)?;
+    validate_cron_label(label)?;
     check_crontab_available()?;
     let mut channel = get_channel_session()?;
 
@@ -537,24 +602,28 @@ pub fn register_cron(plugin_name: &str, schedule: &str, entry: &str, label: &str
         "{} cd {}/{} && {} # {}",
         schedule, PLUGIN_DIR, plugin_name, run_cmd, marker
     );
+    // 마커는 라인 끝에 있으므로 `$` 앵커로 정확히 매칭 (label이 다른 label의
+    // prefix일 때 무관한 항목까지 지워지는 것 방지; name/label은 검증됨)
     let cmd = format!(
-        "(crontab -l 2>/dev/null | grep -v '{marker}'; echo '{job}') | crontab -",
+        "(crontab -l 2>/dev/null | grep -v '{marker}$'; echo '{job}') | crontab -",
         marker = marker, job = job
     );
-    execute_ssh_command(&mut channel, &cmd)?;
+    execute_ssh_command_checked(&mut channel, &cmd)?;
     Ok(())
 }
 
 /// 특정 라벨의 cron 제거 (개별 Off)
 pub fn unregister_single_cron(plugin_name: &str, label: &str) -> Result<()> {
+    validate_plugin_name(plugin_name)?;
+    validate_cron_label(label)?;
     check_crontab_available()?;
     let mut channel = get_channel_session()?;
     let marker = format!("inn-plugin:{}:{}", plugin_name, label);
     let cmd = format!(
-        "crontab -l 2>/dev/null | grep -v '{}' | crontab -",
+        "crontab -l 2>/dev/null | grep -v '{}$' | crontab -",
         marker
     );
-    execute_ssh_command(&mut channel, &cmd)?;
+    execute_ssh_command_checked(&mut channel, &cmd)?;
     Ok(())
 }
 
@@ -577,13 +646,16 @@ pub fn list_registered_crons() -> Result<Vec<String>> {
 
 /// 플러그인의 모든 cron 제거 (disable/uninstall 용)
 pub fn unregister_cron(plugin_name: &str) -> Result<()> {
+    validate_plugin_name(plugin_name)?;
     let mut channel = get_channel_session()?;
-    let marker = format!("inn-plugin:{}", plugin_name);
+    // `:` 종결자로 플러그인 이름 경계를 고정 — `foo` 해제가 `foo-bar`의
+    // cron까지 지우지 않도록 한다
+    let marker = format!("inn-plugin:{}:", plugin_name);
     let cmd = format!(
         "crontab -l 2>/dev/null | grep -v '{}' | crontab -",
         marker
     );
-    execute_ssh_command(&mut channel, &cmd)?;
+    execute_ssh_command_checked(&mut channel, &cmd)?;
     Ok(())
 }
 
@@ -593,6 +665,7 @@ pub fn unregister_cron(plugin_name: &str) -> Result<()> {
 
 /// 서버에서 플러그인 전체를 로컬로 다운로드 (서버에서 tar → 단일 다운로드 → 로컬 해제)
 pub fn pull_plugin(local_path: &str, plugin_name: &str) -> Result<()> {
+    validate_plugin_name(plugin_name)?;
     let sftp = get_sftp_session()?;
     let remote_base = resolve_plugin_dir()?;
     let remote_dir = format!("{}/{}", remote_base, plugin_name);
@@ -600,7 +673,7 @@ pub fn pull_plugin(local_path: &str, plugin_name: &str) -> Result<()> {
 
     // 1. 서버에서 tar.gz 생성
     let mut channel = get_channel_session()?;
-    execute_ssh_command(
+    execute_ssh_command_checked(
         &mut channel,
         &format!("tar -czf '{}' -C '{}' .", remote_tar, remote_dir),
     )?;
