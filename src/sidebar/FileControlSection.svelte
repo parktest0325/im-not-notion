@@ -1,15 +1,31 @@
 <script context="module" lang="ts">
     import { invoke } from "@tauri-apps/api/core";
     import { writable } from "svelte/store";
-    import { isConnected, addToast } from "../stores";
-    import type { FileSystemNode } from "../types/setting";
+    import { isConnected, addToast, openTabs } from "../stores";
+    import { NodeType as NodeTypeM, type FileSystemNode } from "../types/setting";
 
     let directoryStructure = writable<FileSystemNode[]>([]);
+
+    function collectFilePaths(nodes: FileSystemNode[], parent: string, out: Set<string>) {
+        for (const n of nodes) {
+            const p = `${parent}/${n.name}`;
+            if (n.type_ === NodeTypeM.Directory) {
+                collectFilePaths(n.children, p, out);
+            } else {
+                out.add(p);
+            }
+        }
+    }
+
     export async function refreshList() {
         try {
             const data: FileSystemNode[] = await invoke("get_file_tree");
             directoryStructure.set(data);
             isConnected.set(true);
+            // 외부 변경(플러그인, 서버측 이동 등)으로 사라진 파일의 탭 정리
+            const valid = new Set<string>();
+            for (const sec of data) collectFilePaths(sec.children, `/${sec.name}`, valid);
+            openTabs.update((tabs) => tabs.filter((t) => valid.has(t)));
         } catch (error) {
             console.error("Failed to update file list:", error);
             directoryStructure.set([]);
@@ -26,7 +42,8 @@
 
 <script lang="ts">
     import { Search, RefreshCw, FilePlus, FolderPlus, ChevronsUpDown, ChevronsDownUp } from "lucide-svelte";
-    import { treeExpandSignal } from "../stores";
+    import { treeExpandSignal, renameOpenTabs, treeContextMenu, closeTabsUnder, renamingPath } from "../stores";
+    import ConfirmModal from "./ConfirmModal.svelte";
     import { NodeType } from "../types/setting";
     import TreeNode from "./TreeNode.svelte";
     import { onMount, afterUpdate } from "svelte";
@@ -136,6 +153,81 @@
         }
     }
 
+    // ── 트리 우클릭 컨텍스트 메뉴 ──
+    let pendingDeletePath: string | null = null;
+
+    async function menuCreate(createType: "File" | "Directory") {
+        const menu = $treeContextMenu;
+        treeContextMenu.set(null);
+        if (!menu) return;
+        try {
+            const basePath = createType === "Directory"
+                ? menu.path + "/new_folder/_index.md"
+                : menu.path + "/new_file.md";
+            const createdPath: string = await invoke("new_content_for_hugo", {
+                filePath: basePath,
+            });
+            if (menu.isSection) {
+                // 섹션이면 아코디언 열기
+                activeSection = menu.path.slice(1);
+            } else {
+                // 대상 폴더만 펼치기
+                treeExpandSignal.set({ prefix: menu.path, expand: true, seq: ++expandSeq, exact: true });
+                setTimeout(() => treeExpandSignal.set(null), 0);
+            }
+            selectedCursor.set(createdPath);
+            relativeFilePath.set(createdPath);
+            await refreshList();
+            addToast("Item created.", "success");
+        } catch (error) {
+            console.error("failed to create item:", error);
+            addToast("Failed to create item.");
+        }
+    }
+
+    function onSectionContextMenu(event: MouseEvent, sectionName: string) {
+        event.preventDefault();
+        event.stopPropagation();
+        treeContextMenu.set({
+            x: event.clientX,
+            y: event.clientY,
+            path: `/${sectionName}`,
+            isDir: true,
+            isSection: true,
+        });
+    }
+
+    function menuRename() {
+        const menu = $treeContextMenu;
+        treeContextMenu.set(null);
+        if (menu) renamingPath.set(menu.path);
+    }
+
+    function menuDelete() {
+        const menu = $treeContextMenu;
+        treeContextMenu.set(null);
+        if (menu) pendingDeletePath = menu.path;
+    }
+
+    async function confirmDelete() {
+        const target = pendingDeletePath;
+        pendingDeletePath = null;
+        if (!target) return;
+        try {
+            await invoke("remove_file", { path: target });
+            closeTabsUnder(target);
+            if ($relativeFilePath === target || $relativeFilePath.startsWith(target + "/")) {
+                selectedCursor.set("");
+                relativeFilePath.set("");
+            }
+            await refreshList();
+            addToast("Item deleted.", "success");
+        } catch (error) {
+            console.error("failed to delete item:", error);
+            addToast("Failed to delete item.");
+        }
+    }
+
     registerMoveHandler(async (src: string, dstDir: string) => {
         const name = src.split('/').pop();
         const dst = `${dstDir}/${name}`;
@@ -145,6 +237,7 @@
 
         try {
             await invoke('move_file_or_folder', { src, dst });
+            renameOpenTabs(src, dst); // 열려있는 탭 경로 갱신 (폴더면 하위 탭 포함)
             selectedCursor.set(dst);
             relativeFilePath.set(dst);
             await refreshList();
@@ -296,9 +389,16 @@
         if (hidden !== hiddenTagCount) hiddenTagCount = hidden;
     });
 
+    // 캡처 단계에서 처리 — 트리 항목들의 stopPropagation에 막히지 않고
+    // 어디를 클릭하든 메뉴가 닫힌다 (메뉴 내부 클릭만 예외)
     function onWindowClick(e: MouseEvent) {
         const t = e.target as HTMLElement;
         if (!t?.closest?.(".tag-popover, .tag-more")) showTagPopover = false;
+        if (!t?.closest?.(".tree-context-menu")) treeContextMenu.set(null);
+    }
+
+    function onWindowContextMenu() {
+        treeContextMenu.set(null);
     }
 
     function onSearchKeydown(e: KeyboardEvent) {
@@ -329,9 +429,9 @@
     }
 </script>
 
-<svelte:window on:click={onWindowClick} />
+<svelte:window on:click|capture={onWindowClick} on:contextmenu={onWindowContextMenu} />
 
-<div class="flex flex-col h-full" style="font-family: var(--font-mono);">
+<div class="flex flex-col h-full" style="font-family: var(--font-mono); font-size: 15px;">
     <!-- 검색 영역 -->
     <div class="flex space-x-2 h-6 mb-4" style="flex-wrap: nowrap;">
         <input
@@ -443,6 +543,7 @@
                     class:active={activeSection === section.name}
                     class:drag-over-section={$dropTargetPath === `/${section.name}`}
                     on:click={() => toggleSection(section.name)}
+                    on:contextmenu={(e) => onSectionContextMenu(e, section.name)}
                 >
                     <span class="section-arrow">{activeSection === section.name ? '\u25BC' : '\u25B6'}</span>
                     <span class="section-name">{section.name}</span>
@@ -478,7 +579,13 @@
                     </span>
                 </button>
                 {#if activeSection === section.name}
-                    <div class="section-content">
+                    <!-- 빈 배경 우클릭도 섹션 메뉴 (트리 항목의 우클릭은 전파가 막혀
+                         여기 도달하지 않으므로, 도달한 것 = 빈 영역) -->
+                    <div
+                        class="section-content"
+                        role="group"
+                        on:contextmenu={(e) => onSectionContextMenu(e, section.name)}
+                    >
                         <ul class="list-none p-0">
                             {#each section.children as node}
                                 <TreeNode path={`/${section.name}/`} {node} />
@@ -490,6 +597,43 @@
         </div>
     {/if}
 </div>
+
+<!-- 트리 우클릭 컨텍스트 메뉴 -->
+{#if $treeContextMenu}
+    <div class="tree-context-menu fixed z-[100] modal-surface rounded shadow-lg text-xs min-w-[150px]"
+         style="left: {$treeContextMenu.x}px; top: {$treeContextMenu.y}px; font-family: var(--font-ui);"
+         role="menu">
+        <!-- 대상 항목 표시 -->
+        <div class="menu-header" title={$treeContextMenu.path}>
+            {$treeContextMenu.isSection ? "🗂" : $treeContextMenu.isDir ? "📁" : "📄"} {$treeContextMenu.path.split("/").pop()}
+        </div>
+        <div class="border-t modal-divider"></div>
+        {#if $treeContextMenu.isDir}
+            <button class="w-full text-left px-3 py-1.5 btn-plain hover-surface" on:click={() => menuCreate("File")}>New file</button>
+            <button class="w-full text-left px-3 py-1.5 btn-plain hover-surface" on:click={() => menuCreate("Directory")}>New folder</button>
+        {/if}
+        {#if !$treeContextMenu.isSection}
+            {#if $treeContextMenu.isDir}<div class="border-t modal-divider"></div>{/if}
+            <button class="w-full text-left px-3 py-1.5 btn-plain hover-surface" on:click={menuRename}>Rename</button>
+            <div class="border-t modal-divider"></div>
+            <button class="w-full text-left px-3 py-1.5 btn-plain hover-surface text-danger" on:click={menuDelete}>Delete</button>
+        {/if}
+    </div>
+{/if}
+
+{#if pendingDeletePath}
+    <ConfirmModal
+        title="Delete"
+        message={`Delete this item?
+
+${pendingDeletePath}`}
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        danger
+        on:confirm={confirmDelete}
+        on:cancel={() => (pendingDeletePath = null)}
+    />
+{/if}
 
 <style>
     .section-accordion {
@@ -572,6 +716,18 @@
         flex: 1;
         overflow-y: auto;
         min-height: 0;
+    }
+
+    /* 컨텍스트 메뉴 헤더: 어떤 항목의 메뉴인지 표시 */
+    .menu-header {
+        padding: 0.35rem 0.75rem;
+        font-family: var(--font-mono);
+        font-weight: 700;
+        opacity: 0.75;
+        max-width: 240px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     /* ── 태그 필터 ── */

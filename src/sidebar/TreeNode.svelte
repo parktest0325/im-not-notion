@@ -1,14 +1,12 @@
 <script lang="ts">
-    import { FilePlus, FolderPlus, Trash2 } from "lucide-svelte";
     import { writable } from "svelte/store";
     import TreeNode from "./TreeNode.svelte";
-    import { relativeFilePath, selectedCursor, draggingInfo, isEditingFileName, renamingPath, addToast, treeExpandSignal } from "../stores";
+    import { relativeFilePath, selectedCursor, draggingInfo, isEditingFileName, renamingPath, addToast, treeExpandSignal, treeContextMenu, renameOpenTabs } from "../stores";
     import { dropTargetPath, onNodePointerDown, HOVER_EXPAND_MS } from "./treeDrag";
     import { onDestroy } from "svelte";
     import { type GlobalFunctions, GLOBAL_FUNCTIONS } from "../context";
     import { invoke } from "@tauri-apps/api/core";
     import { getContext } from "svelte";
-    import { slide } from "svelte/transition";
     import { NodeType, type FileSystemNode } from "../types/setting";
     import FolderClose from '../resource/InvaderClose.svelte';
     import FolderOpen from '../resource/InvaderOpen.svelte';
@@ -41,59 +39,20 @@
         }
     }
 
-    async function createItem(event: MouseEvent, createType: string) {
-        event.stopPropagation();
-        try {
-            const basePath = createType === "Directory"
-                ? filePath + "/new_folder/_index.md"
-                : filePath + "/new_file.md";
-            const createdPath: string = await invoke("new_content_for_hugo", {
-                filePath: basePath,
-            });
-            isExpanded.set(true);
-            selectedCursor.set(createdPath);
-            relativeFilePath.set(createdPath);
-            await refreshList();
-            addToast("Item created.", "success");
-        } catch (error) {
-            console.error("failed to create item:", error);
-            addToast("Failed to create item.");
-        }
-    }
-
     $: if ($selectedCursor) {
-        showDeleteConfirmation = false;
         isEditing = false;
         isEditingFileName.set(false);
     }
 
-    let showDeleteConfirmation = false;
-
-    function confirmDeleteItem(event: MouseEvent) {
+    function onContextMenu(event: MouseEvent) {
+        event.preventDefault();
         event.stopPropagation();
-        showDeleteConfirmation = true;
-    }
-
-    async function proceedDelete(confirmation: boolean) {
-        if (confirmation) {
-            await deleteItem();
-        }
-        showDeleteConfirmation = false;
-    }
-
-    async function deleteItem() {
-        try {
-            await invoke("remove_file", {
-                path: filePath,
-            });
-            selectedCursor.set("");
-            relativeFilePath.set("");
-            await refreshList();
-            addToast("Item deleted.", "success");
-        } catch (error) {
-            console.error("failed to rmrf:", error);
-            addToast("Failed to delete item.");
-        }
+        treeContextMenu.set({
+            x: event.clientX,
+            y: event.clientY,
+            path: filePath,
+            isDir: node.type_ === NodeType.Directory,
+        });
     }
 
     let isEditing = false;
@@ -112,6 +71,8 @@
                     src: filePath,
                     dst: dstPath,
                 });
+                // 열려있는 탭 경로 갱신 (폴더면 하위 탭도 함께) — 스토어 갱신 전에
+                renameOpenTabs(filePath, dstPath);
                 node.name = editableName;
                 selectedCursor.set(dstPath);
                 relativeFilePath.set(
@@ -146,11 +107,16 @@
     }
 
     $: isDragging = $draggingInfo?.path === filePath;
+    // 컨텍스트 메뉴가 이 항목을 대상으로 열려있는지
+    $: isMenuTarget = $treeContextMenu?.path === filePath;
 
     // 섹션 전체 펼치기/접기 신호 적용 (펼치기 중 새로 마운트되는 하위 노드도
     // 같은 flush 안에서 신호를 읽어 연쇄적으로 펼쳐진다)
+    // exact=true면 해당 경로의 폴더 하나만 펼친다
     $: if ($treeExpandSignal && node.type_ === NodeType.Directory
-        && (filePath + "/").startsWith($treeExpandSignal.prefix + "/")) {
+        && ($treeExpandSignal.exact
+            ? filePath === $treeExpandSignal.prefix
+            : (filePath + "/").startsWith($treeExpandSignal.prefix + "/"))) {
         isExpanded.set($treeExpandSignal.expand);
     }
 
@@ -180,8 +146,9 @@
     class:drag-over-target={$dropTargetPath === filePath}
     class:dragging={isDragging}
     on:pointerdown={(e) => onNodePointerDown(e, filePath)}
+    on:contextmenu={onContextMenu}
     >
-    <div class="flex items-center">
+    <div class="flex items-center" class:menu-target={isMenuTarget}>
         {#if node.type_ === NodeType.Directory}
             <button
                 on:click={(event) => {
@@ -222,53 +189,8 @@
             </button>
         {/if}
 
-        {#if $selectedCursor === filePath && !$isEditingFileName}
-            {#if node.type_ === NodeType.Directory}
-                <button
-                    on:click={(event) => createItem(event, "File")}
-                    class="cursor-pointer w-4 h-4 ml-1"
-                >
-                    <FilePlus size="100%" />
-                </button>
-                <button
-                    on:click={(event) => createItem(event, "Directory")}
-                    class="cursor-pointer w-4 h-4 ml-1"
-                >
-                    <FolderPlus size="100%" />
-                </button>
-            {/if}
-            <button
-                on:click={confirmDeleteItem}
-                class="cursor-pointer w-4 h-4 ml-1"
-            >
-                <Trash2 size="100%" />
-            </button>
-        {/if}
     </div>
 
-    {#if showDeleteConfirmation}
-        <div
-            transition:slide={{ duration: 300 }}
-            class="mt-2 p-3 rounded-md border-2"
-            style="background-color: var(--confirm-box-bg); color: var(--confirm-box-text); border-color: var(--confirm-box-border);"
-        >
-            <p class="text-sm">Are you sure you want to delete this item?</p>
-            <div class="flex justify-end space-x-2 mt-2">
-                <button
-                    class="px-4 py-1 rounded btn-danger focus:outline-none"
-                    on:click={() => proceedDelete(true)}
-                >
-                    Yes
-                </button>
-                <button
-                    class="px-4 py-1 rounded btn-cancel focus:outline-none"
-                    on:click={() => proceedDelete(false)}
-                >
-                    No
-                </button>
-            </div>
-        </div>
-    {/if}
     {#if node.type_ === NodeType.Directory && $isExpanded}
         <ul class="pl-4">
             {#each node.children as child}
@@ -280,9 +202,35 @@
 
 
 <style>
+    /* 트리 항목은 플랫하게 — 전역 버튼 스타일(둥근 테두리/그림자)이
+       새어 들어와 어중간한 둥근 네모로 보이는 것 방지 */
+    li :global(button) {
+        border: none;
+        background: none;
+        box-shadow: none;
+        border-radius: 3px;
+        padding-top: 1px;
+        padding-bottom: 1px;
+    }
+    li :global(button:hover) {
+        border: none;
+        background-color: var(--button-hover-bg-color);
+    }
+
+    /* 우클릭 메뉴의 대상 항목 표시 */
+    .menu-target {
+        outline: 1px solid var(--accent-color);
+        outline-offset: -1px;
+        border-radius: 3px;
+        background-color: var(--button-hover-bg-color);
+    }
+
     .bg-selected-file {
         background-color: var(--button-selected-bg-color);
         color: var(--button-selected-text-color);
+    }
+    .bg-selected-file:hover {
+        background-color: var(--button-selected-bg-color);
     }
     /* 드롭 대상: 흐려지는 대신 뚜렷한 테두리 + 배경 강조로 표시 */
     .drag-over-target {
@@ -300,19 +248,5 @@
     }
     .bg-selected-file.text-hidden {
         color: var(--reverse-third-color-selected);
-    }
-    .btn-danger {
-        background-color: var(--btn-danger-bg);
-        color: var(--btn-danger-text);
-    }
-    .btn-danger:hover {
-        background-color: var(--btn-danger-hover-bg);
-    }
-    .btn-cancel {
-        background-color: var(--btn-cancel-bg);
-        color: var(--btn-cancel-text);
-    }
-    .btn-cancel:hover {
-        background-color: var(--btn-cancel-hover-bg);
     }
 </style>

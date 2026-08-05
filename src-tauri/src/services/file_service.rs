@@ -568,11 +568,10 @@ pub fn move_content(src: &str, dst: &str) -> Result<()> {
             let hidden_base = hugo_config.hidden_abs("");
             let content_dir = hugo_config.content_abs(dst);
             let hidden_dir = hugo_config.hidden_abs(dst);
-            let mut md_files = find_md_files_recursive(&sftp, Path::new(&content_dir)).unwrap_or_default();
-            md_files.extend(find_md_files_recursive(&sftp, Path::new(&hidden_dir)).unwrap_or_default());
+            let mut md_files = find_md_files_recursive(&sftp, &content_dir).unwrap_or_default();
+            md_files.extend(find_md_files_recursive(&sftp, &hidden_dir).unwrap_or_default());
 
-            for abs_md in md_files {
-                let abs_str = abs_md.to_string_lossy();
+            for abs_str in md_files {
                 // hidden_base를 먼저 체크 (content_base보다 더 구체적인 prefix)
                 let rel = if abs_str.starts_with(&hidden_base) {
                     abs_str.strip_prefix(&hidden_base).unwrap_or(&abs_str)
@@ -663,18 +662,22 @@ fn find_image_dir(sftp: &Sftp, config: &HugoConfig, rel: &str) -> Option<(String
     None
 }
 
-/// SFTP로 폴더 내 모든 .md 파일의 절대경로를 재귀 수집
-fn find_md_files_recursive(sftp: &Sftp, dir: &Path) -> Result<Vec<PathBuf>> {
+/// SFTP로 폴더 내 모든 .md 파일의 절대경로를 재귀 수집.
+/// ssh2의 readdir가 반환하는 PathBuf는 Windows에서 '\'로 join되므로
+/// 파일명만 취해 항상 '/'로 다시 조립한다.
+fn find_md_files_recursive(sftp: &Sftp, dir: &str) -> Result<Vec<String>> {
     let mut result = Vec::new();
-    let entries = match sftp.readdir(dir) {
+    let entries = match sftp.readdir(Path::new(dir)) {
         Ok(e) => e,
         Err(_) => return Ok(result),
     };
     for (child_path, stat) in entries {
+        let Some(name) = child_path.file_name().and_then(|n| n.to_str()) else { continue };
+        let child = format!("{}/{}", dir.trim_end_matches('/'), name);
         if stat.is_dir() {
-            result.extend(find_md_files_recursive(sftp, &child_path)?);
-        } else if child_path.extension().and_then(|e| e.to_str()) == Some("md") {
-            result.push(child_path);
+            result.extend(find_md_files_recursive(sftp, &child)?);
+        } else if name.ends_with(".md") {
+            result.push(child);
         }
     }
     Ok(result)
@@ -756,13 +759,12 @@ fn sync_images_on_move(sftp: &Sftp, config: &HugoConfig, src: &str, dst: &str) -
     } else {
         let content_dir = config.content_abs(dst);
         let hidden_dir = config.hidden_abs(dst);
-        let mut files = find_md_files_recursive(sftp, Path::new(&content_dir))?;
-        files.extend(find_md_files_recursive(sftp, Path::new(&hidden_dir))?);
+        let mut files = find_md_files_recursive(sftp, &content_dir)?;
+        files.extend(find_md_files_recursive(sftp, &hidden_dir)?);
         files
     };
 
-    for abs_md in md_files {
-        let abs_str = abs_md.to_string_lossy();
+    for abs_str in md_files {
         // hidden_base를 먼저 체크 (content_base보다 더 구체적인 prefix)
         let rel = if abs_str.starts_with(&hidden_base) {
             abs_str.strip_prefix(&hidden_base).unwrap_or(&abs_str)
@@ -806,10 +808,12 @@ fn copy_file_checked(sftp: &Sftp, src: &Path, dst: &Path) -> Result<CopyResult> 
         let mut rng = rand::thread_rng();
         let hex: String = (0..16).map(|_| format!("{:x}", rng.gen::<u8>())).collect();
         let new_name = hex;
-        let new_dst = dst.parent().unwrap_or(Path::new("/")).join(&new_name);
-        if let Some(parent) = new_dst.parent() {
-            mkdir_recursive(sftp, parent)?;
-        }
+        // 원격 경로는 '/'로 조립 (Windows의 PathBuf::join은 '\'를 넣는다)
+        let dst_str = dst.to_string_lossy();
+        let parent_str = dst_str.rsplit_once('/').map(|(p, _)| p).unwrap_or("");
+        let new_dst_str = format!("{}/{}", parent_str, new_name);
+        let new_dst = PathBuf::from(&new_dst_str);
+        mkdir_recursive(sftp, Path::new(parent_str))?;
         let mut dst_file = sftp.create(&new_dst)?;
         dst_file.write_all(&src_data)?;
         return Ok(CopyResult::Renamed(new_name));
@@ -1155,12 +1159,15 @@ pub fn merge_tree(
 
 // 재귀적으로 폴더 생성
 pub fn mkdir_recursive(sftp: &Sftp, path: &Path) -> Result<()> {
-    let mut current_path = PathBuf::new();
-
-    for component in path.components() {
-        current_path.push(component);
-        if sftp.stat(&current_path).is_err() {
-            sftp.mkdir(&current_path, 0o755)?;
+    // 원격(Linux) 경로는 항상 '/'로 조립한다 — Windows에서 PathBuf로 합치면
+    // '\' 구분자가 들어가 원격에 백슬래시가 포함된 잘못된 이름이 생긴다
+    let path_str = path.to_string_lossy();
+    let mut current = String::new();
+    for comp in path_str.split('/').filter(|c| !c.is_empty()) {
+        current.push('/');
+        current.push_str(comp);
+        if sftp.stat(Path::new(&current)).is_err() {
+            sftp.mkdir(Path::new(&current), 0o755)?;
         }
     }
     Ok(())

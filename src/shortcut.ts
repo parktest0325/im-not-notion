@@ -18,9 +18,10 @@ interface BuiltinDef {
 // --- Built-in defaults ---
 
 export const BUILTIN_DEFAULTS: Record<string, BuiltinDef> = {
-  save:        { shortcuts: ["Ctrl+S", "Meta+S"],  description: "Save file" },
-  "exit-edit": { shortcuts: ["Escape"],        description: "Exit edit mode" },
-  rename:      { shortcuts: ["F2", "Enter"],   description: "Rename file" },
+  save:         { shortcuts: ["Ctrl+S", "Meta+S"],       description: "Save file" },
+  "exit-edit":  { shortcuts: ["Escape"],                 description: "Exit edit mode" },
+  rename:       { shortcuts: ["F2", "Enter"],            description: "Rename file" },
+  "reopen-tab": { shortcuts: ["CmdOrCtrl+Shift+T"],      description: "Reopen closed tab" },
 };
 
 // --- Reserved shortcuts (browser/system defaults — never intercepted) ---

@@ -4,7 +4,7 @@
   import HugoSetup from "./HugoSetup.svelte";
   import { createDefaultAppConfig, createDefaultSshConfig, createDefaultServerEntry, type AppConfig, type ServerEntry } from "../types/setting";
   import Popup from "../component/Popup.svelte";
-  import { url, contentPaths, hiddenPath, addToast, activeServerName } from "../stores";
+  import { url, contentPaths, hiddenPath, addToast, activeServerName, openTabs, relativeFilePath, selectedCursor, clearClosedTabs } from "../stores";
   import { onMount } from "svelte";
   import { buildShortcutMap, getEffectiveShortcuts, eventToShortcutString, isRecordingShortcut, pluginShortcutDefs } from "../shortcut";
   import type { PluginInfo } from "../types/setting";
@@ -82,7 +82,17 @@
     await connectServer(config.active_server);
   }
 
+  /** 다른 서버로 실제 전환됐을 때 작업 상태 초기화 (탭/열린 파일) */
+  function resetWorkspaceAfterSwitch(prevId: string, newId: string) {
+    if (prevId === newId) return; // 같은 서버 재연결이면 유지
+    openTabs.set([]);
+    clearClosedTabs();
+    relativeFilePath.set("");
+    selectedCursor.set("");
+  }
+
   async function connectServer(id: string) {
+    const prevId = config.active_server;
     isSwitching = true;
     try {
       const newConfig: AppConfig = await invoke("switch_server", {
@@ -104,6 +114,7 @@
       isConnected = true;
       refreshShortcutEntries();
       addToast("Server connected.", "success");
+      resetWorkspaceAfterSwitch(prevId, id);
       onServerSwitch();
     } catch (error) {
       console.error("Failed to connect server:", error);
@@ -158,6 +169,7 @@
         }
 
         // 이 서버로 전환 (SSH 재연결 + 서버 설정 로드)
+        const prevActiveForTab = config.active_server;
         const newConfig: AppConfig = await invoke("switch_server", {
           servers: config.servers,
           serverId: editingServer.id,
@@ -170,6 +182,7 @@
         hiddenPath.set(config.cms_config.hugo_config.hidden_path);
         activeServerName.set(editingServer.name || editingServer.ssh_config.host);
         refreshShortcutEntries();
+        resetWorkspaceAfterSwitch(prevActiveForTab, editingServer.id);
         onServerSwitch();
       } catch (error) {
         console.error("Failed to connect with new SSH settings:", error);
@@ -236,6 +249,7 @@
             serverId: config.active_server,
           });
           config = newConfig;
+          resetWorkspaceAfterSwitch("", config.active_server); // active 삭제 → 항상 초기화
           onServerSwitch();
         } else {
           await invoke("save_config", { config });

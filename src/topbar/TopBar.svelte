@@ -2,11 +2,12 @@
   export let isMenuOpen: boolean;
   export let toggleMenu: () => void;
   import { PanelLeftOpen, ExternalLink, ChevronRight } from "lucide-svelte";
-  import { relativeFilePath, url, hiddenPath, fullFilePath, addToast } from "../stores";
+  import { relativeFilePath, url, hiddenPath, fullFilePath, addToast, isEditingContent } from "../stores";
   import { type GlobalFunctions, GLOBAL_FUNCTIONS } from "../context";
   import { invoke } from "@tauri-apps/api/core";
   import { open } from "@tauri-apps/plugin-shell";
   import { getContext } from "svelte";
+  import TabBar from "./TabBar.svelte";
 
   let isHidden = false;
   let isLoading = false;
@@ -40,7 +41,7 @@
 
   async function toggleHidden() {
     if (!$relativeFilePath || isLoading) return;
-    
+
     isLoading = true;
     try {
       await invoke("toggle_hidden_file", { path: $relativeFilePath, state: isHidden });
@@ -54,70 +55,137 @@
       isLoading = false;
     }
   }
-  
+
   $: if ($relativeFilePath) {
     // 파일 선택 시 숨김 상태를 확인하고 전체 경로를 설정
     checkHidden();
-    
+
     // relativeFilePath가 갱신되면 전체 파일 경로 갱신
     // relativeFilePath에 섹션이 포함됨: e.g. "/posts/my-post/_index.md"
     const newPath = (isHidden ? `/${$hiddenPath}` : '') + $relativeFilePath;
     fullFilePath.set(newPath);
   }
-
-
 </script>
 
-<div class="p-4 flex justify-between items-center" style="background-color: var(--topbar-bg-color);">
-  <div class="flex items-center">
-    {#if !isMenuOpen}
-      <button on:click={toggleMenu} class="w-6 h-6 mr-4">
-        <PanelLeftOpen size="100%" />
-      </button>
-    {/if}
-    <!-- 현재 위치 브레드크럼 -->
-    {#if $fullFilePath}
-      {@const crumbs = $fullFilePath.split("/").filter(Boolean)}
-      <div class="breadcrumb">
-        {#each crumbs as crumb, i}
-          {#if i > 0}
-            <span class="crumb-sep"><ChevronRight size={12} /></span>
-          {/if}
-          <span class="crumb" class:last={i === crumbs.length - 1}>{crumb}</span>
-        {/each}
-      </div>
-    {/if}
-  </div>
-  <div class="flex items-center gap-2">
+<!-- 메인 행: [사이드바 토글] [탭들 ...] [Hide/Show] [브라우저 열기] -->
+<div class="topbar-row">
+  {#if !isMenuOpen}
+    <button class="icon-action" on:click={toggleMenu} title="Open sidebar">
+      <PanelLeftOpen size={15} />
+    </button>
+  {/if}
+  <div class="tabs-host"><TabBar /></div>
+  <div class="actions">
     {#if $relativeFilePath && !$relativeFilePath.endsWith('_index.md')}
       <button
         on:click={toggleHidden}
-        class="px-3 py-1 text-sm rounded border transition-colors duration-200"
+        class="vis-btn"
         class:btn-visible={!isHidden}
         class:btn-hidden={isHidden}
       >
         {isHidden ? "Show" : "Hide"}
       </button>
     {/if}
-    <button on:click={handleOpenPage} class="w-6 h-6 border flex items-center justify-center">
-      <ExternalLink size="100%" />
-    </button>
+    {#if $relativeFilePath}
+      <button class="icon-action" on:click={handleOpenPage} title="Open in browser">
+        <ExternalLink size={14} />
+      </button>
+    {/if}
   </div>
 </div>
 
+<!-- 브레드크럼: 파일이 열려 있을 때만 나오는 얇은 줄 -->
+{#if $fullFilePath}
+  {@const crumbs = $fullFilePath.split("/").filter(Boolean)}
+  <div class="crumbbar" class:editing={$isEditingContent}>
+    {#each crumbs as crumb, i}
+      {#if i > 0}
+        <span class="crumb-sep"><ChevronRight size={11} /></span>
+      {/if}
+      <span class="crumb" class:last={i === crumbs.length - 1}>{crumb}</span>
+    {/each}
+    {#if $isEditingContent}
+      <span class="edit-badge">EDIT</span>
+    {/if}
+  </div>
+{/if}
+
 <style>
-  .breadcrumb {
+  .topbar-row {
+    display: flex;
+    align-items: stretch;
+    height: 34px;
+    flex-shrink: 0;
+    background-color: var(--secondary-color);
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .tabs-host {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: stretch;
+  }
+
+  .actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 10px;
+    flex-shrink: 0;
+  }
+
+  .icon-action {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    align-self: center;
+    width: 26px;
+    height: 26px;
+    margin: 0 2px;
+    padding: 0;
+    border: none;
+    background: none;
+    box-shadow: none;
+    border-radius: 0.25rem;
+    color: var(--reverse-secondary-color);
+    opacity: 0.75;
+  }
+  .icon-action:hover {
+    opacity: 1;
+    background-color: var(--button-hover-bg-color);
+    border: none;
+  }
+
+  /* 크롬 요소는 각지게 (3px) — 콘텐츠 UI와 톤 일치 */
+  .vis-btn {
+    padding: 2px 10px;
+    font-size: 12px;
+    border-radius: 3px;
+    border: 1px solid transparent;
+    box-shadow: none;
+    transition: background-color 0.15s;
+  }
+
+  /* 브레드크럼 줄: 에디터 배경 위에 얇게 */
+  .crumbbar {
     display: flex;
     align-items: center;
     gap: 2px;
+    height: 26px;
+    padding: 0 14px;
+    flex-shrink: 0;
     font-family: var(--font-mono);
-    font-size: 12px;
+    font-size: 13px;
     color: var(--reverse-secondary-color);
+    background-color: var(--content-bg-color);
+    border-bottom: 1px solid var(--border-color); /* 콘텐츠 영역과의 경계 */
     overflow: hidden;
     white-space: nowrap;
+    user-select: none;
   }
   .crumb {
-    opacity: 0.75;
+    opacity: 0.7;
   }
   .crumb.last {
     opacity: 1;
@@ -128,6 +196,24 @@
     display: flex;
     align-items: center;
     opacity: 0.4;
+    flex-shrink: 0;
+  }
+
+  /* 에디트 모드 표시: 브레드크럼 하단 액센트 라인 + EDIT 배지 */
+  .crumbbar.editing {
+    box-shadow: inset 0 -2px 0 var(--accent-color);
+  }
+  .edit-badge {
+    margin-left: auto;
+    padding: 0 6px;
+    font-family: var(--font-ui);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    line-height: 1.6;
+    border-radius: 3px;
+    background-color: var(--accent-tint);
+    color: var(--accent-strong);
     flex-shrink: 0;
   }
 

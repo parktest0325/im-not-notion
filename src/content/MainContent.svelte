@@ -727,11 +727,11 @@
     { tag: tags.macroName, color: "var(--accent-color)" },
   ]);
 
-  // ```tree 전용 미니 하이라이터: 박스 문자(├ └ │ ─ …)는 액센트 teal,
-  // `xhci/` 처럼 /로 끝나는 디렉토리 이름은 타입 색으로 표시
+  // ```tree 전용 미니 하이라이터: 박스 문자(├ └ │ ─ …)와 ASCII 커넥터(+ - |)는
+  // 액센트 teal, `xhci/` 처럼 /로 끝나는 디렉토리 이름은 타입 색으로 표시
   const treeLanguage = StreamLanguage.define({
     token(stream) {
-      if (stream.match(/^[│├└┌┬┴┼─┐┤┘┃┣┗┏━]+/)) return "macroName";
+      if (stream.match(/^[│├└┌┬┴┼─┐┤┘┃┣┗┏━+|-]+/)) return "macroName";
       if (stream.match(/^\S+\//)) return "typeName";
       stream.next();
       return null;
