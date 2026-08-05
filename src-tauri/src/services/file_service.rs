@@ -180,9 +180,18 @@ fn fetch_files_and_weights(base_path: &str, paths: &[String]) -> (String, HashMa
     let find_paths = find_targets.join(" ");
     let content_dir = crate::utils::shell::quote(&format!("{}/content", base_path));
 
+    // weight/date는 front matter 블록(첫 줄의 --- 또는 +++ ~ 닫는 구분자) 안에서만
+    // 추출한다 — 단순 grep은 본문의 "date: ..." 같은 줄을 오인하고, 파일당
+    // 여러 번 매칭될 수 있다. nextfile로 파일당 front matter 1블록만 읽는다.
+    let fm_extract = |key: &str| {
+        format!(
+            "find {} -name '*.md' -exec awk 'FNR==1{{fm=0}} FNR==1&&/^(---|\\+\\+\\+)/{{fm=1;next}} fm&&/^(---|\\+\\+\\+)/{{fm=0;nextfile}} fm&&/^{}[[:space:]]*[:=]/{{print FILENAME\":\"FNR\":\"$0}}' {{}} + 2>/dev/null",
+            content_dir, key
+        )
+    };
     let cmd = format!(
-        "echo '---FILES---'; find {} -maxdepth {} -printf '%y %p\\n' 2>/dev/null; echo '---WEIGHTS---'; grep -rn -E '^weight\\s*[=:]\\s*' {} --include='*.md' 2>/dev/null; echo '---DATES---'; grep -rn -E '^date\\s*[=:]\\s*' {} --include='*.md' 2>/dev/null; true",
-        find_paths, FILE_TREE_MAX_DEPTH, content_dir, content_dir
+        "echo '---FILES---'; find {} -maxdepth {} -printf '%y %p\\n' 2>/dev/null; echo '---WEIGHTS---'; {}; echo '---DATES---'; {}; true",
+        find_paths, FILE_TREE_MAX_DEPTH, fm_extract("weight"), fm_extract("date")
     );
 
     let output = match execute_ssh_command(&mut channel, &cmd) {
