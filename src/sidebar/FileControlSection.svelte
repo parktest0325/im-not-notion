@@ -27,8 +27,9 @@
 <script lang="ts">
     import { Search, RefreshCw, FilePlus, FolderPlus, ChevronsUpDown, ChevronsDownUp } from "lucide-svelte";
     import { treeExpandSignal } from "../stores";
+    import { NodeType } from "../types/setting";
     import TreeNode from "./TreeNode.svelte";
-    import { onMount } from "svelte";
+    import { onMount, afterUpdate } from "svelte";
     import { selectedCursor, relativeFilePath, gotoLine } from "../stores";
     import { dropTargetPath, registerMoveHandler, HOVER_EXPAND_MS } from "./treeDrag";
     import { onDestroy } from "svelte";
@@ -176,7 +177,7 @@
         }
         isSearching = true;
         try {
-            const raw: SearchMatch[] = await invoke("search_content_cmd", { query });
+            const raw: SearchMatch[] = await invoke("search_content_cmd", { query, tags: searchTags, matchAll: tagMatchAll });
             searchResults = groupByFile(raw);
             hasSearched = true;
         } catch (e) {
@@ -192,6 +193,112 @@
         searchTerm = "";
         searchResults = [];
         hasSearched = false;
+    }
+
+    // ── 태그 필터 (검색 결과 화면이 아니라 섹션 트리 자체를 필터링) ──
+    let tagInput = "";
+    let searchTags: string[] = [];
+    let tagMatchAll = false; // 기본 OR
+    let showTagPopover = false;
+    let chipsEl: HTMLDivElement | null = null;
+    let hiddenTagCount = 0;
+    let tagFilterPaths: Set<string> | null = null;
+
+    async function refreshTagFilter() {
+        if (searchTags.length === 0) {
+            tagFilterPaths = null;
+            return;
+        }
+        try {
+            const raw: SearchMatch[] = await invoke("search_content_cmd", {
+                query: "",
+                tags: searchTags,
+                matchAll: tagMatchAll,
+            });
+            tagFilterPaths = new Set(raw.map((m) => m.file_path));
+        } catch (e) {
+            console.error("tag filter error:", e);
+            addToast("Tag filter failed.");
+        }
+    }
+
+    /** 태그 매칭 파일만 남기고 트리 필터링 (매칭 파일을 품은 조상 폴더는 유지) */
+    function filterTree(nodes: FileSystemNode[], parentPath: string, keep: Set<string>): FileSystemNode[] {
+        const out: FileSystemNode[] = [];
+        for (const node of nodes) {
+            const path = `${parentPath}/${node.name}`;
+            if (node.type_ === NodeType.Directory) {
+                const children = filterTree(node.children, path, keep);
+                if (children.length > 0 || keep.has(`${path}/_index.md`)) {
+                    out.push({ ...node, children });
+                }
+            } else if (keep.has(path)) {
+                out.push(node);
+            }
+        }
+        return out;
+    }
+
+    $: displayStructure = tagFilterPaths
+        ? $directoryStructure.map((s) => ({
+              ...s,
+              children: filterTree(s.children, `/${s.name}`, tagFilterPaths!),
+          }))
+        : $directoryStructure;
+
+    function onTagsChanged() {
+        refreshTagFilter();
+        // 텍스트 검색 결과가 떠 있으면 태그 제한을 반영해 갱신
+        if (searchTerm.trim() && hasSearched) doSearch();
+    }
+
+    function addTag() {
+        const t = tagInput.trim();
+        tagInput = "";
+        if (!t || searchTags.includes(t)) return;
+        searchTags = [...searchTags, t];
+        onTagsChanged();
+    }
+
+    function removeTag(tag: string) {
+        searchTags = searchTags.filter((x) => x !== tag);
+        if (searchTags.length === 0) showTagPopover = false;
+        onTagsChanged();
+    }
+
+    function clearTags() {
+        searchTags = [];
+        showTagPopover = false;
+        onTagsChanged();
+    }
+
+    /** 태그 문자열 해시 → hue (같은 태그는 항상 같은 색) */
+    function tagHue(tag: string): number {
+        let h = 0;
+        for (let i = 0; i < tag.length; i++) {
+            h = (h * 31 + tag.charCodeAt(i)) >>> 0;
+        }
+        return h % 360;
+    }
+
+    // 한 줄에 다 안 들어가는 칩 개수 측정 → [+n] 배지 표시용
+    afterUpdate(() => {
+        if (!chipsEl) {
+            if (hiddenTagCount !== 0) hiddenTagCount = 0;
+            return;
+        }
+        const limit = chipsEl.clientWidth; // padding-right가 배지 공간 확보
+        let fit = 0;
+        for (const el of Array.from(chipsEl.querySelectorAll<HTMLElement>(".tag-chip"))) {
+            if (el.offsetLeft + el.offsetWidth <= limit) fit++;
+        }
+        const hidden = searchTags.length - fit;
+        if (hidden !== hiddenTagCount) hiddenTagCount = hidden;
+    });
+
+    function onWindowClick(e: MouseEvent) {
+        const t = e.target as HTMLElement;
+        if (!t?.closest?.(".tag-popover, .tag-more")) showTagPopover = false;
     }
 
     function onSearchKeydown(e: KeyboardEvent) {
@@ -222,6 +329,8 @@
     }
 </script>
 
+<svelte:window on:click={onWindowClick} />
+
 <div class="flex flex-col h-full" style="font-family: var(--font-mono);">
     <!-- 검색 영역 -->
     <div class="flex space-x-2 h-6 mb-4" style="flex-wrap: nowrap;">
@@ -244,6 +353,51 @@
             </div>
         </button>
     </div>
+
+    <!-- 태그 필터: Enter로 추가, 칩 클릭으로 제거, [+n] 클릭 시 전체 목록 말풍선 -->
+    <div class="flex space-x-2 h-6 mb-2" style="flex-wrap: nowrap;">
+        <input
+            type="text"
+            placeholder="Tag filter..."
+            class="flex-grow p-2 border rounded"
+            bind:value={tagInput}
+            on:keydown={(e) => { if (e.key === "Enter") addTag(); }}
+            style="min-width: 0; width: auto; flex-grow: 1;"
+        />
+        <button
+            class="tag-mode-btn"
+            title={tagMatchAll ? "모든 태그 포함(AND) — 클릭 시 OR" : "하나라도 포함(OR) — 클릭 시 AND"}
+            on:click={() => { tagMatchAll = !tagMatchAll; if (searchTags.length > 0) onTagsChanged(); }}
+        >
+            {tagMatchAll ? "AND" : "OR"}
+        </button>
+        <button
+            class="tag-mode-btn tag-clear-btn"
+            title="Remove all tags"
+            disabled={searchTags.length === 0}
+            on:click={clearTags}
+        >×</button>
+    </div>
+    {#if searchTags.length > 0}
+        <div class="tag-chips-wrap">
+            <div class="tag-chips" bind:this={chipsEl}>
+                {#each searchTags as tag (tag)}
+                    <button class="tag-chip" style="--tag-h: {tagHue(tag)}" title="Remove tag" on:click={() => removeTag(tag)}>{tag} ×</button>
+                {/each}
+            </div>
+            {#if hiddenTagCount > 0}
+                <button class="tag-more" title="Show all tags" on:click={() => (showTagPopover = !showTagPopover)}>+{hiddenTagCount}</button>
+            {/if}
+            {#if showTagPopover}
+                <!-- 줄에서 가려진(+n) 태그들만 표시 -->
+                <div class="tag-popover" role="dialog">
+                    {#each searchTags.slice(searchTags.length - hiddenTagCount) as tag (tag)}
+                        <button class="tag-chip" style="--tag-h: {tagHue(tag)}" title="Remove tag" on:click={() => removeTag(tag)}>{tag} ×</button>
+                    {/each}
+                </div>
+            {/if}
+        </div>
+    {/if}
 
     {#if hasSearched}
         <!-- 검색 결과 헤더 (고정) -->
@@ -283,7 +437,7 @@
     {:else}
         <!-- 섹션 아코디언: 헤더는 항상 보이고, 열린 섹션만 나머지 공간 차지 -->
         <div class="section-accordion">
-            {#each $directoryStructure as section}
+            {#each displayStructure as section}
                 <button class="section-header"
                     data-drop-dir={`/${section.name}`}
                     class:active={activeSection === section.name}
@@ -418,6 +572,94 @@
         flex: 1;
         overflow-y: auto;
         min-height: 0;
+    }
+
+    /* ── 태그 필터 ── */
+    .tag-mode-btn {
+        flex-shrink: 0;
+        height: 100%;
+        font-size: 10px;
+        font-weight: 700;
+        padding: 0 0.5rem;
+        border-radius: 0.3rem;
+        box-shadow: none;
+    }
+    .tag-mode-btn:disabled {
+        opacity: 0.3;
+        cursor: default;
+    }
+    /* 전체 제거: 파괴적 동작이므로 붉은 톤 (채도 낮게, 호버 시 진하게) */
+    .tag-clear-btn:not(:disabled) {
+        color: var(--error-color);
+        opacity: 0.65;
+    }
+    .tag-clear-btn:not(:disabled):hover {
+        opacity: 1;
+        border-color: var(--error-color);
+    }
+    .tag-chips-wrap {
+        position: relative;
+        margin-bottom: 0.5rem;
+    }
+    .tag-chips {
+        display: flex;
+        gap: 4px;
+        flex-wrap: nowrap;
+        overflow: hidden;
+        padding-right: 36px; /* [+n] 배지 자리 */
+        min-height: 20px;
+    }
+    /* 태그별 색: 문자열 해시로 만든 --tag-h(hue) 기반 — 같은 태그는 항상 같은 색 */
+    .tag-chip {
+        font-size: 11px;
+        line-height: 1.5;
+        padding: 0 8px;
+        border-radius: 999px;
+        background-color: hsla(var(--tag-h), 65%, 50%, 0.16);
+        color: hsl(var(--tag-h), 60%, 32%);
+        border: 1px solid hsla(var(--tag-h), 60%, 45%, 0.35);
+        box-shadow: none;
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+    .tag-chip:hover {
+        border-color: hsl(var(--tag-h), 60%, 45%);
+        background-color: hsla(var(--tag-h), 65%, 50%, 0.24);
+    }
+    :global(.dark) .tag-chip {
+        color: hsl(var(--tag-h), 65%, 74%);
+        border-color: hsla(var(--tag-h), 60%, 60%, 0.35);
+    }
+    :global(.dark) .tag-chip:hover {
+        border-color: hsl(var(--tag-h), 60%, 60%);
+    }
+    .tag-more {
+        position: absolute;
+        right: 0;
+        top: 0;
+        font-size: 11px;
+        line-height: 1.5;
+        padding: 0 7px;
+        border-radius: 999px;
+        background-color: var(--tertiary-color);
+        border: 1px solid var(--border-color);
+        box-shadow: none;
+    }
+    /* [+n] 클릭 시 전체 태그 말풍선 */
+    .tag-popover {
+        position: absolute;
+        top: calc(100% + 4px);
+        right: 0;
+        z-index: 40;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        max-width: 100%;
+        padding: 0.5rem;
+        background-color: var(--popup-bg-color);
+        border: 1px solid var(--border-color);
+        border-radius: 0.5rem;
+        box-shadow: var(--shadow-popup);
     }
 
     /* 드롭 대상 섹션: 흐려지는 대신 뚜렷한 테두리 + 배경 강조로 표시 */

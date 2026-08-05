@@ -198,20 +198,54 @@ pub struct SearchMatch {
 use crate::utils::shell::quote as shell_escape;
 
 /// Search Hugo content (both public + hidden) via SSH grep.
-pub fn search_content(query: &str) -> Result<Vec<SearchMatch>> {
-    if query.trim().is_empty() {
+///
+/// tags가 있으면 front matter의 tags 줄 기준으로 파일을 한정한다.
+/// match_all=true면 모든 태그 보유(AND), false면 하나라도 보유(OR).
+/// query가 함께 있으면 그 파일들 안에서만 본문 전문 검색을 수행한다.
+pub fn search_content(query: &str, tags: &[String], match_all: bool) -> Result<Vec<SearchMatch>> {
+    let query = query.trim();
+    let tags: Vec<&str> = tags.iter().map(|t| t.trim()).filter(|t| !t.is_empty()).collect();
+    if query.is_empty() && tags.is_empty() {
         return Ok(Vec::new());
     }
 
     let hugo = get_hugo_config()?;
     let mut channel = get_channel_session()?;
 
-    let escaped = shell_escape(query);
     let content_dir = shell_escape(&format!("{}/content", hugo.base_path));
-    let cmd = format!(
-        "grep -rn --include='*.md' -F -- {} {} 2>/dev/null || true",
-        escaped, content_dir
-    );
+    let cmd = if tags.is_empty() {
+        format!(
+            "grep -rn --include='*.md' -F -- {} {} 2>/dev/null || true",
+            shell_escape(query),
+            content_dir
+        )
+    } else {
+        // front matter 블록의 tags 줄만 추출 후, 태그별 grep 체인으로 AND 필터
+        let mut tag_filter = format!(
+            "find {} -name '*.md' -exec awk 'FNR==1{{fm=0}} FNR==1&&/^(---|\\+\\+\\+)/{{fm=1;next}} fm&&/^(---|\\+\\+\\+)/{{fm=0;nextfile}} fm&&/^tags[[:space:]]*[:=]/{{print FILENAME\":\"FNR\":\"$0}}' {{}} + 2>/dev/null",
+            content_dir
+        );
+        // 매칭은 "경로:줄번호:tags키"를 제거한 태그 내용에만 수행한다 —
+        // 라인 전체에 grep을 걸면 경로에 태그 문자열이 포함된 파일이 오탐된다.
+        let joined = tags.join("\n");
+        let mode = if match_all { "and" } else { "or" };
+        tag_filter.push_str(&format!(
+            " | awk -v ts={} -v mode={} 'BEGIN{{n=split(ts,T,\"\\n\")}} {{ line=$0; sub(/^[^:]*:[0-9]*:/,\"\",line); sub(/^[[:space:]]*tags[[:space:]]*[:=]/,\"\",line); l=tolower(line); if(mode==\"and\"){{ok=1; for(i=1;i<=n;i++) if(!index(l,tolower(T[i]))){{ok=0;break}}}} else {{ok=0; for(i=1;i<=n;i++) if(index(l,tolower(T[i]))){{ok=1;break}}}} if(ok) print }}'",
+            shell_escape(&joined),
+            mode
+        ));
+        if query.is_empty() {
+            // 태그만: tags 줄 자체를 결과로 반환
+            format!("{} || true", tag_filter)
+        } else {
+            // 태그로 파일을 좁힌 뒤 그 안에서 본문 검색
+            format!(
+                "{} | cut -d: -f1 | sort -u | xargs -r -d '\\n' grep -Hn -F -- {} 2>/dev/null || true",
+                tag_filter,
+                shell_escape(query)
+            )
+        }
+    };
 
     let output = execute_ssh_command(&mut channel, &cmd)?;
     let prefix = format!("{}/content", hugo.base_path);

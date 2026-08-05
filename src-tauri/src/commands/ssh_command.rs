@@ -64,6 +64,6 @@ pub fn execute_ssh(cmd: &str) -> Result<String, InvokeError> {
 }
 
 #[tauri::command]
-pub fn search_content_cmd(query: String) -> Result<Vec<SearchMatch>, InvokeError> {
-    ssh_service::search_content(&query).into_invoke_err()
+pub fn search_content_cmd(query: String, tags: Vec<String>, match_all: bool) -> Result<Vec<SearchMatch>, InvokeError> {
+    ssh_service::search_content(&query, &tags, match_all).into_invoke_err()
 }
