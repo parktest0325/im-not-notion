@@ -25,7 +25,8 @@
 </script>
 
 <script lang="ts">
-    import { Search, RefreshCw, FilePlus, FolderPlus } from "lucide-svelte";
+    import { Search, RefreshCw, FilePlus, FolderPlus, ChevronsUpDown, ChevronsDownUp } from "lucide-svelte";
+    import { treeExpandSignal } from "../stores";
     import TreeNode from "./TreeNode.svelte";
     import { onMount } from "svelte";
     import { selectedCursor, relativeFilePath, gotoLine } from "../stores";
@@ -62,6 +63,17 @@
             activeSection = $directoryStructure[0].name;
             initialized = true;
         }
+    }
+
+    // 섹션 내 모든 폴더 펼치기/접기
+    let expandSeq = 0;
+    function setSectionExpanded(event: MouseEvent, sectionName: string, expand: boolean) {
+        event.stopPropagation();
+        if (expand) activeSection = sectionName; // 닫힌 섹션이면 먼저 열기
+        treeExpandSignal.set({ prefix: `/${sectionName}`, expand, seq: ++expandSeq });
+        // 연쇄 펼침은 같은 flush 안에서 끝나므로, 이후 마운트되는 노드에
+        // 신호가 잔존 적용되지 않도록 바로 비운다
+        setTimeout(() => treeExpandSignal.set(null), 0);
     }
 
     function toggleSection(name: string) {
@@ -294,6 +306,20 @@
                             title="New folder"
                         >
                             <div class="w-3 h-3"><FolderPlus size="100%" /></div>
+                        </button>
+                        <button
+                            class="section-action-btn"
+                            on:click|stopPropagation={(e) => setSectionExpanded(e, section.name, true)}
+                            title="Expand all"
+                        >
+                            <div class="w-3 h-3"><ChevronsUpDown size="100%" /></div>
+                        </button>
+                        <button
+                            class="section-action-btn"
+                            on:click|stopPropagation={(e) => setSectionExpanded(e, section.name, false)}
+                            title="Collapse all"
+                        >
+                            <div class="w-3 h-3"><ChevronsDownUp size="100%" /></div>
                         </button>
                     </span>
                 </button>

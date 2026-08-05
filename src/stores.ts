@@ -22,6 +22,9 @@ export const renamingPath = writable<string>("");
 export const gotoLine = writable<number>(0);
 // 마지막 저장 시각 (상태바 표시용)
 export const lastSavedAt = writable<Date | null>(null);
+// 섹션 전체 펼치기/접기 신호: prefix(예: "/blog") 하위의 모든 폴더에 적용.
+// 디스패치 직후 null로 초기화된다 (이후 마운트되는 노드에 잔존 적용 방지).
+export const treeExpandSignal = writable<{ prefix: string; expand: boolean; seq: number } | null>(null);
 // Set to trigger a plugin via shortcut: { pluginName, triggerLabel, inputFields }
 export const triggerPluginShortcut = writable<{
   pluginName: string;

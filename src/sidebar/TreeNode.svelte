@@ -2,7 +2,7 @@
     import { FilePlus, FolderPlus, Trash2 } from "lucide-svelte";
     import { writable } from "svelte/store";
     import TreeNode from "./TreeNode.svelte";
-    import { relativeFilePath, selectedCursor, draggingInfo, isEditingFileName, renamingPath, addToast } from "../stores";
+    import { relativeFilePath, selectedCursor, draggingInfo, isEditingFileName, renamingPath, addToast, treeExpandSignal } from "../stores";
     import { dropTargetPath, onNodePointerDown, HOVER_EXPAND_MS } from "./treeDrag";
     import { onDestroy } from "svelte";
     import { type GlobalFunctions, GLOBAL_FUNCTIONS } from "../context";
@@ -146,6 +146,13 @@
     }
 
     $: isDragging = $draggingInfo?.path === filePath;
+
+    // 섹션 전체 펼치기/접기 신호 적용 (펼치기 중 새로 마운트되는 하위 노드도
+    // 같은 flush 안에서 신호를 읽어 연쇄적으로 펼쳐진다)
+    $: if ($treeExpandSignal && node.type_ === NodeType.Directory
+        && (filePath + "/").startsWith($treeExpandSignal.prefix + "/")) {
+        isExpanded.set($treeExpandSignal.expand);
+    }
 
     // 드래그 중 닫힌 폴더 위에 잠시 머물면 자동으로 펼침
     let hoverExpandTimer: ReturnType<typeof setTimeout> | null = null;
