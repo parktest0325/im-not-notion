@@ -17,15 +17,22 @@
   let values: Record<string, string | boolean> = {};
   let isExecuting = false;
 
-  $: if (show && inputFields.length > 0) {
-    values = {};
-    for (const field of inputFields) {
-      if (field.type === "boolean") {
-        values[field.name] = field.default === "true";
-      } else {
-        values[field.name] = field.default ?? "";
+  // 기본값 초기화는 팝업이 "열릴 때 한 번"만. 조건 없이 반응형으로 돌리면
+  // values 변경(=타이핑) 때마다 블록이 다시 돌아 입력값이 지워진다.
+  let initKey = "";
+  $: if (show) {
+    const key = `${plugin?.name ?? ""}|${inputFields.map((f) => f.name).join(",")}`;
+    if (key !== initKey) {
+      initKey = key;
+      const next: Record<string, string | boolean> = {};
+      for (const field of inputFields) {
+        next[field.name] =
+          field.type === "boolean" ? field.default === "true" : (field.default ?? "");
       }
+      values = next;
     }
+  } else if (initKey) {
+    initKey = ""; // 닫히면 다음에 열 때 다시 초기화
   }
 
   async function executePlugin() {
@@ -81,8 +88,7 @@
                   <input
                     id={field.name}
                     type="checkbox"
-                    checked={values[field.name]}
-                    on:change={(e) => { values[field.name] = e.currentTarget.checked; values = values; }}
+                    bind:checked={values[field.name]}
                   />
                   {field.label}
                 </label>
@@ -94,7 +100,7 @@
                   class="w-full p-2 rounded border"
                   style="background-color: var(--input-bg-color); border-color: var(--border-color);"
                   value={values[field.name]}
-                  on:input={(e) => { values[field.name] = e.currentTarget.value; values = values; }}
+                  on:input={(e) => { values[field.name] = e.currentTarget.value; }}
                   placeholder={field.default ?? ""}
                 />
               {/if}
