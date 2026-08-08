@@ -581,8 +581,12 @@
                 {#if activeSection === section.name}
                     <!-- 빈 배경 우클릭도 섹션 메뉴 (트리 항목의 우클릭은 전파가 막혀
                          여기 도달하지 않으므로, 도달한 것 = 빈 영역) -->
+                    <!-- data-drop-dir: 빈 영역으로 드래그해도 섹션 루트에 드롭
+                         (트리 항목은 자기 data-drop-dir이 우선 적용됨) -->
                     <div
                         class="section-content"
+                        data-drop-dir={`/${section.name}`}
+                        class:drag-over-root={$dropTargetPath === `/${section.name}`}
                         role="group"
                         on:contextmenu={(e) => onSectionContextMenu(e, section.name)}
                     >
@@ -816,6 +820,13 @@ ${pendingDeletePath}`}
         border: 1px solid var(--border-color);
         border-radius: 0.5rem;
         box-shadow: var(--shadow-popup);
+    }
+
+    /* 섹션 루트로 드롭: 목록 영역 전체를 테두리로 표시 (배경은 생략 — 영역이 넓어 과함) */
+    .drag-over-root {
+        outline: 2px dashed var(--accent-color);
+        outline-offset: -2px;
+        border-radius: 4px;
     }
 
     /* 드롭 대상 섹션: 흐려지는 대신 뚜렷한 테두리 + 배경 강조로 표시 */
